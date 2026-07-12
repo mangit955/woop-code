@@ -1,0 +1,16 @@
+{
+  "defaultProvider": "google",
+  "providers": {
+    "google": {
+      "type": "api"
+    },
+    "openai": {
+      "type": "api",
+      "apiKey": ""
+    },
+    "anthropic": {
+      "type": "api",
+      "apiKey": ""
+    }
+  }
+}

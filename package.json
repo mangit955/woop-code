@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "@types/commander": "^2.12.5",
+    "chalk": "^5.6.2"
+  },
+  "name": "woopcode",
+  "bin": {
+    "woopcode": "./cli.ts"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

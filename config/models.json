@@ -1,0 +1,50 @@
+[
+  {
+    "id": "gpt-5.5",
+    "provider": "openai",
+    "name": "GPT-5.5",
+    "contextWindow": "400000"
+  },
+
+  {
+    "id": "claud-sonnet-4",
+    "provider": "anthropic",
+    "name": "Claude Sonnet 4",
+    "contextWindow": "200000"
+  },
+
+  {
+    "id": "gpt-5.5",
+    "provider": "openai",
+    "name": "GPT-5.5",
+    "contextWindow": "400000"
+  },
+
+  {
+    "id": "gemini-2.5-flash",
+    "provider": "google",
+    "name": "Gemini 2.5 Flash",
+    "contextWindow": 1000000
+  },
+
+  {
+    "id": "gemini-2.5-flash-lite",
+    "provider": "google",
+    "name": "Gemini 2.5 Flash Lite",
+    "contextWindow": 1000000
+  },
+
+  {
+    "id": "gemini-2.0-flash",
+    "provider": "google",
+    "name": "Gemini 2.0 Flash",
+    "contextWindow": 1000000
+  },
+
+  {
+    "id": "gemini-2.0-flash-lite",
+    "provider": "google",
+    "name": "Gemini 2.0 Flash Lite",
+    "contextWindow": 1000000
+  }
+]

@@ -2,7 +2,8 @@
   "defaultProvider": "google",
   "providers": {
     "google": {
-      "type": "api"
+      "type": "api",
+      "apiKey": ""
     },
     "openai": {
       "type": "api",

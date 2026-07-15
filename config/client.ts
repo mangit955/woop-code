@@ -1,4 +1,5 @@
 import { toolRegistery } from "../tools";
+import { SYSTEM_PROMPT } from "./systemPrompt";
 import type { Message, ProviderClient, ModelResponse } from "./types";
 
 export function geminiClient(apiKey: string): ProviderClient {
@@ -40,6 +41,13 @@ export function geminiClient(apiKey: string): ProviderClient {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: SYSTEM_PROMPT,
+                },
+              ],
+            },
             contents,
             tools,
           }),

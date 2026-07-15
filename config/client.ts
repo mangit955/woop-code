@@ -1,12 +1,37 @@
-import type { Message, ProviderClient } from "./types";
+import { toolRegistery } from "../tools";
+import type { Message, ProviderClient, ModelResponse } from "./types";
 
 export function geminiClient(apiKey: string): ProviderClient {
   return {
-    async generate(messages: Message[]) {
+    async generate(messages: Message[]): Promise<ModelResponse> {
       const contents = messages.map((message) => ({
         role: message.role === "assistant" ? "model" : "user",
         parts: [{ text: message.content }],
       }));
+      const tools = [
+        {
+          functionDeclarations: toolRegistery.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            parameters: {
+              type: "OBJECT",
+              properties: Object.fromEntries(
+                tool.parameters.map((param) => [
+                  param.name,
+                  {
+                    type: "STRING",
+                    description: param.description,
+                  },
+                ]),
+              ),
+              required: tool.parameters
+                .filter((param) => param.required)
+                .map((param) => param.name),
+            },
+          })),
+        },
+      ];
+      //console.log(JSON.stringify({ contents, tools }, null, 2));
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
@@ -16,6 +41,7 @@ export function geminiClient(apiKey: string): ProviderClient {
           },
           body: JSON.stringify({
             contents,
+            tools,
           }),
         },
       );
@@ -29,25 +55,43 @@ export function geminiClient(apiKey: string): ProviderClient {
           content?: {
             parts?: Array<{
               text?: string;
+              functionCall?: {
+                name: string;
+                args?: Record<string, unknown>;
+              };
             }>;
           };
         }>;
       };
+      //console.log(JSON.stringify(data, null, 2));
 
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      const part = data.candidates?.[0]?.content?.parts?.[0];
+
+      if (part?.functionCall) {
+        return {
+          type: "tool_call",
+          name: part.functionCall.name,
+          arguments: part.functionCall.args ?? {},
+        } satisfies ModelResponse;
+      }
+
+      return {
+        type: "message",
+        content: part?.text ?? "",
+      } satisfies ModelResponse;
     },
   };
 }
 export function openAIClient(apiKey: string): ProviderClient {
   return {
-    async generate(prompt: string) {
+    async generate(messages: Message[]): Promise<ModelResponse> {
       throw new Error("OpenAI client not implemented yet.");
     },
   };
 }
 export function anthropicClient(apiKey: string): ProviderClient {
   return {
-    async generate(prompt: string) {
+    async generate(messages: Message[]): Promise<ModelResponse> {
       throw new Error("Anthropic client not implemented yet.");
     },
   };

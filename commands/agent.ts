@@ -7,6 +7,7 @@ import {
 } from "../config/config";
 import { createProviderClient } from "../config/client";
 import type { Message } from "../config/types";
+import { agentLoop } from "../config/runtime";
 
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
@@ -41,7 +42,7 @@ export const agentCommand = new Command("agent")
 
     const client = createProviderClient(provider, apiKey);
 
-    const response = await client.generate(requestMessages);
+    const response = await agentLoop(client, requestMessages);
 
     messages.push({
       role: "assistant",

@@ -8,6 +8,7 @@ export type ModelResponse =
       id: string;
       name: string;
       arguments: Record<string, unknown>;
+      thoughtSignature?: string;
     };
 
 export interface ProviderClient {
@@ -28,6 +29,7 @@ export type Message =
       toolName: string;
       toolCallId: string;
       arguments: Record<string, unknown>;
+      thoughtSignature?: string;
     }
   | {
       role: "tool";

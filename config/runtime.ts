@@ -42,6 +42,7 @@ export async function agentLoop(
       toolName: response.name,
       toolCallId: response.id,
       arguments: response.arguments,
+      thoughtSignature: response.thoughtSignature,
     });
 
     const result = await tool.execute(response.arguments);

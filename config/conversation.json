@@ -1,10 +1,1 @@
-[
-  {
-    "role": "user",
-    "content": "Add a console.log('hello') at the top of config/runtime.ts."
-  },
-  {
-    "role": "assistant",
-    "content": "I have added `console.log('hello');` at the top of `config/runtime.ts`."
-  }
-]
+[]

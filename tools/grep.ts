@@ -16,11 +16,27 @@ export const grepTool: Tool = {
     if (!pattern || typeof pattern !== "string") {
       throw new Error("Parameter 'pattern' is required and must be a string.");
     }
+
     const path =
       args.path && typeof args.path === "string" ? args.path : process.cwd();
 
     const proc = Bun.spawn({
-      cmd: ["grep", "-RIn", pattern, path],
+      cmd: [
+        "grep",
+        "-RIn",
+        "--exclude-dir=node_modules",
+        "--exclude-dir=.git",
+        "--exclude-dir=dist",
+        "--exclude-dir=build",
+        "--exclude-dir=.next",
+        "--exclude-dir=coverage",
+        "--exclude=bun.lock",
+        "--exclude=package-lock.json",
+        "--exclude=pnpm-lock.yaml",
+        "--exclude=yarn.lock",
+        pattern,
+        path,
+      ],
       stdout: "pipe",
       stderr: "pipe",
     });

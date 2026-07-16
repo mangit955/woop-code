@@ -30,14 +30,31 @@ export const findFilesTool: Tool = {
     for await (const entry of glob.scan(rootPath)) {
       const parts = entry.split("/");
       if (
-        parts.includes(".git") ||
-        parts.includes("node_modules") ||
-        parts.includes("dist")
+        parts.some((part) =>
+          [
+            ".git",
+            "node_modules",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+          ].includes(part),
+        )
       ) {
         continue;
       }
       const basename = parts.at(-1);
       if (!basename) {
+        continue;
+      }
+      if (
+        [
+          "bun.lock",
+          "package-lock.json",
+          "pnpm-lock.yaml",
+          "yarn.lock",
+        ].includes(basename)
+      ) {
         continue;
       }
       if (

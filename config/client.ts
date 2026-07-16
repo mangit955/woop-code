@@ -32,6 +32,7 @@ export function geminiClient(apiKey: string): ProviderClient {
                     name: message.toolName,
                     args: message.arguments,
                   },
+                  thoughtSignature: message.thoughtSignature,
                 },
               ],
             };
@@ -85,7 +86,7 @@ export function geminiClient(apiKey: string): ProviderClient {
 
       console.log(JSON.stringify(body, null, 2));
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: {
@@ -114,6 +115,7 @@ export function geminiClient(apiKey: string): ProviderClient {
           content?: {
             parts?: Array<{
               text?: string;
+              thoughtSignature?: string;
               functionCall?: {
                 id: string;
                 name: string;
@@ -126,6 +128,7 @@ export function geminiClient(apiKey: string): ProviderClient {
       console.log(JSON.stringify(data, null, 2));
 
       const part = data.candidates?.[0]?.content?.parts?.[0];
+      const thoughtSignature = part?.thoughtSignature;
 
       if (part?.functionCall) {
         return {
@@ -133,6 +136,7 @@ export function geminiClient(apiKey: string): ProviderClient {
           id: part.functionCall.id ?? `gemini-${Date.now()}`,
           name: part.functionCall.name,
           arguments: part.functionCall.args ?? {},
+          thoughtSignature,
         } satisfies ModelResponse;
       }
 

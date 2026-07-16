@@ -17,10 +17,17 @@ export const listFilesTool: Tool = {
     const files: string[] = [];
 
     for await (const file of new Bun.Glob("**/*").scan(path)) {
+      const ignoredDirs = [
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        "coverage",
+      ];
+
       if (
-        file.startsWith("node_modeules") ||
-        file.startsWith("dist") ||
-        file.startsWith("git")
+        ignoredDirs.some((dir) => file === dir || file.startsWith(`${dir}/`))
       ) {
         continue;
       }

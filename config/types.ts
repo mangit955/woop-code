@@ -5,6 +5,7 @@ export type ModelResponse =
     }
   | {
       type: "tool_call";
+      id: string;
       name: string;
       arguments: Record<string, unknown>;
     };
@@ -13,10 +14,21 @@ export interface ProviderClient {
   generate(message: Message[]): Promise<ModelResponse>;
 }
 
-export type Message = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-};
+export type Message =
+  | {
+      role: "user";
+      content: string;
+    }
+  | {
+      role: "assistant";
+      content: string;
+    }
+  | {
+      role: "tool";
+      toolName: string;
+      toolCallId: string;
+      content: string;
+    };
 
 export interface ToolParameter {
   name: string;
@@ -25,6 +37,7 @@ export interface ToolParameter {
 }
 
 export interface ToolCall {
+  id: string;
   name: string;
   arguments: Record<string, unknown>;
 }

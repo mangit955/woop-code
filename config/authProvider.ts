@@ -4,6 +4,8 @@ export async function loginProvider(provider: string, apiKey: string) {
   switch (provider) {
     case "google":
       return verifyGemini(apiKey);
+    case "groq":
+      return verifyGroq(apiKey);
     case "openai":
       return verifyOpenai(apiKey);
     case "anthropic":
@@ -18,6 +20,16 @@ async function verifyGemini(apiKey: string) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
   );
+  return res.ok;
+}
+
+async function verifyGroq(apiKey: string) {
+  const key = apiKey.trim();
+  const res = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: {
+      Authorization: `Bearer ${key}`,
+    },
+  });
   return res.ok;
 }
 

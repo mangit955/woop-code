@@ -1,7 +1,11 @@
 {
-  "defaultProvider": "google",
+  "defaultProvider": "groq",
   "providers": {
     "google": {
+      "type": "api",
+      "apiKey": ""
+    },
+    "groq": {
       "type": "api",
       "apiKey": ""
     },

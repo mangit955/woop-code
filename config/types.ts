@@ -11,7 +11,7 @@ export type ModelResponse =
     };
 
 export interface ProviderClient {
-  generate(message: Message[]): Promise<ModelResponse>;
+  generate(message: Message[], repoContext: string): Promise<ModelResponse>;
 }
 
 export type Message =
@@ -22,6 +22,12 @@ export type Message =
   | {
       role: "assistant";
       content: string;
+    }
+  | {
+      role: "assistant_tool_call";
+      toolName: string;
+      toolCallId: string;
+      arguments: Record<string, unknown>;
     }
   | {
       role: "tool";

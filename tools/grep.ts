@@ -37,6 +37,16 @@ export const grepTool: Tool = {
     if (exitCode > 1) {
       throw new Error(stderr);
     }
-    return stdout;
+    const MAX_OUTPUT_SIZE = 8 * 1024;
+
+    if (stdout.length <= MAX_OUTPUT_SIZE) {
+      return stdout;
+    }
+
+    return (
+      stdout.slice(0, MAX_OUTPUT_SIZE) +
+      `\n\n... Output truncated (${stdout.length - MAX_OUTPUT_SIZE} more bytes). ` +
+      `Refine your search or use read_file on a specific file.`
+    );
   },
 };

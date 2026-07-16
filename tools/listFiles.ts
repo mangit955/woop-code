@@ -27,7 +27,16 @@ export const listFilesTool: Tool = {
 
       files.push(file);
     }
+    const MAX_TOOL_OUTPUT = 8 * 1024; // 8 KB
+    const output = files.join("\n");
 
-    return files.join("\n");
+    if (output.length <= MAX_TOOL_OUTPUT) {
+      return output;
+    }
+
+    return (
+      output.slice(0, MAX_TOOL_OUTPUT) +
+      `\n\n... Output truncated (${output.length - MAX_TOOL_OUTPUT} more characters)`
+    );
   },
 };

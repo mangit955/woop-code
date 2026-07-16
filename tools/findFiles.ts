@@ -51,6 +51,17 @@ export const findFilesTool: Tool = {
     if (matches.length === 0) {
       return "No matching files found.";
     }
-    return matches.join("\n");
+
+    const output = matches.join("\n");
+    const MAX_OUTPUT_SIZE = 8 * 1024; // 8 KB
+
+    if (output.length <= MAX_OUTPUT_SIZE) {
+      return output;
+    }
+
+    return (
+      output.slice(0, MAX_OUTPUT_SIZE) +
+      `\n\n... output truncated (${matches.length} matches found)`
+    );
   },
 };

@@ -25,29 +25,30 @@ export const agentCommand = new Command("agent")
     }
 
     const messages: Message[] = await getConversation();
+    const conversation: Message[] = [...messages];
     const repoContext = await buildRepositoryContext();
 
-    messages.push({
+    conversation.push({
       role: "user",
       content: options.prompt,
     });
 
-    const requestMessages: Message[] = [
-      {
-        role: "system",
-        content: repoContext,
-      },
-      ...messages,
-    ];
+    const requestMessages: Message[] = conversation;
 
     const client = createProviderClient(provider, apiKey);
 
-    const response = await agentLoop(client, requestMessages);
+    const response = await agentLoop(client, requestMessages, repoContext);
 
-    messages.push({
-      role: "assistant",
-      content: response,
-    });
+    messages.push(
+      {
+        role: "user",
+        content: options.prompt,
+      },
+      {
+        role: "assistant",
+        content: response,
+      },
+    );
 
     await saveConversation(messages);
 

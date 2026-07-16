@@ -1,5 +1,5 @@
 {
-  "defaultProvider": "groq",
+  "defaultProvider": "google",
   "providers": {
     "google": {
       "type": "api",

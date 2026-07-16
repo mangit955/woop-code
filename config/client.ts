@@ -4,11 +4,54 @@ import type { Message, ProviderClient, ModelResponse } from "./types";
 
 export function geminiClient(apiKey: string): ProviderClient {
   return {
-    async generate(messages: Message[]): Promise<ModelResponse> {
-      const contents = messages.map((message) => ({
-        role: message.role === "assistant" ? "model" : "user",
-        parts: [{ text: message.content }],
-      }));
+    async generate(
+      messages: Message[],
+      repoContext: string,
+    ): Promise<ModelResponse> {
+      const contents = messages.map((message) => {
+        switch (message.role) {
+          case "user":
+            return {
+              role: "user",
+              parts: [{ text: message.content }],
+            };
+
+          case "assistant":
+            return {
+              role: "model",
+              parts: [{ text: message.content }],
+            };
+
+          case "assistant_tool_call":
+            return {
+              role: "model",
+              parts: [
+                {
+                  functionCall: {
+                    id: message.toolCallId,
+                    name: message.toolName,
+                    args: message.arguments,
+                  },
+                },
+              ],
+            };
+
+          case "tool":
+            return {
+              role: "user",
+              parts: [
+                {
+                  functionResponse: {
+                    name: message.toolName,
+                    response: {
+                      result: message.content,
+                    },
+                  },
+                },
+              ],
+            };
+        }
+      });
       const tools = [
         {
           functionDeclarations: toolRegistery.map((tool) => ({
@@ -32,7 +75,15 @@ export function geminiClient(apiKey: string): ProviderClient {
           })),
         },
       ];
-      // console.log(JSON.stringify({ contents, tools }, null, 2));
+      console.log(JSON.stringify({ contents, tools }, null, 2));
+      const body = {
+        contents,
+        tools,
+      };
+
+      console.log("Request size:", JSON.stringify(body).length, "bytes");
+
+      console.log(JSON.stringify(body, null, 2));
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
@@ -44,7 +95,7 @@ export function geminiClient(apiKey: string): ProviderClient {
             systemInstruction: {
               parts: [
                 {
-                  text: SYSTEM_PROMPT,
+                  text: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
                 },
               ],
             },
@@ -72,7 +123,7 @@ export function geminiClient(apiKey: string): ProviderClient {
           };
         }>;
       };
-      // console.log(JSON.stringify(data, null, 2));
+      console.log(JSON.stringify(data, null, 2));
 
       const part = data.candidates?.[0]?.content?.parts?.[0];
 
@@ -95,7 +146,10 @@ export function geminiClient(apiKey: string): ProviderClient {
 
 export function groqClient(apiKey: string): ProviderClient {
   return {
-    async generate(messages: Message[]): Promise<ModelResponse> {
+    async generate(
+      messages: Message[],
+      repoContext: string,
+    ): Promise<ModelResponse> {
       const tools = toolRegistery.map((tool) => ({
         type: "function",
         function: {
@@ -120,6 +174,21 @@ export function groqClient(apiKey: string): ProviderClient {
       }));
 
       const apiMessages = messages.map((message) => {
+        if (message.role === "assistant_tool_call") {
+          return {
+            role: "assistant",
+            tool_calls: [
+              {
+                id: message.toolCallId,
+                type: "function",
+                function: {
+                  name: message.toolName,
+                  arguments: JSON.stringify(message.arguments),
+                },
+              },
+            ],
+          };
+        }
         if (message.role === "tool") {
           return {
             role: "tool",
@@ -131,9 +200,46 @@ export function groqClient(apiKey: string): ProviderClient {
 
         return {
           role: message.role,
-          content: message.content,
+          content: "content" in message ? message.content : "",
         };
       });
+
+      // // Detailed debug logging
+      // console.log("\n========== GROQ REQUEST ==========");
+      // console.log("Model:", "openai/gpt-oss-20b");
+      // console.log("System prompt length:", SYSTEM_PROMPT.length);
+      // console.log("Conversation messages:", apiMessages.length);
+      // console.log(
+      //   "Conversation size:",
+      //   JSON.stringify(apiMessages).length,
+      //   "bytes",
+      // );
+      // console.log("Tools:", tools.length);
+      // console.log("Tool schema size:", JSON.stringify(tools).length, "bytes");
+
+      const requestBody = {
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
+          },
+          ...apiMessages,
+        ],
+        tools,
+        tool_choice: "auto",
+      };
+
+      // console.log(
+      //   "Total request size:",
+      //   JSON.stringify(requestBody).length,
+      //   "bytes",
+      // );
+
+      // console.log(
+      //   "Approx prompt characters:",
+      //   SYSTEM_PROMPT.length + JSON.stringify(apiMessages).length,
+      // );
 
       const res = await fetch(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -143,18 +249,7 @@ export function groqClient(apiKey: string): ProviderClient {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-20b", // or openai/gpt-oss-120b
-            messages: [
-              {
-                role: "system",
-                content: SYSTEM_PROMPT,
-              },
-              ...apiMessages,
-            ],
-            tools,
-            tool_choice: "auto",
-          }),
+          body: JSON.stringify(requestBody),
         },
       );
 
@@ -177,6 +272,9 @@ export function groqClient(apiKey: string): ProviderClient {
         }>;
       };
 
+      // console.log("\n========== GROQ RESPONSE ==========");
+      // console.log(JSON.stringify(data, null, 2));
+
       const choice = data.choices[0];
 
       if (!choice) {
@@ -188,6 +286,8 @@ export function groqClient(apiKey: string): ProviderClient {
       const tool = message.tool_calls?.[0];
 
       if (tool) {
+        // console.log("Tool requested:", tool.function.name);
+        // console.log("Arguments:", tool.function.arguments);
         return {
           type: "tool_call",
           id: tool.id,
@@ -196,6 +296,8 @@ export function groqClient(apiKey: string): ProviderClient {
         } satisfies ModelResponse;
       }
 
+      // console.log("Assistant response:");
+      // console.log(message.content);
       return {
         type: "message",
         content: message.content ?? "",
@@ -206,14 +308,20 @@ export function groqClient(apiKey: string): ProviderClient {
 
 export function openAIClient(apiKey: string): ProviderClient {
   return {
-    async generate(messages: Message[]): Promise<ModelResponse> {
+    async generate(
+      messages: Message[],
+      repoContext: string,
+    ): Promise<ModelResponse> {
       throw new Error("OpenAI client not implemented yet.");
     },
   };
 }
 export function anthropicClient(apiKey: string): ProviderClient {
   return {
-    async generate(messages: Message[]): Promise<ModelResponse> {
+    async generate(
+      messages: Message[],
+      repoContext: string,
+    ): Promise<ModelResponse> {
       throw new Error("Anthropic client not implemented yet.");
     },
   };

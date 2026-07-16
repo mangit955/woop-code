@@ -23,6 +23,17 @@ export const readFileTool: Tool = {
     if (!(await file.exists())) {
       throw Error(`File ${path} does not exist`);
     }
-    return await file.text();
+
+    const MAX_OUTPUT = 16 * 1024; // 16 KB
+    const content = await file.text();
+
+    if (content.length > MAX_OUTPUT) {
+      return (
+        content.slice(0, MAX_OUTPUT) +
+        `\n\n... File truncated. Showing first ${MAX_OUTPUT} characters of ${content.length}.`
+      );
+    }
+
+    return content;
   },
 };

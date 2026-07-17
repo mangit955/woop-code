@@ -127,22 +127,30 @@ export function geminiClient(apiKey: string): ProviderClient {
       };
       console.log(JSON.stringify(data, null, 2));
 
-      const part = data.candidates?.[0]?.content?.parts?.[0];
-      const thoughtSignature = part?.thoughtSignature;
+      const parts = data.candidates?.[0]?.content?.parts ?? [];
 
-      if (part?.functionCall) {
+      // Prefer tool calls if one exists.
+      const functionPart = parts.find((p) => p.functionCall);
+
+      if (functionPart?.functionCall) {
         return {
           type: "tool_call",
-          id: part.functionCall.id ?? `gemini-${Date.now()}`,
-          name: part.functionCall.name,
-          arguments: part.functionCall.args ?? {},
-          thoughtSignature,
+          id: functionPart.functionCall.id ?? `gemini-${Date.now()}`,
+          name: functionPart.functionCall.name,
+          arguments: functionPart.functionCall.args ?? {},
+          thoughtSignature: functionPart.thoughtSignature,
         } satisfies ModelResponse;
       }
 
+      // Otherwise combine all text parts into one message.
+      const text = parts
+        .filter((p) => p.text)
+        .map((p) => p.text!)
+        .join("\n");
+
       return {
         type: "message",
-        content: part?.text ?? "",
+        content: text,
       } satisfies ModelResponse;
     },
   };

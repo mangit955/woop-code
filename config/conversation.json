@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "role": "user",
+    "content": "Find every TODO comment in the repository."
+  },
+  {
+    "role": "assistant",
+    "content": "Based on a search of the repository, there is **1 TODO comment**:\n\n* **File:** `config/runtime.ts` (Line 2)\n* **Comment:** `//TODO: remove this hello log`"
+  }
+]

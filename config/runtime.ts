@@ -1,6 +1,5 @@
-console.log("hello");
-//TODO: remove this hello log
 import { getTool } from "../tools";
+import { recentMessages } from "./config";
 import type { Message, ProviderClient } from "./types";
 
 export async function agentLoop(
@@ -9,12 +8,16 @@ export async function agentLoop(
   repoContext: string,
 ) {
   const MAX_ITERATIONS = 10;
+  const MAX_TURNS = 8;
   const executedTools = new Set<string>();
   let iterations = 0;
   while (iterations < MAX_ITERATIONS) {
     iterations++;
     console.log("➡️ Calling model...");
-    const response = await client.generate(messages, repoContext);
+    const response = await client.generate(
+      recentMessages(messages, MAX_TURNS),
+      repoContext,
+    );
     console.log("📨 Model response:", response);
 
     if (response.type === "message") {

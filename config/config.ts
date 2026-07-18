@@ -81,3 +81,28 @@ export async function buildRepositoryContext() {
 
   return `Repository Context\n\nPackage.json:\n${packageJson}\n\nREADME:\n${readme}\n\nFiles:\n${files.join("\n")}`;
 }
+
+export function recentMessages(
+  message: Message[],
+  maxTurns: number,
+): Message[] {
+  if (maxTurns <= 0 || message.length === 0) {
+    return [];
+  }
+
+  let userTurn = 0;
+  let startIndex = 0;
+
+  for (let i = message.length - 1; i >= 0; i--) {
+    if (message[i]?.role === "user") {
+      userTurn++;
+
+      if (userTurn == maxTurns) {
+        startIndex = i;
+        break;
+      }
+    }
+  }
+
+  return message.slice(startIndex);
+}

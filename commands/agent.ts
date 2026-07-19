@@ -51,6 +51,4 @@ export const agentCommand = new Command("agent")
     );
 
     await saveConversation(messages);
-
-    console.log(response);
   });

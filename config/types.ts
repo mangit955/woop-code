@@ -12,7 +12,7 @@ export type ModelResponse =
     };
 
 export interface ProviderClient {
-  generate(message: Message[], repoContext: string): Promise<ModelResponse>;
+  stream(message: Message[], repoContext: string): AsyncGenerator<StreamEvent>;
 }
 
 export type Message =
@@ -57,3 +57,14 @@ export interface Tool {
 
   execute(args: Record<string, unknown>): Promise<string>;
 }
+
+export type StreamEvent =
+  | { type: "text"; content: string }
+  | {
+      type: "tool_call";
+      id: string;
+      name: string;
+      arguments: Record<string, unknown>;
+      thoughtSignature?: string;
+    }
+  | { type: "done" };

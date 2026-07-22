@@ -79,9 +79,12 @@ export function geminiClient(apiKey: string): ProviderClient {
           })),
         },
       ];
-
+      // console.time("generateContentStream");
+      // console.log("Repo Context:", repoContext.length);
+      // console.log("Messages:", JSON.stringify(contents).length);
+      // console.log("System:", SYSTEM_PROMPT.length);
       const stream = await ai.models.generateContentStream({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.5-flash-lite",
         contents,
 
         config: {
@@ -89,8 +92,11 @@ export function geminiClient(apiKey: string): ProviderClient {
           tools,
         },
       });
+      // console.timeEnd("generateContentStream");
 
       for await (const chunk of stream) {
+        // console.time("first-sdk-chunk");
+        // console.timeEnd("first-sdk-chunk");
         const part = chunk.candidates?.[0]?.content?.parts?.find(
           (p) => p.functionCall,
         );

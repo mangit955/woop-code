@@ -2,10 +2,15 @@ import { getTool } from "../tools";
 import { recentMessages } from "./config";
 import type { Message, ProviderClient, StreamEvent } from "./types";
 
+interface AgentCallbacks {
+  onText?(text: string): void;
+}
+// console.time("first-token");
 export async function agentLoop(
   client: ProviderClient,
   messages: Message[],
   repoContext: string,
+  callbacks: AgentCallbacks,
 ) {
   const MAX_ITERATIONS = 10;
   const MAX_TURNS = 8;
@@ -23,8 +28,9 @@ export async function agentLoop(
     )) {
       switch (event.type) {
         case "text":
-          process.stdout.write(event.content);
+          // console.timeEnd("first-token");
           assistantText += event.content;
+          callbacks.onText?.(event.content);
           break;
 
         case "tool_call":

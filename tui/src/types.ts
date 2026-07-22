@@ -1,0 +1,28 @@
+export type TimeLineItem =
+  | {
+      id: string;
+      type: "user";
+      content: string;
+    }
+  | {
+      id: string;
+      type: "assistant";
+      content: string;
+      streaming: boolean;
+    }
+  | {
+      id: string;
+      type: "tool";
+      label: string;
+      status: "running" | "completed";
+    };
+
+export interface UIState {
+  timeline: TimeLineItem[];
+  status: string;
+}
+
+export interface TimelineProps {
+  items: TimeLineItem[];
+}
+export type Listener = () => void;

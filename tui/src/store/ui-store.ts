@@ -5,6 +5,7 @@ export class UIStore {
   private state: UIState = { timeline: [], status: "Ready" };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
+  private pendingEmit = false;
 
   getState() {
     return this.state;
@@ -20,6 +21,17 @@ export class UIStore {
 
   private emit() {
     this.listeners.forEach((listener) => listener());
+  }
+
+  // Batches rapid successive emissions (e.g. streaming tokens) into a single
+  // render tick. Non-streaming callers use emit() directly so they stay instant.
+  private emitBatched() {
+    if (this.pendingEmit) return;
+    this.pendingEmit = true;
+    queueMicrotask(() => {
+      this.pendingEmit = false;
+      this.emit();
+    });
   }
 
   addUserMessage(content: string) {
@@ -104,19 +116,20 @@ export class UIStore {
       this.startAssistantMessage();
     }
 
-    this.state = {
-      ...this.state,
-      timeline: this.state.timeline.map((item) =>
-        item.type === "assistant" && item.id === this.activeAssistantId
-          ? {
-              ...item,
-              content: item.content + text,
-            }
-          : item,
-      ),
-    };
+    // Mutate content in-place to avoid allocating a new array on every token.
+    // The state reference is still replaced so useSyncExternalStore detects the change.
+    const timeline = this.state.timeline;
+    const idx = timeline.findIndex(
+      (item) => item.type === "assistant" && item.id === this.activeAssistantId,
+    );
+    if (idx !== -1) {
+      const item = timeline[idx] as Extract<TimeLineItem, { type: "assistant" }>;
+      timeline[idx] = { ...item, content: item.content + text };
+    }
+    // Replace state reference so React sees a new snapshot
+    this.state = { ...this.state, timeline };
 
-    this.emit();
+    this.emitBatched();
   }
 
   finishAssistantMessage() {

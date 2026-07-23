@@ -6,8 +6,9 @@ export function StatusBar() {
   const state = getStatusState(status);
 
   return (
-    <Box>
-      <Text dimColor>status </Text>
+    <Box gap={1}>
+      <Text dimColor>woopcode</Text>
+      <Text dimColor>·</Text>
       <Text color={state.color} dimColor={state.name === "idle"}>
         {state.label}
       </Text>

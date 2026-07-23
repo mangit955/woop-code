@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import type { TimeLineItem } from "./types";
+import { MessageRenderer } from "./components/MessageRenderer";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -37,7 +38,7 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
             {item.streaming && <Text dimColor> · thinking</Text>}
           </Box>
           <Box paddingLeft={1}>
-            <Text>{item.content}</Text>
+            <MessageRenderer content={item.content} streaming={item.streaming} />
           </Box>
         </Box>
       );

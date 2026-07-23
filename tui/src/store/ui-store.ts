@@ -100,6 +100,10 @@ export class UIStore {
   }
 
   appendAssistantText(text: string) {
+    if (!this.activeAssistantId) {
+      this.startAssistantMessage();
+    }
+
     this.state = {
       ...this.state,
       timeline: this.state.timeline.map((item) =>

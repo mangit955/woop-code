@@ -17,6 +17,7 @@ export const agentCommand = new Command("agent")
   .description("Runs the agent")
   .option("-p, --prompt <prompt>", "prompt", "")
   .action(async () => {
+    let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
     const config = await getConfig();
     const provider = config.defaultProvider;
     const apiKey = config.providers[provider].apiKey;
@@ -30,10 +31,15 @@ export const agentCommand = new Command("agent")
 
     const callbacks: AgentCallbacks = {
       onStatus(status) {
+        if (cancelStatusTimeout) {
+          clearTimeout(cancelStatusTimeout);
+          cancelStatusTimeout = undefined;
+        }
         store.setStatus(status);
       },
 
       onToolStart(tool) {
+        store.finishAssistantMessage();
         store.startTool(tool);
         store.setStatus(`Running ${tool.name}...`);
       },
@@ -57,6 +63,15 @@ export const agentCommand = new Command("agent")
         store.finishAssistantMessage();
         store.setStatus(`Error: ${error.message}`);
       },
+
+      onCancel() {
+        store.finishAssistantMessage();
+        store.setStatus("Cancelled");
+
+        cancelStatusTimeout = setTimeout(() => {
+          store.setStatus("Ready");
+        }, 1000);
+      },
     };
     const controller = new AgentController(provider, apiKey, callbacks);
     await controller.initialize();
@@ -73,6 +88,7 @@ export const agentCommand = new Command("agent")
       if (exiting) return;
       exiting = true;
 
+      controller.cancel();
       await controller.dispose();
       unmount();
       process.exit(0);

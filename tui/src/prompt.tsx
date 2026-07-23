@@ -14,7 +14,16 @@ export function Prompt({ controller, onExit }: PromptProps) {
   const isExiting = useRef(false);
 
   useInput((input, key) => {
-    if (key.ctrl && input.toLowerCase() === "c" && !isExiting.current) {
+    if (!(key.ctrl && input.toLowerCase() === "c")) {
+      return;
+    }
+
+    if (controller.isBusy()) {
+      controller.cancel();
+      return;
+    }
+
+    if (!isExiting.current) {
       isExiting.current = true;
       void onExit();
     }

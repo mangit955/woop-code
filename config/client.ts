@@ -10,6 +10,7 @@ export function geminiClient(apiKey: string): ProviderClient {
     async *stream(
       messages: Message[],
       repoContext: string,
+      signal?: AbortSignal,
     ): AsyncGenerator<StreamEvent> {
       const contents = messages.map((message) => {
         switch (message.role) {
@@ -90,6 +91,7 @@ export function geminiClient(apiKey: string): ProviderClient {
         config: {
           systemInstruction: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
           tools,
+          abortSignal: signal,
         },
       });
       // console.timeEnd("generateContentStream");

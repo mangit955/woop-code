@@ -22,6 +22,10 @@ function getStatusState(status: string) {
     return { name: "error", label: "Error", color: "red" } as const;
   }
 
+  if (value.includes("cancelled")) {
+    return { name: "cancelled", label: "Cancelled", color: undefined } as const;
+  }
+
   if (value.includes("tool") || value.includes("running")) {
     return { name: "tool", label: "Running tool", color: "cyan" } as const;
   }

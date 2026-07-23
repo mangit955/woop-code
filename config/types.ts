@@ -12,7 +12,11 @@ export type ModelResponse =
     };
 
 export interface ProviderClient {
-  stream(message: Message[], repoContext: string): AsyncGenerator<StreamEvent>;
+  stream(
+    message: Message[],
+    repoContext: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<StreamEvent>;
 }
 
 export type Message =
@@ -61,6 +65,7 @@ export interface AgentCallbacks {
   onToolFinish?(tool: ToolResult): void;
   onDone?(): void;
   onError?(error: Error): void;
+  onCancel?(): void;
 }
 
 export interface Tool {

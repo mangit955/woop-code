@@ -7,12 +7,12 @@ import type {
   StreamEvent,
 } from "./types";
 
-// console.time("first-token");
 export async function agentLoop(
   client: ProviderClient,
   messages: Message[],
   repoContext: string,
   callbacks: AgentCallbacks,
+  signal?: AbortSignal,
 ) {
   const MAX_ITERATIONS = 10;
   const MAX_TURNS = 8;
@@ -30,6 +30,7 @@ export async function agentLoop(
       for await (const event of client.stream(
         recentMessages(messages, MAX_TURNS),
         repoContext,
+        signal,
       )) {
         switch (event.type) {
           case "text":
@@ -46,6 +47,11 @@ export async function agentLoop(
         }
       }
 
+      if (signal?.aborted) {
+        callbacks.onCancel?.();
+        return "";
+      }
+
       if (!toolCall) {
         messages.push({
           role: "assistant",
@@ -53,7 +59,6 @@ export async function agentLoop(
         });
 
         callbacks.onDone?.();
-        //console.log("onDone emitted");
 
         return assistantText;
       }
@@ -111,6 +116,11 @@ export async function agentLoop(
       `Agent exceeded the maximum number of iterations (${MAX_ITERATIONS}).`,
     );
   } catch (error) {
+    if (signal?.aborted) {
+      callbacks.onCancel?.();
+      return "";
+    }
+
     const agentError =
       error instanceof Error ? error : new Error(String(error));
 

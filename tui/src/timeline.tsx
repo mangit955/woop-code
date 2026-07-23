@@ -1,17 +1,21 @@
 import { Box, Text } from "ink";
 import type { TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
+import { ToolStatus } from "./components/ToolStatus";
+import { ThinkingIndicator } from "./components/ThinkingIndicator";
 
 interface TimelineProps {
   items: TimeLineItem[];
+  isThinking: boolean;
 }
 
-export function Timeline({ items }: TimelineProps) {
+export function Timeline({ items, isThinking }: TimelineProps) {
   return (
     <Box flexDirection="column">
       {items.map((item) => (
         <TimelineItem key={item.id} item={item} />
       ))}
+      {isThinking && <ThinkingIndicator />}
     </Box>
   );
 }
@@ -43,23 +47,20 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
         </Box>
       );
 
-    case "tool":
-      const argument = formatToolArgument(item.arguments);
+    case "tool": {
+      const label = toolLabel(item.name);
+      const target = formatToolArgument(item.arguments);
 
       return (
-        <Box marginBottom={1} paddingLeft={1}>
-          <Text dimColor>tool </Text>
-          <Text>{item.name}</Text>
-          {argument && <Text dimColor> · {argument}</Text>}
-          <Text dimColor> · </Text>
-          <Text
-            color={item.status === "running" ? "cyan" : undefined}
-            dimColor={item.status === "completed"}
-          >
-            {item.status}
-          </Text>
+        <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+          <Box gap={1}>
+            <Text bold color="#888888">{label}</Text>
+            {target && <Text>{target}</Text>}
+          </Box>
+          <ToolStatus status={item.status} />
         </Box>
       );
+    }
   }
 }
 
@@ -75,4 +76,21 @@ function formatToolArgument(arguments_: Record<string, unknown>) {
   }
 
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function toolLabel(name: string): string {
+  const map: Record<string, string> = {
+    read_file: "READ",
+    write_file: "WRITE",
+    edit_file: "EDIT",
+    create_file: "CREATE",
+    delete_file: "DELETE",
+    run_command: "RUN",
+    execute_command: "RUN",
+    search: "SEARCH",
+    grep: "SEARCH",
+    list_directory: "LIST",
+    list_files: "LIST",
+  };
+  return map[name] ?? name.toUpperCase().replace(/_/g, " ");
 }

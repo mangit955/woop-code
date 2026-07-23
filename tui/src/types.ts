@@ -21,6 +21,7 @@ export type TimeLineItem =
 export interface UIState {
   timeline: TimeLineItem[];
   status: string;
+  isThinking: boolean;
 }
 
 export interface TimelineProps {

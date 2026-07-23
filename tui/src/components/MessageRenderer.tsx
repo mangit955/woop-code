@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box } from "ink";
 import { lexer, type Token } from "marked";
 import { Markdown } from "./Markdown";
+import { StreamingCursor } from "./StreamingCursor";
 
 interface MessageRendererProps {
   content: string;
@@ -77,7 +78,7 @@ export function MessageRenderer({ content, streaming }: MessageRendererProps) {
   return (
     <Box flexDirection="column">
       <Markdown tokens={tokens} />
-      {streaming && <Text dimColor>▌</Text>}
+      {streaming && <StreamingCursor />}
     </Box>
   );
 }

@@ -1,7 +1,7 @@
 import { Box } from "ink";
 import { Header } from "./header";
 import { Timeline } from "./timeline";
-import { StatusBar } from "./statusBar";
+import { ConnectedStatusBar } from "./statusBar";
 import { Prompt } from "./prompt";
 import { useUIStore } from "./store/useUIStore";
 import type { AgentController } from "../../commands/agentController";
@@ -21,11 +21,11 @@ export function App({ controller, onExit }: AppProps) {
       </Box>
 
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
-        <Timeline items={state.timeline} />
+        <Timeline items={state.timeline} isThinking={state.isThinking} />
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
-        <StatusBar />
+        <ConnectedStatusBar />
         <Prompt controller={controller} onExit={onExit} />
       </Box>
     </Box>

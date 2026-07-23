@@ -2,7 +2,7 @@ import type { Listener, TimeLineItem, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
 export class UIStore {
-  private state: UIState = { timeline: [], status: "Ready" };
+  private state: UIState = { timeline: [], status: "Ready", isThinking: false };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
   private pendingEmit = false;
@@ -127,7 +127,8 @@ export class UIStore {
       timeline[idx] = { ...item, content: item.content + text };
     }
     // Replace state reference so React sees a new snapshot
-    this.state = { ...this.state, timeline };
+    // Also clear isThinking — first token arrived
+    this.state = { ...this.state, timeline, isThinking: false };
 
     this.emitBatched();
   }
@@ -151,11 +152,8 @@ export class UIStore {
   }
 
   setStatus(status: string) {
-    this.state = {
-      ...this.state,
-      status,
-    };
-
+    const isThinking = status.toLowerCase().includes("thinking");
+    this.state = { ...this.state, status, isThinking };
     this.emit();
   }
 }

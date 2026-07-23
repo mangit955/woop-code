@@ -4,8 +4,13 @@ import { Timeline } from "./timeline";
 import { StatusBar } from "./statusBar";
 import { Prompt } from "./prompt";
 import { useUIStore } from "./store/useUIStore";
+import type { AgentController } from "../../commands/agentController";
 
-export function App() {
+interface AppProps {
+  controller: AgentController;
+}
+
+export function App({ controller }: AppProps) {
   const state = useUIStore();
 
   return (
@@ -20,7 +25,7 @@ export function App() {
 
       <Box flexDirection="column" marginTop={1}>
         <StatusBar />
-        <Prompt />
+        <Prompt controller={controller} />
       </Box>
     </Box>
   );

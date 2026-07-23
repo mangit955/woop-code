@@ -1,9 +1,11 @@
 {
   "dependencies": {
     "@google/genai": "^2.12.0",
+    "@inkjs/ui": "^2.0.0",
     "@types/commander": "^2.12.5",
     "chalk": "^5.6.2",
     "ink": "^7.1.1",
+    "ink-text-input": "^6.0.0",
     "react": "^19.2.7"
   },
   "name": "woopcode",

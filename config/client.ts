@@ -3,6 +3,10 @@ import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type { Message, ProviderClient, StreamEvent } from "./types";
 
+export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
+  google: "Gemini 3.5 Flash Lite",
+};
+
 export function geminiClient(apiKey: string): ProviderClient {
   const ai = new GoogleGenAI({ apiKey });
 

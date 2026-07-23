@@ -12,24 +12,29 @@ import { agentLoop } from "../config/runtime";
 import { App, store } from "../tui/src";
 import { render } from "ink";
 import { AgentController } from "./agentController";
+import { ACTIVE_PROVIDER_MODELS } from "../config/client";
+import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
   .option("-p, --prompt <prompt>", "prompt", "")
-  .action(async () => {
-    let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
-    const config = await getConfig();
-    const provider = config.defaultProvider;
-    const apiKey = config.providers[provider].apiKey;
+  .action(runAgent);
 
-    if (!provider || !apiKey) {
-      console.error(
-        "No provider is configured run woopcode provider --login first",
-      );
-      return;
-    }
+/** Runs the interactive agent from either `woopcode` or `woopcode agent`. */
+export async function runAgent() {
+  let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
+  const config = await getConfig();
+  const provider = config.defaultProvider;
+  const apiKey = config.providers[provider].apiKey;
 
-    const callbacks: AgentCallbacks = {
+  if (!provider || !apiKey) {
+    console.error(
+      "No provider is configured run woopcode provider --login first",
+    );
+    return;
+  }
+
+  const callbacks: AgentCallbacks = {
       onStatus(status) {
         if (cancelStatusTimeout) {
           clearTimeout(cancelStatusTimeout);
@@ -72,29 +77,66 @@ export const agentCommand = new Command("agent")
           store.setStatus("Ready");
         }, 1000);
       },
-    };
-    const controller = new AgentController(provider, apiKey, callbacks);
-    await controller.initialize();
-    const { unmount } = render(
-      <App controller={controller} onExit={handleExit} />,
-      {
-        exitOnCtrlC: false,
-      },
-    );
+  };
+  const controller = new AgentController(provider, apiKey, callbacks);
+  await controller.initialize();
+  const homeScreen = await buildHomeScreen(provider);
 
-    let exiting = false;
+  const { unmount } = render(
+    <App controller={controller} onExit={handleExit} homeScreen={homeScreen} />,
+    { exitOnCtrlC: false },
+  );
 
-    async function handleExit() {
-      if (exiting) return;
-      exiting = true;
+  let exiting = false;
 
-      controller.cancel();
-      await controller.dispose();
-      unmount();
-      process.exit(0);
-    }
+  async function handleExit() {
+    if (exiting) return;
+    exiting = true;
 
-    process.once("SIGINT", () => {
-      void handleExit();
-    });
+    controller.cancel();
+    await controller.dispose();
+    unmount();
+    process.exit(0);
+  }
+
+  process.once("SIGINT", () => {
+    void handleExit();
   });
+}
+
+async function buildHomeScreen(provider: string): Promise<HomeScreenData> {
+  const repository = process.cwd().split("/").filter(Boolean).at(-1) ?? "workspace";
+  const branch = await getBranch();
+  const providerLabel = provider === "google" ? "Gemini" : titleCase(provider);
+
+  return {
+    logoWord: "WOOPCODE",
+    subtitle: "AI software engineering agent",
+    promptExamples: [
+      "Explain this repository",
+      "Review recent changes",
+      "Find duplicate code",
+      "Generate tests",
+      "Optimize performance",
+      "Add authentication",
+    ],
+    capabilities: ["Build", "Review", "Explain", "Refactor", "Debug", "Test", "Document"],
+    repository,
+    branch,
+    providerName: providerLabel,
+    provider: ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
+  };
+}
+
+async function getBranch(): Promise<string> {
+  try {
+    const branch = (await Bun.$`git branch --show-current`.text()).trim();
+    return branch || "detached";
+  } catch {
+    return "not a git repository";
+  }
+}
+
+function titleCase(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}

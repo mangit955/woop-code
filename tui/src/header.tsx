@@ -1,6 +1,11 @@
 import { Box, Text } from "ink";
 
-export function Header() {
+interface HeaderProps {
+  branch: string;
+  provider: string;
+}
+
+export function Header({ branch, provider }: HeaderProps) {
   return (
     <Box justifyContent="space-between" width="100%">
       <Box>
@@ -11,9 +16,9 @@ export function Header() {
       </Box>
 
       <Box>
-        <Text dimColor>main</Text>
+        <Text dimColor>{branch}</Text>
         <Text dimColor> · </Text>
-        <Text color="cyan">Gemini</Text>
+        <Text color="cyan">{provider}</Text>
       </Box>
     </Box>
   );

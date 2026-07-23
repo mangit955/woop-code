@@ -1,16 +1,23 @@
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { AgentController } from "../../commands/agentController";
 
 interface PromptProps {
   controller: AgentController;
   onExit: () => Promise<void>;
+  value: string;
+  placeholder?: string;
+  onValueChange: (value: string) => void;
 }
 
-export function Prompt({ controller, onExit }: PromptProps) {
-  const [value, setValue] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
+export function Prompt({
+  controller,
+  onExit,
+  value,
+  placeholder,
+  onValueChange,
+}: PromptProps) {
   const isExiting = useRef(false);
 
   useInput((input, key) => {
@@ -32,7 +39,7 @@ export function Prompt({ controller, onExit }: PromptProps) {
   async function handleSubmit(input: string) {
     const prompt = input.trim();
 
-    if (!prompt || isRunning) {
+    if (!prompt || controller.isBusy()) {
       return;
     }
     if (prompt === "/exit") {
@@ -40,21 +47,21 @@ export function Prompt({ controller, onExit }: PromptProps) {
       return;
     }
 
-    setIsRunning(true);
-
-    try {
-      setValue("");
-      await controller.run(prompt);
-    } finally {
-      setIsRunning(false);
-    }
+    onValueChange("");
+    await controller.run(prompt);
   }
 
   return (
     <Box>
-      <Text>❯ </Text>
+      <Text color="cyan">❯ </Text>
 
-      <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      <TextInput
+        value={value}
+        placeholder={placeholder}
+        showCursor
+        onChange={onValueChange}
+        onSubmit={handleSubmit}
+      />
     </Box>
   );
 }

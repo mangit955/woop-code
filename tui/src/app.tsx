@@ -8,9 +8,10 @@ import type { AgentController } from "../../commands/agentController";
 
 interface AppProps {
   controller: AgentController;
+  onExit: () => Promise<void>;
 }
 
-export function App({ controller }: AppProps) {
+export function App({ controller, onExit }: AppProps) {
   const state = useUIStore();
 
   return (
@@ -25,7 +26,7 @@ export function App({ controller }: AppProps) {
 
       <Box flexDirection="column" marginTop={1}>
         <StatusBar />
-        <Prompt controller={controller} />
+        <Prompt controller={controller} onExit={onExit} />
       </Box>
     </Box>
   );

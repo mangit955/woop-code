@@ -9,6 +9,10 @@ import type { AgentCallbacks, Message } from "../config/types";
 import { store } from "../tui/src";
 
 export class AgentController {
+  private conversation: Message[] = [];
+  private repoContext = "";
+  private pendingAssistantText: string | null = null;
+
   constructor(
     private readonly provider: string,
     private readonly apiKey: string,
@@ -16,15 +20,13 @@ export class AgentController {
   ) {}
 
   async run(prompt: string) {
-    const messages = await getConversation();
-    const conversation: Message[] = [...messages];
-
-    const repoContext = await buildRepositoryContext();
-
-    conversation.push({
+    this.conversation.push({
       role: "user",
       content: prompt,
     });
+
+    const conversation = [...this.conversation];
+    this.pendingAssistantText = "";
 
     // Update UI before starting the agent
     store.addUserMessage(prompt);
@@ -36,23 +38,39 @@ export class AgentController {
     const response = await agentLoop(
       client,
       conversation,
-      repoContext,
-      this.callbacks,
-    );
-
-    messages.push(
+      this.repoContext,
       {
-        role: "user",
-        content: prompt,
-      },
-      {
-        role: "assistant",
-        content: response,
+        ...this.callbacks,
+        onText: (text) => {
+          this.pendingAssistantText += text;
+          this.callbacks.onText?.(text);
+        },
       },
     );
 
-    await saveConversation(messages);
+    this.conversation.push({
+      role: "assistant",
+      content: response,
+    });
+    this.pendingAssistantText = null;
 
     return response;
+  }
+
+  async initialize() {
+    this.conversation = await getConversation();
+    this.repoContext = await buildRepositoryContext();
+  }
+
+  async dispose() {
+    if (this.pendingAssistantText) {
+      this.conversation.push({
+        role: "assistant",
+        content: this.pendingAssistantText,
+      });
+      this.pendingAssistantText = null;
+    }
+
+    await saveConversation(this.conversation);
   }
 }

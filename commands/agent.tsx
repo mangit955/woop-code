@@ -16,7 +16,7 @@ import { AgentController } from "./agentController";
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
   .option("-p, --prompt <prompt>", "prompt", "")
-  .action(async (options) => {
+  .action(async () => {
     const config = await getConfig();
     const provider = config.defaultProvider;
     const apiKey = config.providers[provider].apiKey;
@@ -59,5 +59,26 @@ export const agentCommand = new Command("agent")
       },
     };
     const controller = new AgentController(provider, apiKey, callbacks);
-    render(<App controller={controller} />);
+    await controller.initialize();
+    const { unmount } = render(
+      <App controller={controller} onExit={handleExit} />,
+      {
+        exitOnCtrlC: false,
+      },
+    );
+
+    let exiting = false;
+
+    async function handleExit() {
+      if (exiting) return;
+      exiting = true;
+
+      await controller.dispose();
+      unmount();
+      process.exit(0);
+    }
+
+    process.once("SIGINT", () => {
+      void handleExit();
+    });
   });

@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { store } from "./ui-store";
 
 export function useUIStore() {
-  const [state, setState] = useState(store.getState());
-
-  useEffect(() => {
-    return store.subscribe(() => {
-      setState({ ...store.getState() });
-    });
-  }, []);
-  return state;
+  return useSyncExternalStore(
+    store.subscribe.bind(store),
+    store.getState.bind(store),
+  );
 }

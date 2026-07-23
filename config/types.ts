@@ -50,6 +50,19 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface ToolResult extends ToolCall {
+  output: string;
+}
+
+export interface AgentCallbacks {
+  onStatus?(status: string): void;
+  onText?(text: string): void;
+  onToolStart?(tool: ToolCall): void;
+  onToolFinish?(tool: ToolResult): void;
+  onDone?(): void;
+  onError?(error: Error): void;
+}
+
 export interface Tool {
   name: string;
   description: string;

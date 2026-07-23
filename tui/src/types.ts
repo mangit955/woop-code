@@ -13,7 +13,8 @@ export type TimeLineItem =
   | {
       id: string;
       type: "tool";
-      label: string;
+      name: string;
+      arguments: Record<string, unknown>;
       status: "running" | "completed";
     };
 

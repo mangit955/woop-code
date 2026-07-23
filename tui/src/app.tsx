@@ -1,4 +1,4 @@
-import { Box, Text } from "ink";
+import { Box } from "ink";
 import { Header } from "./header";
 import { Timeline } from "./timeline";
 import { StatusBar } from "./statusBar";
@@ -9,15 +9,19 @@ export function App() {
   const state = useUIStore();
 
   return (
-    <Box flexDirection="column" height="100%">
-      <Header />
-      <Text color="gray">{"─".repeat(process.stdout.columns || 80)}</Text>
-      <Box flexDirection="column" flexGrow={1}>
+    <Box flexDirection="column" height="100%" paddingX={1}>
+      <Box marginBottom={1}>
+        <Header />
+      </Box>
+
+      <Box flexDirection="column" flexGrow={1} paddingX={1}>
         <Timeline items={state.timeline} />
       </Box>
 
-      <StatusBar />
-      <Prompt />
+      <Box flexDirection="column" marginTop={1}>
+        <StatusBar />
+        <Prompt />
+      </Box>
     </Box>
   );
 }

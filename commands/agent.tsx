@@ -7,6 +7,7 @@ import {
 } from "../config/config";
 import { createProviderClient } from "../config/client";
 import type { Message } from "../config/types";
+import type { AgentCallbacks } from "../config/types";
 import { agentLoop } from "../config/runtime";
 import { App, store } from "../tui/src";
 import { render } from "ink";
@@ -16,12 +17,38 @@ export const agentCommand = new Command("agent")
   .option("-p, --prompt <prompt>", "prompt", "")
   .action(async (options) => {
     const { unmount } = render(<App />);
+
     const config = await getConfig();
     const provider = config.defaultProvider;
     const apiKey = config.providers[provider].apiKey;
-    const callbacks = {
-      onText(text: string) {
+    const callbacks: AgentCallbacks = {
+      onStatus(status) {
+        store.setStatus(status);
+      },
+
+      onToolStart(tool) {
+        store.startTool(tool);
+        store.setStatus(`Running ${tool.name}...`);
+      },
+
+      onToolFinish(tool) {
+        store.finishTool(tool.id);
+        store.setStatus("Thinking...");
+      },
+
+      onText(text) {
         store.appendAssistantText(text);
+      },
+
+      onDone() {
+        //console.log("onDone received");
+        store.finishAssistantMessage();
+        store.setStatus("Ready");
+      },
+
+      onError(error) {
+        store.finishAssistantMessage();
+        store.setStatus(`Error: ${error.message}`);
       },
     };
 
@@ -53,11 +80,7 @@ export const agentCommand = new Command("agent")
     store.addUserMessage(options.prompt);
     store.startAssistantMessage();
     store.setStatus("Thinking...");
-
     const response = await runAgent(conversation, repoContext);
-
-    store.finishAssistantMessage();
-    store.setStatus("Ready");
     //console.timeEnd("agentLoop");
 
     messages.push(
@@ -72,4 +95,5 @@ export const agentCommand = new Command("agent")
     );
 
     await saveConversation(messages);
+    unmount();
   });

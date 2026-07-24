@@ -18,8 +18,11 @@
   },
   "private": true,
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/typescript-checker": "^9.6.1",
     "@types/bun": "latest",
-    "@types/react": "^19.2.17"
+    "@types/react": "^19.2.17",
+    "fast-check": "^4.9.0"
   },
   "peerDependencies": {
     "typescript": "^5"

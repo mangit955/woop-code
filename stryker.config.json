@@ -1,0 +1,35 @@
+{
+  "packageManager": "npm",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "./run-tests.sh"
+  },
+  "mutate": [
+    "config/runtime.ts",
+    "tools/readFile.ts",
+    "tools/writeFile.ts",
+    "tools/editFile.ts",
+    "tools/terminal.ts"
+  ],
+  "ignorePatterns": [
+    "packages/tests/**",
+    "node_modules/**",
+    "tui/**",
+    "cli.ts",
+    "commands/**",
+    "tools/index.ts"
+  ],
+  "timeoutMS": 300000,
+  "timeoutFactor": 1.5,
+  "concurrency": 1,
+  "coverageAnalysis": "off",
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
+  "reporters": ["html", "clear-text", "progress"],
+  "htmlReporter": {
+    "fileName": "packages/tests/mutation-report/index.html"
+  }
+}

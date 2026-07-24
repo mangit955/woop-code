@@ -14,6 +14,7 @@ import { render } from "ink";
 import { AgentController } from "./agentController";
 import { ACTIVE_PROVIDER_MODELS } from "../config/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
+import { ensureProviderConfigured } from "../onboarding";
 
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
@@ -22,17 +23,13 @@ export const agentCommand = new Command("agent")
 
 /** Runs the interactive agent from either `woopcode` or `woopcode agent`. */
 export async function runAgent() {
+  // Ensure provider is configured (launches onboarding if needed)
+  await ensureProviderConfigured();
+
   let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
   const config = await getConfig();
   const provider = config.defaultProvider;
   const apiKey = config.providers[provider].apiKey;
-
-  if (!provider || !apiKey) {
-    console.error(
-      "No provider is configured run woopcode provider --login first",
-    );
-    return;
-  }
 
   const callbacks: AgentCallbacks = {
       onStatus(status) {

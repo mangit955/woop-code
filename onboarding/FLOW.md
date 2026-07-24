@@ -1,0 +1,291 @@
+# Onboarding Flow Diagram
+
+## User Journey
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    User runs: woopcode                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+            ┌─────────────────────┐
+            │ Check configuration │
+            │ (ensureProvider     │
+            │  Configured())      │
+            └──────────┬──────────┘
+                       │
+            ┌──────────┴──────────┐
+            │                     │
+    ┌───────▼────────┐   ┌───────▼────────┐
+    │  Has API Key?  │   │  Has API Key?  │
+    │      YES       │   │       NO       │
+    └───────┬────────┘   └───────┬────────┘
+            │                     │
+            │              ┌──────▼──────┐
+            │              │   Welcome   │
+            │              │   Screen    │
+            │              └──────┬──────┘
+            │                     │
+            │              ┌──────▼──────────┐
+            │              │  Select         │
+            │              │  Provider       │
+            │              │  (Arrow Keys)   │
+            │              └──────┬──────────┘
+            │                     │
+            │              ┌──────▼──────────┐
+            │              │  Show API Key   │
+            │              │  URL            │
+            │              └──────┬──────────┘
+            │                     │
+            │              ┌──────▼──────────┐
+            │              │  Enter API Key  │
+            │              │  (Masked Input) │
+            │              └──────┬──────────┘
+            │                     │
+            │              ┌──────▼──────────┐
+            │              │  Validate Key   │
+            │              │  (Spinner)      │
+            │              └──────┬──────────┘
+            │                     │
+            │              ┌──────┴──────┐
+            │              │             │
+            │         ┌────▼────┐  ┌────▼────┐
+            │         │ Invalid │  │  Valid  │
+            │         │  Key    │  │   Key   │
+            │         └────┬────┘  └────┬────┘
+            │              │            │
+            │         ┌────▼────────┐   │
+            │         │ Show Error  │   │
+            │         │ Return to   │   │
+            │         │ Input       │   │
+            │         └────┬────────┘   │
+            │              │            │
+            │              └────────┬───┘
+            │                       │
+            │                ┌──────▼──────┐
+            │                │ Save Config │
+            │                └──────┬──────┘
+            │                       │
+            │                ┌──────▼──────┐
+            │                │   Success   │
+            │                │   Message   │
+            │                └──────┬──────┘
+            │                       │
+            └───────────────────────┘
+                            │
+                     ┌──────▼──────┐
+                     │   Launch    │
+                     │  Main Chat  │
+                     │  Interface  │
+                     └─────────────┘
+```
+
+## State Machine
+
+```
+┌─────────┐     Enter     ┌────────────────┐     ↑↓     ┌──────────────┐
+│ welcome ├──────────────►│select-provider ├───────────►│ highlighting │
+└─────────┘                └────────┬───────┘            │  provider    │
+                                    │                    └──────┬───────┘
+                                    │ Enter                     │
+                            ┌───────▼──────┐                    │
+                            │api-key-info  │◄───────────────────┘
+                            └───────┬──────┘
+                                    │ Enter
+                            ┌───────▼──────┐
+                            │  enter-key   │
+                            └───────┬──────┘
+                                    │ Submit
+                            ┌───────▼──────┐
+                            │ validating   │
+                            └───────┬──────┘
+                                    │
+                        ┌───────────┴───────────┐
+                        │                       │
+                   ┌────▼────┐             ┌───▼─────┐
+                   │  Error  │             │Complete │
+                   └────┬────┘             └───┬─────┘
+                        │                      │
+                   Back to                  Continue to
+                   enter-key                main app
+```
+
+## Error Handling Flow
+
+```
+┌──────────────┐
+│   API Call   │
+└──────┬───────┘
+       │
+       ├─────► Network Error ──────► Show "Check connection" ──► Retry
+       │
+       ├─────► Invalid Key  ──────► Show "Invalid key"     ──► Retry  
+       │
+       ├─────► Timeout      ──────► Show "Request timeout" ──► Retry
+       │
+       ├─────► 401/403      ──────► Show "Invalid key"     ──► Retry
+       │
+       ├─────► 500          ──────► Show "Provider error"  ──► Retry
+       │
+       └─────► Success      ──────► Save & Continue
+```
+
+## Component Tree
+
+```
+<SetupWizard>
+  │
+  ├─ step: "welcome"
+  │  └─ <Box>
+  │     ├─ Welcome message
+  │     ├─ Instructions
+  │     └─ "Press Enter" hint
+  │
+  ├─ step: "select-provider"
+  │  └─ <Box>
+  │     ├─ Provider list (map)
+  │     │  └─ Each provider:
+  │     │     ├─ Highlight if selected
+  │     │     └─ Show description
+  │     └─ Keyboard hints
+  │
+  ├─ step: "api-key-info"
+  │  └─ <Box>
+  │     ├─ Provider name
+  │     ├─ API key URL
+  │     └─ "Press Enter" hint
+  │
+  ├─ step: "enter-key"
+  │  └─ <Box>
+  │     ├─ Prompt
+  │     ├─ <TextInput mask="*" />
+  │     └─ Submit hint
+  │
+  ├─ step: "validating"
+  │  └─ <Box>
+  │     ├─ <Spinner />
+  │     └─ "Validating..." text
+  │
+  └─ step: "complete"
+     └─ <Box>
+        ├─ ✓ API key verified
+        ├─ ✓ Configuration saved
+        └─ Starting message
+```
+
+## Data Flow
+
+```
+┌─────────────┐
+│   User      │
+│   Input     │
+└──────┬──────┘
+       │
+       ▼
+┌────────────────┐
+│ SetupWizard    │ ──► state: { step, selectedIndex, 
+│ Component      │              selectedProvider, apiKey }
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│ handleKeySubmit│
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│ loginProvider()│ ──► Reuses existing validation
+└────────┬───────┘     from config/authProvider.ts
+         │
+         ├─► Invalid ─► onError() ─► Show error & retry
+         │
+         └─► Valid ───┐
+                      │
+                      ▼
+         ┌────────────────────┐
+         │ getConfig()        │
+         │ config.provider = X│
+         │ config.apiKey = Y  │
+         │ saveConfig()       │
+         └────────┬───────────┘
+                  │
+                  ▼
+         ┌────────────────┐
+         │ onComplete()   │ ──► Unmount wizard
+         └────────┬───────┘     Continue to app
+                  │
+                  ▼
+         ┌────────────────┐
+         │ Main App       │
+         │ (agent.tsx)    │
+         └────────────────┘
+```
+
+## Keyboard Shortcuts
+
+```
+┌──────────────┬─────────────────────────────────┐
+│   Key        │   Action                        │
+├──────────────┼─────────────────────────────────┤
+│   Enter      │ Confirm / Next step             │
+│   ↑          │ Previous provider (select step) │
+│   ↓          │ Next provider (select step)     │
+│   Ctrl+C     │ Cancel onboarding, exit         │
+│   Type       │ Input API key (masked)          │
+└──────────────┴─────────────────────────────────┘
+```
+
+## Integration Points
+
+```
+cli.ts (Entry)
+   │
+   ▼
+agent.tsx
+   │
+   ├─► ensureProviderConfigured()  ──────┐
+   │                                     │
+   │   ┌───────────────────────────────┘
+   │   │
+   │   ▼
+   │ onboarding/index.ts
+   │   │
+   │   ├─► Check config exists? ───► Yes ───► Return (skip)
+   │   │
+   │   └─► No ───► Launch wizard
+   │               │
+   │               ▼
+   │         onboarding/setupWizard.tsx
+   │               │
+   │               ├─► providers.ts (data)
+   │               │
+   │               ├─► loginProvider() (validation)
+   │               │
+   │               └─► saveConfig() (persistence)
+   │
+   ▼
+Continue to main app
+```
+
+## File Dependencies
+
+```
+onboarding/index.ts
+   ├─► ink (render)
+   ├─► react
+   ├─► ./setupWizard (component)
+   └─► ../config/config (getConfig)
+
+onboarding/setupWizard.tsx
+   ├─► react (useState)
+   ├─► ink (Box, Text, useInput)
+   ├─► ink-text-input (TextInput)
+   ├─► ink-spinner (Spinner)
+   ├─► chalk
+   ├─► ./providers (getEnabledProviders, ProviderInfo)
+   ├─► ../config/authProvider (loginProvider)
+   └─► ../config/config (getConfig, saveConfig)
+
+onboarding/providers.ts
+   └─► No dependencies (pure data)
+```

@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { statSync } from "fs";
 
 export const readFileTool: Tool = {
   name: "read_file",
@@ -22,6 +23,19 @@ export const readFileTool: Tool = {
 
     if (!(await file.exists())) {
       throw Error(`File ${path} does not exist`);
+    }
+
+    // Check if path is a directory
+    try {
+      const stats = statSync(path);
+      if (stats.isDirectory()) {
+        throw Error(`Cannot read ${path}: it is a directory. Use list_files to see directory contents.`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('is a directory')) {
+        throw err;
+      }
+      // If stat fails for other reasons, continue trying to read
     }
 
     const MAX_OUTPUT = 16 * 1024; // 16 KB

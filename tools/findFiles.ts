@@ -61,7 +61,17 @@ export const findFilesTool: Tool = {
         basename.toLowerCase().includes(lowerQuery) ||
         entry.toLowerCase().includes(lowerQuery)
       ) {
-        matches.push(entry);
+        // Only include files, not directories
+        const fullPath = `${rootPath}/${entry}`;
+        try {
+          const stat = await Bun.file(fullPath).stat();
+          if (!stat.isDirectory) {
+            matches.push(entry);
+          }
+        } catch {
+          // If we can't stat it, skip it
+          continue;
+        }
       }
     }
 

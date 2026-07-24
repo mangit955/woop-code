@@ -99,7 +99,8 @@ describe("Filesystem - Property Tests", () => {
         // Only use safe unicode characters for filenames
         fc
           .string({ minLength: 1, maxLength: 50 })
-          .filter((s) => !/[/\\:*?"<>|]/.test(s)), // Exclude invalid filename chars
+          .filter((s) => !/[/\\:*?"<>|]/.test(s)) // Exclude invalid filename chars
+          .filter((s) => s !== "." && s !== ".."), // Exclude directory references
         fc.string({ minLength: 0, maxLength: 200 }),
         async (filename, content) => {
           if (filename.trim().length === 0) return; // Skip empty filenames
@@ -211,16 +212,11 @@ describe("Filesystem - Property Tests", () => {
           const file2 = Bun.file(filePath);
           const result = await file2.text();
 
-          // Should only have second content
+          // PROPERTY: After overwrite, file contains exactly the new content
           expect(result).toBe(content2);
           
           // Cleanup
           await rm(filePath, { force: true });
-          
-          // Only check if contents are different and non-empty
-          if (content1.length > 0 && content2.length > 0 && content1 !== content2) {
-            expect(result).not.toContain(content1);
-          }
         }
       ),
       { numRuns: 50 }

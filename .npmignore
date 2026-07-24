@@ -1,0 +1,35 @@
+# Development files
+.git/
+.github/
+.kiro/
+.cursor/
+.vscode/
+node_modules/
+
+# Test files
+packages/tests/
+*.test.ts
+*.bench.ts
+stryker.config.json
+run-benchmarks.ts
+run-tests.sh
+
+# Config files
+.env
+.gitignore
+tsconfig.json
+bun.lock
+
+# Documentation (keep only essential)
+CLAUDE.md
+AGENTS.md
+ONBOARDING.md
+IMPLEMENTATION_SUMMARY.md
+onboarding/README.md
+onboarding/FLOW.md
+onboarding/QUICK_START.md
+onboarding/test-reset.ts
+
+# Build artifacts
+dist/
+*.log

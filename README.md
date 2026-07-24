@@ -1,5 +1,8 @@
 # Woopcode
 
+[![npm version](https://badge.fury.io/js/woopcode.svg)](https://www.npmjs.com/package/woopcode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **An autonomous AI coding assistant built for the terminal.**
 
 Woopcode combines a streaming agent runtime, extensible tool system, and provider abstraction to help developers read, modify, and execute code directly from the command line. It operates within your project directory, with full access to your repository context.
@@ -75,24 +78,38 @@ All file-modifying tools (`write_file`, `edit_file`) trigger an approval workflo
 
 ## Installation
 
+### Using Bun (Recommended)
+
+```bash
+# Run without installing
+bunx woopcode
+
+# Install globally
+bun add -g woopcode
+```
+
+### Using npm/npx
+
+```bash
+# Run without installing
+npx woopcode
+
+# Install globally
+npm install -g woopcode
+```
+
 ### From Source
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/woopcode.git
-cd woopcode
+git clone https://github.com/mangit955/woop-code.git
+cd woop-code
 
 # Install dependencies
 bun install
 
 # Run locally
 bun cli.ts
-```
-
-### Global Install (Coming Soon)
-
-```bash
-bun add -g woopcode
 ```
 
 ---

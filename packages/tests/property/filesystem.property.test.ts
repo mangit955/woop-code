@@ -199,7 +199,7 @@ describe("Filesystem - Property Tests", () => {
         fc.string({ minLength: 0, maxLength: 200 }),
         fc.string({ minLength: 0, maxLength: 200 }),
         async (content1, content2) => {
-          const filePath = join(testDir, "test.txt");
+          const filePath = join(testDir, `overwrite-${Date.now()}-${Math.random()}.txt`);
 
           // Write first content
           await Bun.write(filePath, content1);
@@ -213,6 +213,9 @@ describe("Filesystem - Property Tests", () => {
 
           // Should only have second content
           expect(result).toBe(content2);
+          
+          // Cleanup
+          await rm(filePath, { force: true });
           
           // Only check if contents are different and non-empty
           if (content1.length > 0 && content2.length > 0 && content1 !== content2) {

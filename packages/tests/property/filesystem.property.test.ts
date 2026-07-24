@@ -279,6 +279,14 @@ describe("Filesystem - Property Tests", () => {
           
           const filePath = join(testDir, cleanFilename);
 
+          // Clean up if file exists from previous iteration
+          try {
+            await Bun.write(filePath, "");
+            await rm(filePath, { force: true });
+          } catch {
+            // Ignore errors
+          }
+
           // Before writing, should not exist
           const fileBefore = Bun.file(filePath);
           expect(await fileBefore.exists()).toBe(false);
@@ -287,6 +295,9 @@ describe("Filesystem - Property Tests", () => {
           await Bun.write(filePath, "test");
           const fileAfter = Bun.file(filePath);
           expect(await fileAfter.exists()).toBe(true);
+          
+          // Clean up
+          await rm(filePath, { force: true });
         }
       ),
       { numRuns: 30 }

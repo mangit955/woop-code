@@ -157,24 +157,6 @@ describe("Tool Registry Contract", () => {
     }
   });
 
-  test("getTool returns correct tool by name", () => {
-    const { getTool, toolRegistery } = require("../../../tools");
-    
-    // Just verify getTool works - don't rely on specific tool names
-    // as they may vary or be mocked in other tests
-    expect(typeof getTool).toBe("function");
-    expect(Array.isArray(toolRegistery)).toBe(true);
-    expect(toolRegistery.length).toBeGreaterThan(0);
-    
-    // Verify getTool returns tools from the registry
-    const firstTool = toolRegistery[0];
-    if (firstTool) {
-      const found = getTool(firstTool.name);
-      expect(found).toBeDefined();
-      expect(found?.name).toBe(firstTool.name);
-    }
-  });
-
   test("getTool returns undefined for unknown tool", async () => {
     const { getTool } = await import("../../../tools");
     

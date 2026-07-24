@@ -285,11 +285,17 @@ export const editFileTool: Tool = {
 
 #### Configuration (`config/`)
 
-Configuration is stored locally in JSON files:
+Configuration is stored in the user's home directory:
 
-- `config/providers.json` - Provider settings and API keys
-- `config/conversation.json` - Persistent conversation history
-- `config/models.json` - Available models per provider
+**Location:**
+- **macOS/Linux**: `~/.config/woopcode/`
+- **Windows**: `%LOCALAPPDATA%\woopcode\`
+
+**Files:**
+- `providers.json` - Provider settings and API keys
+- `conversation.json` - Persistent conversation history
+
+Configuration is automatically created on first run.
 
 #### TUI (`tui/src/`)
 

@@ -1,17 +1,25 @@
 import type { Message } from "./types";
+import { getProvidersConfigPath, getConversationPath, initializeConfig } from "./paths";
 
 export async function getConfig() {
-  return JSON.parse(await Bun.file("./config/providers.json").text());
+  await initializeConfig();
+  const configPath = getProvidersConfigPath();
+  return JSON.parse(await Bun.file(configPath).text());
 }
+
 export async function saveConfig(config: any) {
-  await Bun.write("./config/providers.json", JSON.stringify(config, null, 2));
+  await initializeConfig();
+  const configPath = getProvidersConfigPath();
+  await Bun.write(configPath, JSON.stringify(config, null, 2));
 }
 
 // for storing and apending the conversation history
 export async function getConversation() {
-  const file = await Bun.file("./config/conversation.json");
+  await initializeConfig();
+  const conversationPath = getConversationPath();
+  const file = Bun.file(conversationPath);
 
-  if (!file) {
+  if (!(await file.exists())) {
     return [];
   }
 
@@ -19,8 +27,10 @@ export async function getConversation() {
 }
 
 export async function saveConversation(messages: Message[]) {
+  await initializeConfig();
+  const conversationPath = getConversationPath();
   await Bun.write(
-    "./config/conversation.json",
+    conversationPath,
     JSON.stringify(messages, null, 2),
   );
 }

@@ -62,7 +62,8 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "marked": "^18.0.7",
-    "react": "^19.2.7"
+    "react": "^19.2.7",
+    "woopcode": "file:woopcode-0.1.0.tgz"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
@@ -76,8 +77,7 @@
     "typescript": "^5.0.0"
   },
   "engines": {
-    "bun": ">=1.0.0",
-    "node": ">=18.0.0"
+    "bun": ">=1.0.0"
   },
   "publishConfig": {
     "access": "public",

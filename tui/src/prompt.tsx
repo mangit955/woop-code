@@ -54,7 +54,6 @@ export function Prompt({
   return (
     <Box>
       <Text color="cyan">❯ </Text>
-
       <TextInput
         value={value}
         placeholder={placeholder}

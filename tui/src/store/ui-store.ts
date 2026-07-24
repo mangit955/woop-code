@@ -1,11 +1,20 @@
-import type { Listener, TimeLineItem, UIState } from "../types";
+import type { Listener, PendingEdit, TimeLineItem, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
 export class UIStore {
-  private state: UIState = { timeline: [], status: "Ready", isThinking: false };
+  private state: UIState = {
+    timeline: [],
+    status: "Ready",
+    isThinking: false,
+    pendingEdit: null,
+  };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
   private pendingEmit = false;
+  private editResolvers: Map<
+    string,
+    { resolve: (approved: boolean) => void; reject: (error: Error) => void }
+  > = new Map();
 
   getState() {
     return this.state;
@@ -154,6 +163,70 @@ export class UIStore {
   setStatus(status: string) {
     const isThinking = status.toLowerCase().includes("thinking");
     this.state = { ...this.state, status, isThinking };
+    this.emit();
+  }
+
+  // Pending Edit Management
+  setPendingEdit(edit: PendingEdit): Promise<boolean> {
+    this.state = {
+      ...this.state,
+      pendingEdit: edit,
+    };
+    this.emit();
+
+    return new Promise((resolve, reject) => {
+      this.editResolvers.set(edit.id, { resolve, reject });
+    });
+  }
+
+  approvePendingEdit() {
+    const edit = this.state.pendingEdit;
+    if (!edit) return;
+
+    const resolver = this.editResolvers.get(edit.id);
+    if (resolver) {
+      resolver.resolve(true);
+      this.editResolvers.delete(edit.id);
+    }
+
+    this.state = {
+      ...this.state,
+      pendingEdit: null,
+    };
+    this.emit();
+  }
+
+  rejectPendingEdit() {
+    const edit = this.state.pendingEdit;
+    if (!edit) return;
+
+    const resolver = this.editResolvers.get(edit.id);
+    if (resolver) {
+      resolver.resolve(false);
+      this.editResolvers.delete(edit.id);
+    }
+
+    this.state = {
+      ...this.state,
+      pendingEdit: null,
+    };
+    this.emit();
+  }
+
+  clearPendingEdit() {
+    const edit = this.state.pendingEdit;
+    if (!edit) return;
+
+    const resolver = this.editResolvers.get(edit.id);
+    if (resolver) {
+      resolver.reject(new Error("Edit cancelled"));
+      this.editResolvers.delete(edit.id);
+    }
+
+    this.state = {
+      ...this.state,
+      pendingEdit: null,
+    };
     this.emit();
   }
 }

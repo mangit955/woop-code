@@ -5,6 +5,7 @@ import { ConnectedStatusBar } from "./statusBar";
 import { Prompt } from "./prompt";
 import { useUIStore } from "./store/useUIStore";
 import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
+import { DiffPreview } from "./components/DiffPreview";
 import type { AgentController } from "../../commands/agentController";
 import { useState } from "react";
 
@@ -18,6 +19,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const state = useUIStore();
   const [promptValue, setPromptValue] = useState("");
   const showHome = state.timeline.length === 0;
+  const hasPendingEdit = state.pendingEdit !== null;
 
   const promptProps = {
     controller,
@@ -33,7 +35,9 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       </Box>
 
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
-        {showHome ? (
+        {hasPendingEdit ? (
+          <DiffPreview pendingEdit={state.pendingEdit!} />
+        ) : showHome ? (
           <HomeScreen
             {...homeScreen}
             renderPrompt={(placeholder) => (
@@ -45,7 +49,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         )}
       </Box>
 
-      {!showHome && (
+      {!showHome && !hasPendingEdit && (
         <Box flexDirection="column" marginTop={1}>
           <ConnectedStatusBar />
           <Prompt {...promptProps} />

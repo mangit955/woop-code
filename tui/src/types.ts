@@ -18,10 +18,20 @@ export type TimeLineItem =
       status: "running" | "completed";
     };
 
+export interface PendingEdit {
+  id: string;
+  filePath: string;
+  oldContent: string;
+  newContent: string;
+  diff: string;
+  toolCallId: string;
+}
+
 export interface UIState {
   timeline: TimeLineItem[];
   status: string;
   isThinking: boolean;
+  pendingEdit: PendingEdit | null;
 }
 
 export interface TimelineProps {

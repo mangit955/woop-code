@@ -5,6 +5,7 @@
     "@types/commander": "^2.12.5",
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
+    "diff": "^9.0.0",
     "ink": "^7.1.1",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",

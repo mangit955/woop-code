@@ -1,0 +1,24 @@
+{
+  "description": "User cancels during streaming",
+  "input": {
+    "userPrompt": "Generate a long response",
+    "repoContext": "",
+    "cancelAfterMs": 10
+  },
+  "providerResponse": {
+    "events": [
+      { "type": "text", "content": "Starting to generate" },
+      { "type": "text", "content": " a very long" },
+      { "type": "text", "content": " response that" },
+      { "type": "text", "content": " will be cancelled" }
+    ]
+  },
+  "expectedResult": "",
+  "expectedCallbacks": {
+    "onText": ">= 1",
+    "onDone": 0,
+    "onCancel": 1,
+    "onError": 0
+  },
+  "note": "Conversation should not include the cancelled user message after dispose"
+}

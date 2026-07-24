@@ -1,0 +1,18 @@
+{
+  "description": "Provider throws an error during streaming",
+  "input": {
+    "userPrompt": "Do something",
+    "repoContext": ""
+  },
+  "providerResponse": {
+    "error": "NetworkError: Connection timeout"
+  },
+  "expectedError": "NetworkError: Connection timeout",
+  "expectedCallbacks": {
+    "onText": 0,
+    "onDone": 0,
+    "onError": 1,
+    "onCancel": 0
+  },
+  "note": "Conversation should preserve user message even though execution failed"
+}

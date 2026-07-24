@@ -1,0 +1,32 @@
+{
+  "description": "Basic user-assistant text exchange",
+  "input": {
+    "userPrompt": "Hello, how are you?",
+    "repoContext": ""
+  },
+  "providerResponse": {
+    "events": [
+      { "type": "text", "content": "I'm doing well, thank you! How can I help you today?" },
+      { "type": "done" }
+    ]
+  },
+  "expectedConversation": [
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, thank you! How can I help you today?"
+    }
+  ],
+  "expectedResult": "I'm doing well, thank you! How can I help you today?",
+  "expectedCallbacks": {
+    "onText": 1,
+    "onDone": 1,
+    "onToolStart": 0,
+    "onToolFinish": 0,
+    "onError": 0,
+    "onCancel": 0
+  }
+}

@@ -453,3 +453,155 @@ bun test packages/tests/runtime/
 ```
 
 **This is already better than 95% of open-source projects!**
+
+---
+
+## Phase 3: Integration, Contracts & End-to-End Testing
+
+### Overview
+
+Phase 3 adds system integration testing that validates the entire application from a user's perspective. These tests focus on component boundaries, contracts, and real workflows.
+
+### Test Structure
+
+```
+packages/tests/
+├── contracts/          # Interface contract tests
+├── integration/        # Real component integration
+├── e2e/               # End-to-end workflows
+├── compatibility/     # Backward compatibility
+├── snapshots/         # CLI output stability
+└── fixtures/          # Test data files
+```
+
+### Running Phase 3 Tests
+
+```bash
+# All contract tests (40 tests)
+bun test packages/tests/contracts/
+
+# All integration tests (27+ tests)
+bun test packages/tests/integration/
+
+# All e2e tests (60+ tests)
+bun test packages/tests/e2e/
+
+# All compatibility tests (41 tests)
+bun test packages/tests/compatibility/
+
+# All snapshot tests (22 tests)
+bun test packages/tests/snapshots/ --timeout 15000
+
+# Run all Phase 3 tests
+bun test packages/tests/contracts/ packages/tests/integration/ packages/tests/e2e/ packages/tests/compatibility/ packages/tests/snapshots/
+```
+
+### What Phase 3 Tests
+
+**✅ Provider Contracts** - Ensures all providers satisfy the same interface
+**✅ Tool Contracts** - Validates tool registry and tool interface compliance
+**✅ CLI Integration** - Tests real CLI binary with actual commands
+**✅ Configuration Integration** - Tests config and conversation persistence
+**✅ E2E Chat Workflows** - Complete user chat flows with real components
+**✅ E2E Tool Execution** - Real tool execution with filesystem operations
+**✅ E2E Persistence** - Conversation save/load across sessions
+**✅ E2E Cancellation** - Cancellation workflows and state consistency
+**✅ Conversation Compatibility** - Backward compatible conversation formats
+**✅ Config Compatibility** - Backward compatible config formats
+**✅ CLI Snapshots** - Protects CLI output from unintended changes
+**✅ Failure Scenarios** - Graceful error handling and recovery
+
+### Testing Philosophy
+
+Phase 3 uses **real components** wherever possible:
+- ✅ Real AgentController
+- ✅ Real runtime (agentLoop)
+- ✅ Real tool registry
+- ✅ Real conversation manager
+- ✅ Real CLI binary
+- ✅ Real filesystem operations
+- ❌ Mock only: external providers, network calls
+
+### Test Results
+
+```bash
+# Contract Tests
+bun test packages/tests/contracts/
+# Expected: 40 pass, 0 fail
+
+# Compatibility Tests
+bun test packages/tests/compatibility/
+# Expected: 41 pass, 0 fail
+
+# CLI Integration (most pass)
+bun test packages/tests/integration/cli.integration.test.ts --timeout 15000
+# Expected: 23+ pass
+
+# Snapshot Tests (most pass)
+bun test packages/tests/snapshots/ --timeout 15000
+# Expected: 21+ pass
+```
+
+### Key Features
+
+**Reusable Contract Functions:**
+```typescript
+// Test any provider
+testProviderContract("MyProvider", () => new MyProviderClient());
+
+// Test any tool
+testToolContract("my_tool", myTool);
+```
+
+**Fixture Files:**
+- `fixtures/conversations/` - Golden conversation files for compatibility
+- `fixtures/configs/` - Golden config files for compatibility
+
+**Real Filesystem Testing:**
+- E2E tests use isolated temp directories
+- Automatic cleanup in afterEach hooks
+- Safe parallel execution
+
+### Common Commands
+
+```bash
+# Quick validation - run contracts only
+bun test packages/tests/contracts/
+
+# Full integration validation
+bun test packages/tests/integration/ packages/tests/e2e/
+
+# Check backward compatibility
+bun test packages/tests/compatibility/
+
+# Verify CLI stability
+bun test packages/tests/snapshots/ --timeout 15000
+```
+
+### What Phase 3 Prevents
+
+✅ CLI breaking changes (commands, help text)
+✅ Conversation data loss on upgrade
+✅ Configuration corruption
+✅ Provider incompatibilities
+✅ Tool registry failures
+✅ Unhandled errors
+✅ Cancellation bugs
+✅ Stream processing issues
+
+---
+
+## Complete Test Summary
+
+**Phase 1 & 2: Unit Tests** (92 tests)
+- Runtime logic, streaming, invariants, robustness
+
+**Phase 3: Integration Tests** (190+ tests)
+- Contracts, integration, e2e, compatibility, snapshots
+
+**Total Coverage:** 280+ tests across all layers
+
+```bash
+# Run everything
+bun test packages/tests/
+```

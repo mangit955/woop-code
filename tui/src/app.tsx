@@ -35,16 +35,28 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       </Box>
 
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
-        {hasPendingEdit ? (
-          <DiffPreview pendingEdit={state.pendingEdit!} />
-        ) : showHome ? (
+        {showHome ? (
           <HomeScreen
             {...homeScreen}
             renderPrompt={(placeholder) => (
               <Prompt {...promptProps} placeholder={placeholder} />
             )}
           />
+        ) : hasPendingEdit ? (
+          /* Split layout: Timeline on top, Diff below */
+          <Box flexDirection="column" height="100%">
+            {/* Agent conversation - compressed but visible */}
+            <Box flexDirection="column" flexShrink={1} maxHeight="40%">
+              <Timeline items={state.timeline} isThinking={state.isThinking} />
+            </Box>
+
+            {/* Diff preview - takes remaining space */}
+            <Box flexDirection="column" flexGrow={1}>
+              <DiffPreview pendingEdit={state.pendingEdit!} />
+            </Box>
+          </Box>
         ) : (
+          /* Normal timeline view */
           <Timeline items={state.timeline} isThinking={state.isThinking} />
         )}
       </Box>

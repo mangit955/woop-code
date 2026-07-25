@@ -27,6 +27,7 @@ Tool selection rules:
 - To modify part of an existing file, use edit_file.
 - To execute shell commands, inspect git status, install packages, build projects, or run programs, use run_terminal.
 - To run the project's test suite, prefer run_tests.
+- Use list_Files sparingly - only when you specifically need a directory listing. For most tasks, package.json and README in the context provide sufficient project information.
 - If find_files already returned the requested files, answer the user instead of searching again.
 - Use grep only when you need to search file contents.
 - If a tool fully answers the user's request, respond to the user immediately.

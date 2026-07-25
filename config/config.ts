@@ -87,9 +87,20 @@ export async function listRepositoryFiles() {
 export async function buildRepositoryContext() {
   const packageJson = await readPackageJson();
   const readme = await readReadme();
-  const files = await listRepositoryFiles();
-
-  return `Repository Context\n\nPackage.json:\n${packageJson}\n\nREADME:\n${readme}\n\nFiles:\n${files.join("\n")}`;
+  
+  // Don't include full file list - it can be massive and waste tokens
+  // The agent has list_files and find_files tools to discover files on demand
+  let contextParts = ["Repository Context"];
+  
+  if (packageJson) {
+    contextParts.push(`\nPackage.json:\n${packageJson}`);
+  }
+  
+  if (readme) {
+    contextParts.push(`\nREADME:\n${readme}`);
+  }
+  
+  return contextParts.join("");
 }
 
 export function recentMessages(

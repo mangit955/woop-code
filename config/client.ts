@@ -84,20 +84,47 @@ export function geminiClient(apiKey: string): ProviderClient {
           })),
         },
       ];
-      // console.time("generateContentStream");
-      // console.log("Repo Context:", repoContext.length);
-      // console.log("Messages:", JSON.stringify(contents).length);
-      // console.log("System:", SYSTEM_PROMPT.length);
-      const stream = await ai.models.generateContentStream({
-        model: "gemini-3.5-flash-lite",
-        contents,
+      
+      // Log token usage for debugging (enable with DEBUG=1 environment variable)
+      if (process.env.DEBUG) {
+        console.log("Token usage estimate:");
+        console.log("  Repo Context:", repoContext.length, "chars");
+        console.log("  Messages:", JSON.stringify(contents).length, "chars");
+        console.log("  System Prompt:", SYSTEM_PROMPT.length, "chars");
+        console.log("  Total:", (repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length), "chars (~", Math.ceil((repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length) / 4), "tokens)");
+      }
+      
+      let stream;
+      try {
+        stream = await ai.models.generateContentStream({
+          model: "gemini-3.5-flash-lite",
+          contents,
 
-        config: {
-          systemInstruction: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
-          tools,
-          abortSignal: signal,
-        },
-      });
+          config: {
+            systemInstruction: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
+            tools,
+            abortSignal: signal,
+          },
+        });
+      } catch (error: any) {
+        // Handle rate limit errors gracefully
+        if (error?.status === 429 || error?.code === 429) {
+          const errorData = error?.error || error;
+          const retryAfter = errorData?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay || 'a few moments';
+          
+          throw new Error(
+            `⚠️  Rate limit exceeded for Google Gemini API.\n\n` +
+            `Please wait ${retryAfter} before trying again, or switch to a different provider.\n\n` +
+            `You can:\n` +
+            `  • Wait and retry your request\n` +
+            `  • Use a different API provider (run 'woopcode providers' to see options)\n` +
+            `  • Check your quota at: https://ai.dev/rate-limit`
+          );
+        }
+        
+        // Re-throw other errors
+        throw error;
+      }
       // console.timeEnd("generateContentStream");
 
       for await (const chunk of stream) {

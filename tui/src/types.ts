@@ -12,6 +12,11 @@ export type TimeLineItem =
     }
   | {
       id: string;
+      type: "system";
+      content: string;
+    }
+  | {
+      id: string;
       type: "tool";
       name: string;
       arguments: Record<string, unknown>;

@@ -47,6 +47,18 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
         </Box>
       );
 
+    case "system":
+      return (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text bold color="yellow">
+            System
+          </Text>
+          <Box paddingLeft={1}>
+            <Text>{item.content}</Text>
+          </Box>
+        </Box>
+      );
+
     case "tool": {
       const label = toolLabel(item.name);
       const target = formatToolArgument(item.arguments);

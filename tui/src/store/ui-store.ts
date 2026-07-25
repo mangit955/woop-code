@@ -59,6 +59,22 @@ export class UIStore {
     this.emit();
   }
 
+  addSystemMessage(content: string) {
+    this.state = {
+      ...this.state,
+      timeline: [
+        ...this.state.timeline,
+        {
+          id: crypto.randomUUID(),
+          type: "system",
+          content,
+        },
+      ],
+    };
+
+    this.emit();
+  }
+
   startTool(tool: ToolCall) {
     this.state = {
       ...this.state,

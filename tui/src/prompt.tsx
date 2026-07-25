@@ -2,6 +2,8 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useRef } from "react";
 import type { AgentController } from "../../commands/agentController";
+import { handleSlashCommand } from "../../commands/slash";
+import { store } from "./store/ui-store";
 
 interface PromptProps {
   controller: AgentController;
@@ -42,6 +44,24 @@ export function Prompt({
     if (!prompt || controller.isBusy()) {
       return;
     }
+
+    // 🔥 Slash command interception
+    const context = {
+      controller,
+      onExit,
+      onOutput: (message: string) => {
+        store.addSystemMessage(message);
+      },
+    };
+
+    const result = await handleSlashCommand(prompt, context);
+
+    if (result.handled) {
+      onValueChange("");
+      return;
+    }
+
+    // Original flow
     if (prompt === "/exit") {
       await onExit();
       return;

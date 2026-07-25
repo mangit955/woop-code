@@ -79,11 +79,8 @@ export class AgentController {
         });
       }
     } catch (error) {
-      // Error is already handled by callbacks.onError in agentLoop
-      // Just log it for debugging purposes, don't re-throw
-      if (process.env.DEBUG) {
-        console.error("Agent error:", error);
-      }
+      // Re-throw error (error callback already called by agentLoop)
+      throw error;
     } finally {
       this.abortController = null;
       this.isRunning = false;

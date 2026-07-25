@@ -24,8 +24,8 @@ export const terminalTool: Tool = {
       throw Error("command is required");
     }
     
-    // Warn about potentially problematic commands
-    if (command.includes("&") && !command.includes("wait")) {
+    // Warn about potentially problematic commands (only single & for background, not &&)
+    if (/\s&\s*$/.test(command) || /\s&\s+[^&]/.test(command)) {
       return "Error: Background processes (&) are not supported. Use run_terminal for quick commands only (tests, builds, installs), not for starting servers.";
     }
 
@@ -55,7 +55,7 @@ export const terminalTool: Tool = {
         return stderr;
       }
       
-      return stdout || stderr || "Command completed successfully (no output)";
+      return stdout || stderr || "";
     } catch (error) {
       if (error instanceof Error && error.message.includes("timed out")) {
         return `Error: ${error.message}\n\nNote: For long-running processes like servers, the agent cannot verify them. Just create/edit the code and inform the user to test manually.`;

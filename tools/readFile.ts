@@ -22,7 +22,7 @@ export const readFileTool: Tool = {
     const file = Bun.file(path);
 
     if (!(await file.exists())) {
-      return `Error: File ${path} does not exist`;
+      throw Error(`File ${path} does not exist`);
     }
 
     // Check if path is a directory

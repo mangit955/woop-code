@@ -14,9 +14,9 @@ export async function agentLoop(
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
 ) {
-  const MAX_ITERATIONS = 20; // Reduced for free tier efficiency
+  const MAX_ITERATIONS = 10; // Prevent infinite loops
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
-  const SAME_TOOL_THRESHOLD = 2; // Strict - prevent wasteful repeats
+  const SAME_TOOL_THRESHOLD = 1; // Throw on second identical call
   const executedTools = new Map<string, number>(); // Track count instead of just presence
 
   let iterations = 0;
@@ -95,8 +95,7 @@ export async function agentLoop(
 
       const callCount = executedTools.get(toolKey) || 0;
 
-      // Allow some tools to be called multiple times (like read_file after edit_file)
-      // But block obvious loops where the same tool is called 3+ times with identical args
+      // Detect tool loops: if same tool+args called more than once, it's a loop
       if (callCount >= SAME_TOOL_THRESHOLD) {
         throw new Error(
           `Tool loop detected: ${toolCall.name} called ${callCount + 1} times with identical arguments. ` +

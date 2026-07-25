@@ -14,6 +14,16 @@ Local commands that execute instantly without invoking the LLM.
 - **`/provider [name]`** (alias: `p`) - Show current provider or switch to another
   - Without arguments: Shows current provider and all available providers
   - With provider name: Switches to the specified provider (if configured)
+
+- **`/login <provider> <api-key>`** - Login to a provider from within the app
+  - Example: `/login google YOUR_API_KEY`
+  - Validates the API key before saving
+  - Sets the provider as active
+  
+- **`/logout [provider]`** - Logout from a provider
+  - Without arguments: Logs out from current provider
+  - With provider name: Logs out from specified provider
+  - Automatically switches to another logged-in provider if available
   
 - **`/model`** (alias: `m`) - Show current model and available models
   - Currently read-only; model switching will be added in future versions

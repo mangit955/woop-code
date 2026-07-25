@@ -81,7 +81,7 @@ const providerCommand: SlashCommand = {
         })
         .join("\n");
 
-      return `Current Provider: ${current}\n\nAvailable:\n${providers}`;
+      return `Current Provider: ${current}\n\nAvailable:\n${providers}\n\nTip: Use /login or /logout to manage authentication`;
     }
 
     const newProvider = args[0];
@@ -97,7 +97,7 @@ const providerCommand: SlashCommand = {
 
     const providerConfig = config.providers[newProvider];
     if (!providerConfig || !providerConfig.apiKey) {
-      return `Provider "${newProvider}" not configured.\nRun: woopcode providers login -p ${newProvider}`;
+      return `Provider "${newProvider}" not configured.\nUse: /login ${newProvider} <api-key>`;
     }
 
     config.defaultProvider = newProvider;
@@ -131,6 +131,93 @@ const modelCommand: SlashCommand = {
     }
 
     return output.trim();
+  },
+};
+
+const loginCommand: SlashCommand = {
+  name: "login",
+  description: "Login to a provider",
+  category: "configuration",
+  usage: "/login <provider> <api-key>",
+
+  async execute(context, args) {
+    if (args.length < 2) {
+      return `Usage: /login <provider> <api-key>\nExample: /login google YOUR_API_KEY`;
+    }
+
+    const provider = args[0];
+    const apiKey = args.slice(1).join(" "); // Allow API keys with spaces
+
+    const config = await getConfig();
+
+    if (!config.providers[provider]) {
+      const available = Object.keys(config.providers);
+      return `Unknown provider "${provider}".\nAvailable: ${available.join(", ")}`;
+    }
+
+    // Validate API key
+    const { loginProvider } = await import("../../config/authProvider");
+    const isValid = await loginProvider(provider, apiKey);
+
+    if (!isValid) {
+      return `Invalid API key for ${provider}.\nPlease check your API key and try again.`;
+    }
+
+    // Save the API key
+    config.providers[provider].apiKey = apiKey;
+    config.defaultProvider = provider;
+    await saveConfig(config);
+
+    return `Successfully logged in to ${provider}!\nThis is now your active provider.`;
+  },
+};
+
+const logoutCommand: SlashCommand = {
+  name: "logout",
+  description: "Logout from a provider",
+  category: "configuration",
+  usage: "/logout [provider]",
+
+  async execute(context, args) {
+    const config = await getConfig();
+
+    // If no provider specified, logout from current
+    const provider = args[0] || config.defaultProvider;
+
+    if (!config.providers[provider]) {
+      const available = Object.keys(config.providers);
+      return `Unknown provider "${provider}".\nAvailable: ${available.join(", ")}`;
+    }
+
+    const providerConfig = config.providers[provider];
+    if (!providerConfig?.apiKey) {
+      return `Already logged out from ${provider}.`;
+    }
+
+    // Remove API key
+    delete config.providers[provider].apiKey;
+
+    // If logging out from default provider, clear default
+    if (config.defaultProvider === provider) {
+      // Find another logged-in provider
+      const otherProvider = Object.entries(config.providers).find(
+        ([name, details]: [string, any]) => name !== provider && details.apiKey
+      );
+
+      if (otherProvider) {
+        config.defaultProvider = otherProvider[0];
+      } else {
+        config.defaultProvider = "";
+      }
+    }
+
+    await saveConfig(config);
+
+    const nextProvider = config.defaultProvider
+      ? `\nActive provider: ${config.defaultProvider}`
+      : "\nNo providers logged in. Use /login to authenticate.";
+
+    return `Logged out from ${provider}.${nextProvider}`;
   },
 };
 
@@ -232,6 +319,8 @@ export function registerCommands() {
   registry.register(newCommand);
   registry.register(exitCommand);
   registry.register(providerCommand);
+  registry.register(loginCommand);
+  registry.register(logoutCommand);
   registry.register(modelCommand);
   registry.register(workspaceCommand);
   registry.register(statusCommand);

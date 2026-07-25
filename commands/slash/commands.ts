@@ -43,6 +43,11 @@ const newCommand: SlashCommand = {
 
   async execute(context, args) {
     await saveConversation([]);
+    
+    // Clear UI timeline as well
+    const { store } = await import("../../tui/src/store/ui-store");
+    store.clearTimeline();
+    
     return "Started new conversation";
   },
 };

@@ -2,7 +2,7 @@ import type { Tool } from "../config/types";
 
 export const findFilesTool: Tool = {
   name: "find_files",
-  description: "Finds files by name or partial filename.",
+  description: "Finds files by name or partial filename. Use specific queries (e.g., 'websocket', 'config') rather than broad patterns (e.g., '.').",
   parameters: [
     {
       name: "query",
@@ -20,6 +20,12 @@ export const findFilesTool: Tool = {
     if (!query || typeof query !== "string") {
       throw new Error("Parameter 'query' is required and must be a string.");
     }
+    
+    // Prevent overly broad searches that waste tokens
+    if (query === "." || query === "*" || query === "**" || query.length <= 1) {
+      return "Error: Query too broad or too short. Please provide a specific filename or pattern with at least 2 characters (e.g., 'websocket', 'config', 'auth', 'index').";
+    }
+    
     const rootPath =
       args.path && typeof args.path === "string" ? args.path : process.cwd();
 
@@ -76,7 +82,18 @@ export const findFilesTool: Tool = {
     }
 
     if (matches.length === 0) {
-      return "No matching files found.";
+      // Check if the query matches a directory
+      const queryPath = `${rootPath}/${query}`;
+      try {
+        const stat = await Bun.file(queryPath).stat();
+        if (stat.isDirectory) {
+          return `"${query}" is a directory. Use list_Files with path="${query}" to see its contents.`;
+        }
+      } catch {
+        // Not a valid path
+      }
+      
+      return `No matching files found for "${query}". Try:\n- Use list_Files to see directory contents\n- Use a more specific or different search term\n- Check if the file exists in the project`;
     }
 
     const output = matches.join("\n");

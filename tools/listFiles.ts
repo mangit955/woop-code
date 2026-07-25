@@ -2,7 +2,7 @@ import type { Tool } from "../config/types";
 
 export const listFilesTool: Tool = {
   name: "list_Files",
-  description: "List all the files in the directory",
+  description: "List all files in a directory. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.",
   parameters: [
     {
       name: "path",

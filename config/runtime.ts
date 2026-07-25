@@ -14,15 +14,23 @@ export async function agentLoop(
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
 ) {
-  const MAX_ITERATIONS = 10;
-  const MAX_TURNS = 8;
-  const executedTools = new Set<string>();
+  const MAX_ITERATIONS = 20; // Reduced for free tier efficiency
+  const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
+  const SAME_TOOL_THRESHOLD = 2; // Strict - prevent wasteful repeats
+  const executedTools = new Map<string, number>(); // Track count instead of just presence
 
   let iterations = 0;
 
   try {
     while (iterations < MAX_ITERATIONS) {
       iterations++;
+      
+      // Warn the agent about efficiency at key milestones
+      if (iterations === 6) {
+        callbacks.onStatus?.(`⚠️  ${iterations} tools used - start implementing now to conserve quota`);
+      } else if (iterations === MAX_ITERATIONS - 5) {
+        callbacks.onStatus?.(`⚠️  ${MAX_ITERATIONS - iterations} iterations remaining - prioritize completion`);
+      }
 
       let assistantText = "";
       let toolCall: Extract<StreamEvent, { type: "tool_call" }> | null = null;
@@ -69,13 +77,34 @@ export async function agentLoop(
         throw new Error(`Unknown tool: ${toolCall.name}`);
       }
 
-      const toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
-
-      if (executedTools.has(toolKey)) {
-        throw new Error("Tool loop detected");
+      // Create normalized key for better duplicate detection
+      let toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
+      
+      // Special handling for terminal commands - normalize to catch duplicates
+      if (toolCall.name === "run_terminal" && toolCall.arguments.command) {
+        const cmd = String(toolCall.arguments.command).trim();
+        // Normalize: remove "cd X &&", normalize package managers, trim whitespace
+        const normalizedCmd = cmd
+          .replace(/^cd\s+\S+\s+&&\s+/, "") // remove cd prefix
+          .replace(/bun (add|install)/, "install") // normalize bun
+          .replace(/npm (i|install)/, "install") // normalize npm
+          .replace(/\s+/g, " ") // normalize whitespace
+          .trim();
+        toolKey = `run_terminal:${normalizedCmd}`;
       }
 
-      executedTools.add(toolKey);
+      const callCount = executedTools.get(toolKey) || 0;
+
+      // Allow some tools to be called multiple times (like read_file after edit_file)
+      // But block obvious loops where the same tool is called 3+ times with identical args
+      if (callCount >= SAME_TOOL_THRESHOLD) {
+        throw new Error(
+          `Tool loop detected: ${toolCall.name} called ${callCount + 1} times with identical arguments. ` +
+          `This usually indicates the tool result is being ignored or the task cannot be completed.`
+        );
+      }
+
+      executedTools.set(toolKey, callCount + 1);
       callbacks.onToolStart?.({
         id: toolCall.id,
         name: toolCall.name,
@@ -113,7 +142,11 @@ export async function agentLoop(
     }
 
     throw new Error(
-      `Agent exceeded the maximum number of iterations (${MAX_ITERATIONS}).`,
+      `Agent exceeded the maximum number of iterations (${MAX_ITERATIONS}).\n\n` +
+      `This usually means:\n` +
+      `  • The task is too complex - try breaking it into smaller steps\n` +
+      `  • The agent is stuck in analysis - it may need clearer instructions\n` +
+      `  • More iterations are needed - consider increasing MAX_ITERATIONS`
     );
   } catch (error) {
     if (signal?.aborted) {

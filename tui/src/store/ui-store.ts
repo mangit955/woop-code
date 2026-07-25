@@ -245,6 +245,17 @@ export class UIStore {
     };
     this.emit();
   }
+
+  clearTimeline() {
+    this.state = {
+      ...this.state,
+      timeline: [],
+      status: "Ready",
+      isThinking: false,
+    };
+    this.activeAssistantId = null;
+    this.emit();
+  }
 }
 
 export const store = new UIStore();

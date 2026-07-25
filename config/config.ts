@@ -84,9 +84,35 @@ export async function listRepositoryFiles() {
   return files;
 }
 
+export async function getProjectStructure() {
+  const root = process.cwd();
+  const topLevel: string[] = [];
+  
+  try {
+    // Only get top-level directories and key files
+    for await (const entry of new Bun.Glob("*").scan(root)) {
+      if (entry === "node_modules" || entry === ".git") {
+        continue;
+      }
+      
+      topLevel.push(entry);
+      
+      // Limit to 50 entries to avoid token waste
+      if (topLevel.length >= 50) {
+        break;
+      }
+    }
+  } catch {
+    return "";
+  }
+  
+  return topLevel.sort().join("\n");
+}
+
 export async function buildRepositoryContext() {
   const packageJson = await readPackageJson();
   const readme = await readReadme();
+  const structure = await getProjectStructure();
   
   // Don't include full file list - it can be massive and waste tokens
   // The agent has list_files and find_files tools to discover files on demand
@@ -98,6 +124,10 @@ export async function buildRepositoryContext() {
   
   if (readme) {
     contextParts.push(`\nREADME:\n${readme}`);
+  }
+  
+  if (structure) {
+    contextParts.push(`\nTop-level structure:\n${structure}\n\nUse find_files or list_files to explore deeper.`);
   }
   
   return contextParts.join("");

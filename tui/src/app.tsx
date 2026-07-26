@@ -1,4 +1,4 @@
-import { Box } from "ink";
+import { Box, Text } from "ink";
 import { Header } from "./header";
 import { Timeline } from "./timeline";
 import { ConnectedStatusBar } from "./statusBar";
@@ -8,6 +8,8 @@ import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
 import type { AgentController } from "../../commands/agentController";
 import { useState } from "react";
+import { useTerminalSize } from "./hooks/useTerminalSize";
+import { colors } from "./styles/theme";
 
 interface AppProps {
   controller: AgentController;
@@ -18,53 +20,69 @@ interface AppProps {
 export function App({ controller, onExit, homeScreen }: AppProps) {
   const state = useUIStore();
   const [promptValue, setPromptValue] = useState("");
+  const { width, height } = useTerminalSize();
   const showHome = state.timeline.length === 0;
   const hasPendingEdit = state.pendingEdit !== null;
+
+  const endIdx = state.timeline.length - (state.scrollOffset || 0);
+  const visibleTimeline = state.timeline.slice(0, Math.max(0, endIdx));
 
   const promptProps = {
     controller,
     onExit,
     value: promptValue,
     onValueChange: setPromptValue,
+    providerName: homeScreen.providerName,
+    modelName: homeScreen.provider,
   };
 
   return (
-    <Box flexDirection="column" height="100%" paddingX={1}>
-      <Box marginBottom={1}>
+    <Box
+      flexDirection="column"
+      width={width}
+      height={height}
+      backgroundColor="#000000"
+    >
+      {/* Header — pinned at top */}
+      <Box flexShrink={0} paddingX={1}>
         <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
       </Box>
 
-      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+      {/* Main content — fills all available space */}
+      <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1}>
         {showHome ? (
           <HomeScreen
             {...homeScreen}
             renderPrompt={(placeholder) => (
-              <Prompt {...promptProps} placeholder={placeholder} />
+              <Prompt {...promptProps} placeholder={placeholder} variant="block" />
             )}
           />
         ) : hasPendingEdit ? (
           /* Split layout: Timeline on top, Diff below */
-          <Box flexDirection="column" height="100%">
+          <Box flexDirection="column" flexGrow={1} minHeight={0}>
             {/* Agent conversation - compressed but visible */}
-            <Box flexDirection="column" flexShrink={1} maxHeight="40%">
-              <Timeline items={state.timeline} isThinking={state.isThinking} />
+            <Box flexDirection="column-reverse" flexShrink={1} overflow="hidden">
+              <Timeline items={visibleTimeline} isThinking={state.isThinking && state.scrollOffset === 0} />
             </Box>
 
             {/* Diff preview - takes remaining space */}
-            <Box flexDirection="column" flexGrow={1}>
+            <Box flexDirection="column" flexGrow={1} minHeight={0}>
               <DiffPreview pendingEdit={state.pendingEdit!} />
             </Box>
           </Box>
         ) : (
-          /* Normal timeline view */
-          <Timeline items={state.timeline} isThinking={state.isThinking} />
+          /* Normal timeline view — scrolls within available space */
+          <Box flexDirection="column-reverse" flexGrow={1} minHeight={0} overflow="hidden">
+            <Timeline items={visibleTimeline} isThinking={state.isThinking && state.scrollOffset === 0} />
+          </Box>
         )}
       </Box>
 
+      {/* Footer — pinned at bottom */}
       {!showHome && !hasPendingEdit && (
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column" flexShrink={0} paddingX={1} gap={1} marginBottom={1}>
+          <Prompt {...promptProps} variant="block" />
           <ConnectedStatusBar />
-          <Prompt {...promptProps} />
         </Box>
       )}
     </Box>

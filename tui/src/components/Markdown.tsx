@@ -3,6 +3,7 @@ import type { Token, Tokens } from "marked";
 import { CodeBlock } from "./CodeBlock";
 import { InlineCode } from "./InlineCode";
 import type { ReactNode } from "react";
+import { colors } from "../styles/theme";
 
 interface MarkdownProps {
   tokens: Token[];
@@ -27,14 +28,15 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
     case "heading": {
       const t = token as Tokens.Heading;
       const prefix = "#".repeat(t.depth) + " ";
+      // OpenCode theme: accent purple for headings
       const color =
         t.depth === 1
-          ? "#5fafff"
+          ? colors.accent
           : t.depth === 2
-            ? "#87afff"
-            : "#afafaf";
+            ? colors.accent
+            : colors.textMuted;
       return (
-        <Box marginTop={1} marginBottom={1}>
+        <Box marginTop={t.depth === 1 ? 2 : 1} marginBottom={1}>
           <Text bold color={color}>
             {prefix}
             {renderInline(t.tokens)}
@@ -47,7 +49,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const t = token as Tokens.Paragraph;
       return (
         <Box marginBottom={1}>
-          <Text>{renderInline(t.tokens)}</Text>
+          <Text color={colors.textBase}>{renderInline(t.tokens)}</Text>
         </Box>
       );
     }
@@ -67,7 +69,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
           borderTop={false}
           borderBottom={false}
           borderRight={false}
-          borderColor="#666666"
+          borderColor={colors.borderBase}
           paddingLeft={1}
         >
           <Box flexDirection="column">
@@ -138,7 +140,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
         );
         return (
           <Box marginBottom={1}>
-            <Text>{[top, headerRow, mid, ...dataRows, bot].join("\n")}</Text>
+            <Text color={colors.borderBase}>{[top, headerRow, mid, ...dataRows, bot].join("\n")}</Text>
           </Box>
         );
       } else {
@@ -147,18 +149,18 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
         const divider = "─".repeat(Math.min(termWidth, 40));
         return (
           <Box flexDirection="column" marginBottom={1}>
-            <Text dimColor>{divider}</Text>
+            <Text color={colors.borderMuted}>{divider}</Text>
             {t.rows.map((row, ri) => (
               <Box key={ri} flexDirection="column">
                 <Box flexDirection="column" marginY={1}>
                   {t.header.map((h, ci) => (
                     <Box key={ci}>
-                      <Text dimColor>{`  ${pad(cellPlain(h.tokens), labelWidth)}  `}</Text>
-                      <Text>{renderInline(row[ci]?.tokens ?? [])}</Text>
+                      <Text color={colors.textMuted}>{`  ${pad(cellPlain(h.tokens), labelWidth)}  `}</Text>
+                      <Text color={colors.textBase}>{renderInline(row[ci]?.tokens ?? [])}</Text>
                     </Box>
                   ))}
                 </Box>
-                <Text dimColor>{divider}</Text>
+                <Text color={colors.borderMuted}>{divider}</Text>
               </Box>
             ))}
           </Box>
@@ -172,7 +174,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const hrWidth = Math.min((process.stdout.columns || 80) - 6, 60);
       return (
         <Box marginY={1}>
-          <Text dimColor>{"─".repeat(hrWidth)}</Text>
+          <Text color={colors.borderBase}>{"─".repeat(hrWidth)}</Text>
         </Box>
       );
     }
@@ -183,7 +185,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
     default:
       // Unknown block types — show raw text if non-empty
       if (token.raw?.trim()) {
-        return <Text>{token.raw}</Text>;
+        return <Text color={colors.textBase}>{token.raw}</Text>;
       }
       return null;
   }
@@ -202,21 +204,21 @@ function ListItem({
 }) {
   return (
     <Box>
-      <Text dimColor>{prefix}</Text>
+      <Text color={colors.textMuted}>{prefix}</Text>
       <Box flexDirection="column" flexShrink={1}>
         {item.tokens.map((inner, j) => {
           // In tight lists, unwrap paragraphs to avoid extra spacing
           if (inner.type === "paragraph") {
             const p = inner as Tokens.Paragraph;
-            return <Text key={j}>{renderInline(p.tokens)}</Text>;
+            return <Text key={j} color={colors.textBase}>{renderInline(p.tokens)}</Text>;
           }
           // Tight list items use a bare "text" token instead of paragraph
           if (inner.type === "text") {
             const txt = inner as Tokens.Text;
             if (txt.tokens && txt.tokens.length > 0) {
-              return <Text key={j}>{renderInline(txt.tokens)}</Text>;
+              return <Text key={j} color={colors.textBase}>{renderInline(txt.tokens)}</Text>;
             }
-            return <Text key={j}>{txt.text}</Text>;
+            return <Text key={j} color={colors.textBase}>{txt.text}</Text>;
           }
           // Nested lists, code blocks, etc.
           return <MarkdownBlock key={j} token={inner} />;
@@ -244,7 +246,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
       case "strong": {
         const t = token as Tokens.Strong;
         return (
-          <Text key={i} bold>
+          <Text key={i} bold color={colors.primary}>
             {renderInline(t.tokens)}
           </Text>
         );
@@ -253,7 +255,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
       case "em": {
         const t = token as Tokens.Em;
         return (
-          <Text key={i} italic>
+          <Text key={i} italic color={colors.warningBase}>
             {renderInline(t.tokens)}
           </Text>
         );
@@ -266,8 +268,12 @@ function renderInline(tokens: Token[]): ReactNode[] {
 
       case "link": {
         const t = token as Tokens.Link;
-        // Render link text only, as requested
-        return <Text key={i}>{renderInline(t.tokens)}</Text>;
+        // Render link text with accent color
+        return (
+          <Text key={i} color={colors.textAccent}>
+            {renderInline(t.tokens)}
+          </Text>
+        );
       }
 
       case "br":

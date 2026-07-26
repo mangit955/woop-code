@@ -2,6 +2,7 @@ import { Box, Text } from "ink";
 import type { TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
+import { colors } from "./styles/theme";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -10,7 +11,7 @@ interface TimelineProps {
 
 export function Timeline({ items, isThinking }: TimelineProps) {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexShrink={0}>
       {items.map((item) => (
         <TimelineItem key={item.id} item={item} />
       ))}
@@ -22,24 +23,29 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
   switch (item.type) {
     case "user":
       return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold dimColor>
-            You
-          </Text>
-          <Text>{item.content}</Text>
+        <Box flexDirection="row" marginBottom={1} flexShrink={0}>
+          {/* Left accent bar — OpenCode style */}
+          <Box flexShrink={0} marginRight={1}>
+            <Text color={colors.primary}>│</Text>
+          </Box>
+          <Box flexDirection="column">
+            <Text color={colors.textBase}>{item.content}</Text>
+          </Box>
         </Box>
       );
 
     case "assistant":
       return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Box>
-            <Text bold color="cyan">
+        <Box flexDirection="column" marginBottom={1} flexShrink={0}>
+          <Box gap={1} marginBottom={0}>
+            <Text bold color={colors.primary}>
               Woopcode
             </Text>
-            {item.streaming && <Text dimColor> · thinking</Text>}
+            {item.streaming && (
+              <Text color={colors.textMuted}> · thinking</Text>
+            )}
           </Box>
-          <Box paddingLeft={1}>
+          <Box paddingLeft={2}>
             <MessageRenderer content={item.content} streaming={item.streaming} />
           </Box>
         </Box>
@@ -47,12 +53,10 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
 
     case "system":
       return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color="yellow">
-            System
-          </Text>
-          <Box paddingLeft={1}>
-            <Text>{item.content}</Text>
+        <Box marginBottom={1} paddingLeft={2} flexShrink={0}>
+          <Box gap={1}>
+            <Text color={colors.textMuted}>⊙</Text>
+            <Text color={colors.textMuted}>{item.content}</Text>
           </Box>
         </Box>
       );
@@ -62,12 +66,14 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
       const target = formatToolArgument(item.arguments);
 
       return (
-        <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+        <Box flexDirection="column" marginBottom={0} paddingLeft={2} flexShrink={0}>
           <Box gap={1}>
-            <Text bold color="#888888">{label}</Text>
-            {target && <Text>{target}</Text>}
+            <ToolStatus status={item.status} />
+            <Text bold color={colors.textMuted}>
+              {label}
+            </Text>
+            {target && <Text color={colors.textFaint}>{target}</Text>}
           </Box>
-          <ToolStatus status={item.status} />
         </Box>
       );
     }
@@ -90,17 +96,17 @@ function formatToolArgument(arguments_: Record<string, unknown>) {
 
 function toolLabel(name: string): string {
   const map: Record<string, string> = {
-    read_file: "READ",
-    write_file: "WRITE",
-    edit_file: "EDIT",
-    create_file: "CREATE",
-    delete_file: "DELETE",
-    run_command: "RUN",
-    execute_command: "RUN",
-    search: "SEARCH",
-    grep: "SEARCH",
-    list_directory: "LIST",
-    list_files: "LIST",
+    read_file: "Read",
+    write_file: "Write",
+    edit_file: "Edit",
+    create_file: "Create",
+    delete_file: "Delete",
+    run_command: "Run",
+    execute_command: "Run",
+    search: "Search",
+    grep: "Search",
+    list_directory: "List",
+    list_files: "List",
   };
-  return map[name] ?? name.toUpperCase().replace(/_/g, " ");
+  return map[name] ?? name.replace(/_/g, " ");
 }

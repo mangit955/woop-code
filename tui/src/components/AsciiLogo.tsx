@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import { useLogoAnimation } from "../hooks/useLogoAnimation";
+import { colors } from "../styles/theme";
 
 const REVEAL_DURATION_MS = 500;
 const WORD_SPACING = "    ";
@@ -33,8 +34,8 @@ export function AsciiLogo({
 
         return (
           <Box key={index}>
-            <Text bold color="cyan">{visibleWoop}</Text>
-            <Text bold dimColor>{visibleCode}</Text>
+            <Text bold color={colors.primary}>{visibleWoop}</Text>
+            <Text bold color={colors.textFaint}>{visibleCode}</Text>
           </Box>
         );
       })}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Text } from "ink";
+import { colors } from "../styles/theme";
 
 export function StreamingCursor() {
   const [visible, setVisible] = useState(true);
@@ -9,5 +10,5 @@ export function StreamingCursor() {
     return () => clearInterval(id);
   }, []);
 
-  return <Text dimColor>{visible ? "▌" : " "}</Text>;
+  return <Text color={colors.textMuted}>{visible ? "▌" : " "}</Text>;
 }

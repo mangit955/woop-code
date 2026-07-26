@@ -1,6 +1,7 @@
 import { Box } from "ink";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { colors } from "../styles/theme";
 
 const PLACEHOLDER_ROTATION_MS = 3500;
 const TYPEWRITER_FRAME_MS = 24;
@@ -15,7 +16,7 @@ export function PromptCard({ width, examples, children }: PromptCardProps) {
   const placeholder = useRotatingPlaceholder(examples);
 
   return (
-    <Box borderStyle="round" borderColor="gray" paddingX={1} width={width}>
+    <Box width={width}>
       {children(placeholder)}
     </Box>
   );

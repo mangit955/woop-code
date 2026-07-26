@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box } from "ink";
+import { Box, Text } from "ink";
 import { lexer, type Token } from "marked";
 import { Markdown } from "./Markdown";
 import { StreamingCursor } from "./StreamingCursor";
@@ -78,7 +78,11 @@ export function MessageRenderer({ content, streaming }: MessageRendererProps) {
   return (
     <Box flexDirection="column">
       <Markdown tokens={tokens} />
-      {streaming && <StreamingCursor />}
+      {streaming && (
+        <Box marginTop={0}>
+          <StreamingCursor />
+        </Box>
+      )}
     </Box>
   );
 }

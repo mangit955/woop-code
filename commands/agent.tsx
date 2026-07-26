@@ -39,12 +39,10 @@ export async function runAgent() {
     onToolStart(tool) {
       store.finishAssistantMessage();
       store.startTool(tool);
-      store.setStatus(`Running ${tool.name}...`);
     },
 
     onToolFinish(tool) {
       store.finishTool(tool.id);
-      store.setStatus("Thinking...");
     },
 
     onText(text) {
@@ -85,7 +83,7 @@ export async function runAgent() {
 
   const { unmount } = render(
     <App controller={controller} onExit={handleExit} homeScreen={homeScreen} />,
-    { exitOnCtrlC: false },
+    { exitOnCtrlC: false, fullScreen: true },
   );
 
   let exiting = false;

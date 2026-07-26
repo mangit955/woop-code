@@ -7,6 +7,7 @@ export class UIStore {
     status: "Ready",
     isThinking: false,
     pendingEdit: null,
+    scrollOffset: 0,
   };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
@@ -46,6 +47,7 @@ export class UIStore {
   addUserMessage(content: string) {
     this.state = {
       ...this.state,
+      scrollOffset: 0, // Reset scroll on new message
       timeline: [
         ...this.state.timeline,
         {
@@ -78,6 +80,7 @@ export class UIStore {
   startTool(tool: ToolCall) {
     this.state = {
       ...this.state,
+      scrollOffset: 0, // Reset scroll
       timeline: [
         ...this.state.timeline,
         {
@@ -122,6 +125,7 @@ export class UIStore {
 
     this.state = {
       ...this.state,
+      scrollOffset: 0, // Reset scroll
       timeline: [
         ...this.state.timeline,
         {
@@ -252,8 +256,33 @@ export class UIStore {
       timeline: [],
       status: "Ready",
       isThinking: false,
+      scrollOffset: 0,
     };
     this.activeAssistantId = null;
+    this.emit();
+  }
+
+  scrollUp() {
+    this.state = {
+      ...this.state,
+      scrollOffset: Math.min(this.state.scrollOffset + 1, Math.max(0, this.state.timeline.length - 1)),
+    };
+    this.emit();
+  }
+
+  scrollDown() {
+    this.state = {
+      ...this.state,
+      scrollOffset: Math.max(0, this.state.scrollOffset - 1),
+    };
+    this.emit();
+  }
+
+  resetScroll() {
+    this.state = {
+      ...this.state,
+      scrollOffset: 0,
+    };
     this.emit();
   }
 }

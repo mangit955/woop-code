@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useUIStore } from "./store/useUIStore";
+import { colors } from "./styles/theme";
 
 // ─── Pure presentational component ───────────────────────────────────────────
 
@@ -13,9 +14,14 @@ interface StatusBarProps {
 
 export function StatusBar({ status, message }: StatusBarProps) {
   return (
-    <Box gap={1}>
-      <StatusIcon status={status} />
-      <StatusLabel status={status} message={message} />
+    <Box justifyContent="space-between" width="100%">
+      <Box gap={1}>
+        <StatusIcon status={status} />
+        <StatusLabel status={status} message={message} />
+      </Box>
+      <Box gap={2} flexShrink={0}>
+        <Text color={colors.textFaint}>ctrl+c</Text>
+      </Box>
     </Box>
   );
 }
@@ -23,15 +29,15 @@ export function StatusBar({ status, message }: StatusBarProps) {
 function StatusIcon({ status }: { status: StatusState }) {
   if (status === "thinking" || status === "tool") {
     return (
-      <Text color="cyan">
+      <Text color={colors.primary}>
         <Spinner type="dots" />
       </Text>
     );
   }
-  if (status === "ready") return <Text color="green">✓</Text>;
-  if (status === "error") return <Text color="red">✗</Text>;
+  if (status === "ready") return <Text color="green">●</Text>;
+  if (status === "error") return <Text color={colors.dangerBase}>●</Text>;
   // cancelled
-  return <Text dimColor>–</Text>;
+  return <Text color={colors.textMuted}>●</Text>;
 }
 
 function StatusLabel({
@@ -41,13 +47,13 @@ function StatusLabel({
   status: StatusState;
   message?: string;
 }) {
-  if (status === "ready") return <Text dimColor>Ready</Text>;
+  if (status === "ready") return <Text color={colors.textMuted}>Ready</Text>;
   if (status === "error")
-    return <Text color="red">{message ?? "Error"}</Text>;
+    return <Text color={colors.dangerBase}>{message ?? "Error"}</Text>;
   if (status === "cancelled")
-    return <Text dimColor>{message ?? "Cancelled"}</Text>;
+    return <Text color={colors.textMuted}>{message ?? "Cancelled"}</Text>;
   // thinking or tool — animated, show message
-  return <Text color="cyan">{message}</Text>;
+  return <Text color={colors.textMuted}>{message}</Text>;
 }
 
 // ─── Connected wrapper (reads from store) ────────────────────────────────────

@@ -1,4 +1,5 @@
 import { Text } from "ink";
+import { colors } from "../styles/theme";
 
 export interface HomeFooterProps {
   repository: string;
@@ -7,5 +8,5 @@ export interface HomeFooterProps {
 }
 
 export function HomeFooter({ repository, branch, provider }: HomeFooterProps) {
-  return <Text dimColor>{repository} · {branch} · {provider}</Text>;
+  return <Text color={colors.textMuted}>{repository} · {branch} · {provider}</Text>;
 }

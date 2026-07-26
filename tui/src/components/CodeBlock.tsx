@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import { highlight } from "cli-highlight";
 import chalk from "chalk";
+import { colors } from "../styles/theme";
 
 interface CodeBlockProps {
   code: string;
@@ -23,7 +24,8 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   }
 
   const lines = highlighted.split("\n");
-  const dim = chalk.dim;
+  // Use theme colors for borders
+  const borderColor = chalk.hex(colors.borderBase);
 
   const termWidth = Math.max((process.stdout.columns || 80) - 6, 30);
   const maxContent = lines.reduce(
@@ -37,13 +39,13 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   // ╭─ language ────────╮
   const label = language ? `─ ${language} ` : "─";
   const topFill = Math.max(0, boxWidth - label.length - 2);
-  const top = dim(`╭${label}${"─".repeat(topFill)}╮`);
+  const top = borderColor(`╭${label}${"─".repeat(topFill)}╮`);
 
   // ╰────────────────────╯
-  const bottom = dim(`╰${"─".repeat(boxWidth - 2)}╯`);
+  const bottom = borderColor(`╰${"─".repeat(boxWidth - 2)}╯`);
 
   // empty padding row
-  const empty = dim("│") + " ".repeat(boxWidth - 2) + dim("│");
+  const empty = borderColor("│") + " ".repeat(boxWidth - 2) + borderColor("│");
 
   // code rows — truncate long lines at inner width so the box never breaks
   const rows = lines.map((line) => {
@@ -54,10 +56,10 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
       // only when it fits — safest approach for ANSI-heavy strings.
       const truncated = stripAnsi(line).slice(0, inner - 1) + "…";
       const pad = inner - truncated.length;
-      return dim("│") + "  " + truncated + " ".repeat(Math.max(0, pad)) + " " + dim("│");
+      return borderColor("│") + "  " + truncated + " ".repeat(Math.max(0, pad)) + " " + borderColor("│");
     }
     const pad = inner - vis;
-    return dim("│") + "  " + line + " ".repeat(pad) + " " + dim("│");
+    return borderColor("│") + "  " + line + " ".repeat(pad) + " " + borderColor("│");
   });
 
   const output = [top, empty, ...rows, empty, bottom].join("\n");

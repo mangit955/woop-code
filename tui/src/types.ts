@@ -37,6 +37,7 @@ export interface UIState {
   status: string;
   isThinking: boolean;
   pendingEdit: PendingEdit | null;
+  scrollOffset: number;
 }
 
 export interface TimelineProps {

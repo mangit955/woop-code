@@ -1,4 +1,5 @@
 import { Text } from "ink";
+import { colors } from "../styles/theme";
 
 interface InlineCodeProps {
   text: string;
@@ -6,7 +7,7 @@ interface InlineCodeProps {
 
 export function InlineCode({ text }: InlineCodeProps) {
   return (
-    <Text color="#d4d4d4" backgroundColor="#2d2d2d">
+    <Text color={colors.textCode} backgroundColor={colors.bgLayer02}>
       {` ${text} `}
     </Text>
   );

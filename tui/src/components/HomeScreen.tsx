@@ -4,6 +4,7 @@ import { AsciiLogo } from "./AsciiLogo";
 import { CapabilityRow } from "./CapabilityRow";
 import { HomeFooter } from "./HomeFooter";
 import { PromptCard } from "./PromptCard";
+import { colors } from "../styles/theme";
 
 export interface HomeScreenData {
   logoWord: string;
@@ -49,7 +50,7 @@ export function HomeScreen({
       <Box flexDirection="column" alignItems="center">
         <AsciiLogo word={logoWord} />
         <Box marginTop={1} marginBottom={3}>
-          <Text dimColor>{subtitle}</Text>
+          <Text color={colors.textMuted}>{subtitle}</Text>
         </Box>
       </Box>
 

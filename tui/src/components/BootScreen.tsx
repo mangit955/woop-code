@@ -2,6 +2,7 @@ import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useBootAnimation, STEPS } from "../hooks/useBootAnimation";
 import { LogoReveal } from "./LogoReveal";
+import { colors } from "../styles/theme";
 
 interface BootScreenProps {
   onComplete: () => void;
@@ -19,10 +20,11 @@ export function BootScreen({ onComplete }: BootScreenProps) {
             text="Woopcode"
             duration={400}
             mode="highlight"
+            highlightColor={colors.primary}
             onComplete={() => {}}
           />
         ) : (
-          <Text bold color="cyan">
+          <Text bold color={colors.primary}>
             Woopcode
           </Text>
         )}
@@ -62,7 +64,7 @@ function StepRow({ label, done, loading }: StepRowProps) {
   return (
     <Box gap={1}>
       <StepIcon done={done} loading={loading} />
-      <Text dimColor={!done && !loading} color={done ? "green" : loading ? "cyan" : undefined}>
+      <Text color={done ? colors.successBase : loading ? colors.primary : colors.textMuted}>
         {label}
       </Text>
     </Box>
@@ -70,7 +72,7 @@ function StepRow({ label, done, loading }: StepRowProps) {
 }
 
 function StepIcon({ done, loading }: { done: boolean; loading: boolean }) {
-  if (done)    return <Text color="green">✓</Text>;
-  if (loading) return <Text color="cyan"><Spinner type="dots" /></Text>;
-  return       <Text dimColor>○</Text>;
+  if (done)    return <Text color={colors.successBase}>✓</Text>;
+  if (loading) return <Text color={colors.primary}><Spinner type="dots" /></Text>;
+  return       <Text color={colors.textMuted}>○</Text>;
 }

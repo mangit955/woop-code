@@ -68,7 +68,17 @@ export function Prompt({
     }
 
     onValueChange("");
-    await controller.run(prompt);
+    
+    // Run the agent with error handling to keep app alive
+    try {
+      await controller.run(prompt);
+    } catch (error) {
+      // Error already displayed via callbacks.onError
+      // Just catch it here to prevent app crash
+      if (process.env.DEBUG) {
+        console.error("Prompt handler caught error:", error);
+      }
+    }
   }
 
   return (

@@ -60,6 +60,14 @@ export async function runAgent() {
     onError(error) {
       store.finishAssistantMessage();
       store.setStatus(`Error: ${error.message}`);
+      
+      // Clear error status after a few seconds so user can continue
+      if (cancelStatusTimeout) {
+        clearTimeout(cancelStatusTimeout);
+      }
+      cancelStatusTimeout = setTimeout(() => {
+        store.setStatus("Ready");
+      }, 3000); // Show error for 3 seconds then reset
     },
 
     onCancel() {

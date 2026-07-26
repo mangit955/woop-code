@@ -79,8 +79,6 @@ export class AgentController {
         });
       }
     } catch (error) {
-      // Error is already handled by callbacks.onError in agentLoop
-      // Re-throw for tests to assert on, but UI (prompt.tsx) will catch
       throw error;
     } finally {
       this.abortController = null;

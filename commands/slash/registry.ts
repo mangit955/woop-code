@@ -6,7 +6,7 @@ export class SlashCommandRegistry {
 
   register(command: SlashCommand): void {
     this.commands.set(command.name, command);
-    
+
     if (command.aliases) {
       command.aliases.forEach((alias) => {
         this.aliases.set(alias, command.name);
@@ -55,7 +55,7 @@ export class SlashCommandRegistry {
     return output.trim();
   }
 
-  // 🔥 Discovery list
+  // Discovery list
   generateDiscoveryList(): string {
     return this.getAll()
       .map((cmd) => `/${cmd.name}`)

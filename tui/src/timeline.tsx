@@ -2,7 +2,6 @@ import { Box, Text } from "ink";
 import type { TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
-import { ThinkingIndicator } from "./components/ThinkingIndicator";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -15,7 +14,6 @@ export function Timeline({ items, isThinking }: TimelineProps) {
       {items.map((item) => (
         <TimelineItem key={item.id} item={item} />
       ))}
-      {isThinking && <ThinkingIndicator />}
     </Box>
   );
 }

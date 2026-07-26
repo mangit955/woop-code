@@ -14,10 +14,11 @@ export async function agentLoop(
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
 ) {
-  const MAX_ITERATIONS = 10; // Prevent infinite loops
+  const MAX_ITERATIONS = 20; // Allow complex tasks to complete
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
-  const SAME_TOOL_THRESHOLD = 1; // Throw on second identical call
-  const executedTools = new Map<string, number>(); // Track count instead of just presence
+  const SAME_TOOL_THRESHOLD = 2; // Allow re-reading files after edits
+  
+  const executedTools = new Map<string, number>();
 
   let iterations = 0;
 

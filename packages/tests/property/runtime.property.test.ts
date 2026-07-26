@@ -164,10 +164,11 @@ describe("Runtime - Property Tests", () => {
           const callbacks = new CallbackSpy();
           const messages: Message[] = [createUserMessage("Test")];
 
-          // INVARIANT: Calling same tool with same args twice = loop detection
+          // INVARIANT: Calling same tool with same args THREE times = loop detection (threshold is 2)
           const provider = createStreamingProvider([
             [createToolCallEvent("test_tool", args), createDoneEvent()],
-            [createToolCallEvent("test_tool", args), createDoneEvent()], // Duplicate!
+            [createToolCallEvent("test_tool", args), createDoneEvent()], // Second call - allowed
+            [createToolCallEvent("test_tool", args), createDoneEvent()], // Third call - should trigger
           ]);
 
           await expect(

@@ -299,7 +299,7 @@ describe("agentLoop - Tool Loop Detection", () => {
   });
 
   test("detects identical tool calls and throws", async () => {
-    // Simulate the agent calling the same tool twice in ONE agentLoop execution
+    // Simulate the agent calling the same tool THREE times (threshold is 2)
     let iterationCount = 0;
     const dynamicClient: any = {
       async *stream() {
@@ -309,7 +309,12 @@ describe("agentLoop - Tool Loop Detection", () => {
           yield createDoneEvent();
         } else if (iterationCount === 1) {
           iterationCount++;
-          // Same tool with same args - should trigger loop detection
+          // Second call - still allowed (threshold is 2)
+          yield createToolCallEvent("looping_tool", { param: "value" });
+          yield createDoneEvent();
+        } else if (iterationCount === 2) {
+          iterationCount++;
+          // Third call - should trigger loop detection
           yield createToolCallEvent("looping_tool", { param: "value" });
           yield createDoneEvent();
         }
@@ -402,10 +407,10 @@ describe("agentLoop - Iteration Limits", () => {
     const promise = agentLoop(dynamicClient, messages, "", callbackSpy);
 
     await expect(promise).rejects.toThrow(
-      "Agent exceeded the maximum number of iterations (10)",
+      "Agent exceeded the maximum number of iterations (20)",
     );
     
-    expect(mockTool.executionCount).toBe(10);
+    expect(mockTool.executionCount).toBe(20);
   });
 
   test("completes successfully within iteration limit", async () => {

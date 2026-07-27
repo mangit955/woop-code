@@ -37,6 +37,23 @@ describe("UIStore conversation scrolling", () => {
 });
 
 describe("UIStore edit approvals", () => {
+  test("scrolls a diff from its first line toward its last line", () => {
+    const store = new UIStore();
+    store.setPendingEditScrollLimit(12);
+
+    store.scrollPendingEditBy(3);
+    expect(store.getState().pendingEditScrollOffset).toBe(3);
+
+    store.scrollPendingEditBy(20);
+    expect(store.getState().pendingEditScrollOffset).toBe(12);
+
+    store.scrollPendingEditBy(-5);
+    expect(store.getState().pendingEditScrollOffset).toBe(7);
+
+    store.scrollPendingEditToStart();
+    expect(store.getState().pendingEditScrollOffset).toBe(0);
+  });
+
   test("exposes a pending edit until it is approved", async () => {
     const store = new UIStore();
     const pending = store.setPendingEdit({

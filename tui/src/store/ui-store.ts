@@ -7,12 +7,14 @@ export class UIStore {
     status: "Ready",
     isThinking: false,
     pendingEdit: null,
+    pendingEditScrollOffset: 0,
     scrollOffset: 0,
   };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
   private pendingEmit = false;
   private maxScrollOffset = 0;
+  private maxPendingEditScrollOffset = 0;
   private editResolvers: Map<
     string,
     { resolve: (approved: boolean) => void; reject: (error: Error) => void }
@@ -201,9 +203,11 @@ export class UIStore {
 
   // Pending Edit Management
   setPendingEdit(edit: PendingEdit): Promise<boolean> {
+    this.maxPendingEditScrollOffset = 0;
     this.state = {
       ...this.state,
       pendingEdit: edit,
+      pendingEditScrollOffset: 0,
     };
     this.emit();
 
@@ -225,6 +229,7 @@ export class UIStore {
     this.state = {
       ...this.state,
       pendingEdit: null,
+      pendingEditScrollOffset: 0,
     };
     this.emit();
   }
@@ -242,6 +247,7 @@ export class UIStore {
     this.state = {
       ...this.state,
       pendingEdit: null,
+      pendingEditScrollOffset: 0,
     };
     this.emit();
   }
@@ -259,17 +265,20 @@ export class UIStore {
     this.state = {
       ...this.state,
       pendingEdit: null,
+      pendingEditScrollOffset: 0,
     };
     this.emit();
   }
 
   clearTimeline() {
     this.maxScrollOffset = 0;
+    this.maxPendingEditScrollOffset = 0;
     this.state = {
       ...this.state,
       timeline: [],
       status: "Ready",
       isThinking: false,
+      pendingEditScrollOffset: 0,
       scrollOffset: 0,
     };
     this.activeAssistantId = null;
@@ -331,6 +340,51 @@ export class UIStore {
     this.state = {
       ...this.state,
       scrollOffset: 0,
+    };
+    this.emit();
+  }
+
+  scrollPendingEditBy(lines: number) {
+    if (lines === 0) return;
+
+    const pendingEditScrollOffset = Math.max(
+      0,
+      Math.min(
+        this.state.pendingEditScrollOffset + lines,
+        this.maxPendingEditScrollOffset,
+      ),
+    );
+
+    if (pendingEditScrollOffset === this.state.pendingEditScrollOffset) return;
+
+    this.state = { ...this.state, pendingEditScrollOffset };
+    this.emit();
+  }
+
+  setPendingEditScrollLimit(maxScrollOffset: number) {
+    this.maxPendingEditScrollOffset = Math.max(0, maxScrollOffset);
+    const pendingEditScrollOffset = Math.min(
+      this.state.pendingEditScrollOffset,
+      this.maxPendingEditScrollOffset,
+    );
+
+    if (pendingEditScrollOffset === this.state.pendingEditScrollOffset) return;
+
+    this.state = { ...this.state, pendingEditScrollOffset };
+    this.emit();
+  }
+
+  scrollPendingEditToStart() {
+    if (this.state.pendingEditScrollOffset === 0) return;
+    this.state = { ...this.state, pendingEditScrollOffset: 0 };
+    this.emit();
+  }
+
+  scrollPendingEditToEnd() {
+    if (this.state.pendingEditScrollOffset === this.maxPendingEditScrollOffset) return;
+    this.state = {
+      ...this.state,
+      pendingEditScrollOffset: this.maxPendingEditScrollOffset,
     };
     this.emit();
   }

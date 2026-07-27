@@ -26,6 +26,7 @@ describe("writeFile Tool - Integration Tests", () => {
     // Mock the UI store (only thing we CAN mock)
     mockStore = {
       setPendingEdit: mock(async () => true), // Auto-approve
+      addSystemMessage: mock(() => {}),
     };
 
     mock.module("../../../tui/src/store/ui-store", () => ({
@@ -184,8 +185,11 @@ describe("writeFile Tool - Integration Tests", () => {
         content: "new",
       });
 
-      expect(result).toBe(`Edit rejected for ${path}`);
+      expect(result).toBe(`Edit rejected for ${path}. No changes were applied. Do not claim this edit was completed.`);
       expect(await readFile(path)).toBe("original"); // Unchanged
+      expect(mockStore.addSystemMessage).toHaveBeenCalledWith(
+        `Edit rejected for ${path}. No changes were applied. Do not claim this edit was completed.`,
+      );
     });
 
     test("cancelled edit returns cancellation message", async () => {
@@ -200,8 +204,11 @@ describe("writeFile Tool - Integration Tests", () => {
         content: "new",
       });
 
-      expect(result).toBe(`Edit cancelled for ${path}`);
+      expect(result).toBe(`Edit cancelled for ${path}. No changes were applied.`);
       expect(await readFile(path)).toBe("original"); // Unchanged
+      expect(mockStore.addSystemMessage).toHaveBeenCalledWith(
+        `Edit cancelled for ${path}. No changes were applied.`,
+      );
     });
 
     test("approval includes correct diff", async () => {

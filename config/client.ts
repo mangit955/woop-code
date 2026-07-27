@@ -7,6 +7,8 @@ export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
 };
 
+const GEMINI_REQUEST_TIMEOUT_MS = 60_000;
+
 export function geminiClient(apiKey: string): ProviderClient {
   const ai = new GoogleGenAI({ apiKey });
 
@@ -94,70 +96,89 @@ export function geminiClient(apiKey: string): ProviderClient {
         console.log("  Total:", (repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length), "chars (~", Math.ceil((repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length) / 4), "tokens)");
       }
       
-      let stream;
+      const requestController = new AbortController();
+      let timedOut = false;
+      const abortFromCaller = () => requestController.abort();
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        requestController.abort();
+      }, GEMINI_REQUEST_TIMEOUT_MS);
+
+      if (signal) {
+        if (signal.aborted) {
+          abortFromCaller();
+        } else {
+          signal.addEventListener("abort", abortFromCaller, { once: true });
+        }
+      }
+
       try {
-        stream = await ai.models.generateContentStream({
+        const stream = await ai.models.generateContentStream({
           model: "gemini-3.5-flash-lite",
           contents,
 
           config: {
             systemInstruction: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
             tools,
-            abortSignal: signal,
+            abortSignal: requestController.signal,
           },
         });
+
+        for await (const chunk of stream) {
+          const part = chunk.candidates?.[0]?.content?.parts?.find(
+            (p) => p.functionCall,
+          );
+
+          if (part?.functionCall) {
+            yield {
+              type: "tool_call",
+              id: part.functionCall.id ?? crypto.randomUUID(),
+              name: part.functionCall.name!,
+              arguments: part.functionCall.args ?? {},
+              thoughtSignature: part.thoughtSignature,
+            };
+
+            continue;
+          }
+          const text = chunk.text;
+
+          if (text) {
+            yield {
+              type: "text",
+              content: text,
+            };
+          }
+        }
+
+        yield {
+          type: "done",
+        };
       } catch (error: any) {
+        if (timedOut) {
+          throw new Error(
+            "Gemini did not respond within 60 seconds. Check your network connection and API quota, then try again.",
+          );
+        }
+
         // Handle rate limit errors gracefully
         if (error?.status === 429 || error?.code === 429) {
           const errorData = error?.error || error;
           const retryAfter = errorData?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay || 'a few moments';
-          
+
           throw new Error(
             `⚠️  Rate limit exceeded for Google Gemini API.\n\n` +
-            `Please wait ${retryAfter} before trying again, or switch to a different provider.\n\n` +
+            `Please wait ${retryAfter} before trying again.\n\n` +
             `You can:\n` +
             `  • Wait and retry your request\n` +
-            `  • Use a different API provider (run 'woopcode providers' to see options)\n` +
-            `  • Check your quota at: https://ai.dev/rate-limit`
+            `  • Check your quota at: https://ai.dev/rate-limit`,
           );
         }
-        
-        // Re-throw other errors
+
         throw error;
+      } finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortFromCaller);
       }
-      // console.timeEnd("generateContentStream");
-
-      for await (const chunk of stream) {
-        // console.time("first-sdk-chunk");
-        // console.timeEnd("first-sdk-chunk");
-        const part = chunk.candidates?.[0]?.content?.parts?.find(
-          (p) => p.functionCall,
-        );
-
-        if (part?.functionCall) {
-          yield {
-            type: "tool_call",
-            id: part.functionCall.id ?? crypto.randomUUID(),
-            name: part.functionCall.name!,
-            arguments: part.functionCall.args ?? {},
-            thoughtSignature: part.thoughtSignature,
-          };
-
-          continue;
-        }
-        const text = chunk.text;
-
-        if (text) {
-          yield {
-            type: "text",
-            content: text,
-          };
-        }
-      }
-
-      yield {
-        type: "done",
-      };
     },
   };
 }

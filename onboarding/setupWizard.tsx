@@ -6,6 +6,7 @@ import chalk from "chalk";
 import { getEnabledProviders, type ProviderInfo } from "./providers";
 import { loginProvider } from "../config/authProvider";
 import { getConfig, saveConfig } from "../config/config";
+import { colors } from "../tui/src/styles/theme";
 
 type WizardStep =
   | "welcome"
@@ -93,7 +94,7 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
   if (step === "welcome") {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text bold color="cyan">
+        <Text bold color={colors.primary}>
           Welcome to Woopcode!
         </Text>
         <Text dimColor> </Text>
@@ -112,7 +113,7 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
         <Text dimColor> </Text>
         {enabledProviders.map((provider, index) => (
           <Box key={provider.id} flexDirection="column">
-            <Text color={index === selectedIndex ? "cyan" : undefined}>
+            <Text color={index === selectedIndex ? colors.primary : undefined}>
               {index === selectedIndex ? "❯ " : "  "}
               {provider.name}
             </Text>
@@ -130,7 +131,7 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
   if (step === "api-key-info" && selectedProvider) {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text bold color="cyan">
+        <Text bold color={colors.primary}>
           Setting up {selectedProvider.name}
         </Text>
         <Text dimColor> </Text>
@@ -169,7 +170,7 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
     return (
       <Box flexDirection="column" paddingY={1}>
         <Box>
-          <Text color="cyan">
+          <Text color={colors.primary}>
             <Spinner type="dots" />
           </Text>
           <Text> Validating API key...</Text>

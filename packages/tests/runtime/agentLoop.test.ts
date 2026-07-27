@@ -181,6 +181,31 @@ describe("agentLoop - Tool Execution", () => {
     expect(messages[2]).toMatchObject({ role: "tool", content: "Tool failed: Tool execution failed" });
   });
 
+  test("stops the turn when the user rejects a proposed edit", async () => {
+    mockTool.setResult("Edit rejected for src/example.ts. No changes were applied.");
+
+    let streamCalls = 0;
+    const client: any = {
+      async *stream() {
+        streamCalls += 1;
+        yield createToolCallEvent("test_tool", {});
+        yield createDoneEvent();
+      },
+    };
+
+    await expect(agentLoop(client, messages, "", callbackSpy)).resolves.toBe(
+      "The proposed file change was not applied because it was rejected.",
+    );
+
+    expect(streamCalls).toBe(1);
+    expect(callbackSpy.getCallsByName("onToolError")).toHaveLength(1);
+    expect(callbackSpy.getCallsByName("onToolFinish")).toHaveLength(0);
+    expect(messages.at(-1)).toMatchObject({
+      role: "assistant",
+      content: "The proposed file change was not applied because it was rejected.",
+    });
+  });
+
   test("truncates tool result at MAX_TOOL_RESULT", async () => {
     const largeResult = generateLargeText(5000);
     mockTool.setResult(largeResult);

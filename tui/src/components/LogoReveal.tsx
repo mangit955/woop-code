@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { useLogoAnimation } from "../hooks/useLogoAnimation";
 import type { AnimationMode } from "../hooks/useLogoAnimation";
+import { colors } from "../styles/theme";
 
 export interface LogoRevealProps {
   /** The text to animate */
@@ -10,7 +11,7 @@ export interface LogoRevealProps {
   duration?: number;
   /** Animation style (default: "highlight") */
   mode?: AnimationMode;
-  /** Color for highlighted characters (default: "cyan") */
+  /** Color for highlighted characters (defaults to the primary blue) */
   highlightColor?: string;
   /** Whether to show bold text (default: true) */
   bold?: boolean;
@@ -30,7 +31,7 @@ export function LogoReveal({
   text,
   duration = 600,
   mode = "highlight",
-  highlightColor = "cyan",
+  highlightColor = colors.primary,
   bold = true,
   onComplete,
 }: LogoRevealProps) {

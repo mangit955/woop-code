@@ -48,7 +48,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       </Box>
 
       {/* Main content */}
-      <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1}>
+      <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} backgroundColor="#000000">
         {showHome ? (
           <HomeScreen
             {...homeScreen}
@@ -58,7 +58,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           />
         ) : hasPendingEdit ? (
           /* Split layout: Timeline on top, Diff below */
-          <Box flexDirection="column" flexGrow={1} minHeight={0}>
+          <Box flexDirection="column" flexGrow={1} minHeight={0} backgroundColor="#000000">
             <ConversationViewport
               items={state.timeline}
               isThinking={state.isThinking}
@@ -69,7 +69,13 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
             />
 
             {/* Diff preview - takes remaining space */}
-            <Box flexDirection="column" flexGrow={1} minHeight={0} marginTop={1}>
+            <Box
+              flexDirection="column"
+              flexGrow={1}
+              flexShrink={1}
+              minHeight={0}
+              backgroundColor="#000000"
+            >
               <DiffPreview pendingEdit={state.pendingEdit!} />
             </Box>
           </Box>

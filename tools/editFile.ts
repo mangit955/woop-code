@@ -69,12 +69,15 @@ export const editFileTool: Tool = {
     try {
       approved = await store.setPendingEdit(pendingEdit);
     } catch (error) {
-      // User cancelled with Esc
-      return `Edit cancelled for ${path}`;
+      const outcome = `Edit cancelled for ${path}. No changes were applied.`;
+      store.addSystemMessage(outcome);
+      return outcome;
     }
 
     if (!approved) {
-      return `Edit rejected for ${path}`;
+      const outcome = `Edit rejected for ${path}. No changes were applied. Do not claim this edit was completed.`;
+      store.addSystemMessage(outcome);
+      return outcome;
     }
 
     // Write file after approval

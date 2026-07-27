@@ -12,4 +12,9 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toContain("tool fails or a duplicate call is skipped");
     expect(SYSTEM_PROMPT).toContain("identical arguments");
   });
+
+  test("requires rejected edits to be reported as unapplied", () => {
+    expect(SYSTEM_PROMPT).toContain("rejected or cancelled edit means the file is unchanged");
+    expect(SYSTEM_PROMPT).toContain("never report the proposed change as completed");
+  });
 });

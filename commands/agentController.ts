@@ -47,11 +47,12 @@ export class AgentController {
     store.addUserMessage(prompt);
     store.setStatus("Thinking...");
 
-    const client = createProviderClient(this.provider, this.apiKey);
-
     let response = "";
+    let agentLoopStarted = false;
 
     try {
+      const client = createProviderClient(this.provider, this.apiKey);
+      agentLoopStarted = true;
       response = await agentLoop(
         client,
         conversation,
@@ -79,6 +80,14 @@ export class AgentController {
         });
       }
     } catch (error) {
+      // agentLoop reports provider and tool failures itself. Client creation can
+      // fail earlier (for example, when an unsupported provider is selected),
+      // so surface that path to the UI as well.
+      if (!agentLoopStarted) {
+        this.callbacks.onError?.(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
       throw error;
     } finally {
       this.abortController = null;

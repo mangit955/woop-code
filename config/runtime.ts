@@ -171,6 +171,31 @@ export async function agentLoop(
           ? result.slice(0, MAX_TOOL_RESULT) + "\n\n...output truncated..."
           : result;
 
+      const editWasDeclined =
+        toolResult.startsWith("Edit rejected") ||
+        toolResult.startsWith("Edit cancelled");
+
+      if (editWasDeclined) {
+        callbacks.onToolError?.({
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+          error: "Rejected by user",
+        });
+        messages.push({
+          role: "tool",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          content: toolResult,
+        });
+
+        const outcome = "The proposed file change was not applied because it was rejected.";
+        messages.push({ role: "assistant", content: outcome });
+        callbacks.onText?.(outcome);
+        callbacks.onDone?.();
+        return outcome;
+      }
+
       callbacks.onToolFinish?.({
         id: toolCall.id,
         name: toolCall.name,

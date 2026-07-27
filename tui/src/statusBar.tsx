@@ -3,6 +3,8 @@ import { useUIStore } from "./store/useUIStore";
 import { colors } from "./styles/theme";
 import { StatusSpinner } from "./components/StatusSpinner";
 
+const workspacePath = process.cwd().replace(process.env.HOME ?? "", "~");
+
 // ─── Pure presentational component ───────────────────────────────────────────
 
 type StatusState = "ready" | "thinking" | "tool" | "error" | "cancelled";
@@ -44,7 +46,9 @@ function StatusLabel({
   status: StatusState;
   message?: string;
 }) {
-  if (status === "ready") return <Text color={colors.textMuted}>Ready</Text>;
+  if (status === "ready") {
+    return <Text color={colors.textMuted}>{workspacePath}</Text>;
+  }
   if (status === "error")
     return <Text color={colors.dangerBase}>{message ?? "Error"}</Text>;
   if (status === "cancelled")
@@ -68,9 +72,8 @@ function parseStatus(raw: string): { state: StatusState; message?: string } {
     return { state: "thinking", message: "Thinking…" };
   }
 
-  if (lower.startsWith("running ")) {
-    // "Running read_file..." → message = "Running read_file"
-    return { state: "tool", message: raw.replace(/\.*$/, "") };
+  if (lower.startsWith("working") || lower.startsWith("running ")) {
+    return { state: "tool", message: "Working…" };
   }
 
   if (lower.startsWith("error")) {

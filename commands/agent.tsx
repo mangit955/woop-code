@@ -34,21 +34,29 @@ export async function runAgent() {
         clearTimeout(cancelStatusTimeout);
         cancelStatusTimeout = undefined;
       }
-      store.setStatus(status);
+      // Runtime notices (such as iteration-budget warnings) are informational,
+      // not terminal states. Keep the activity indicator truthful while a turn
+      // is still in progress.
+      store.setStatus(status.startsWith("⚠️") ? "Thinking..." : status);
     },
 
     onToolStart(tool) {
       store.finishAssistantMessage();
       store.startTool(tool);
+      store.setStatus("Working...");
     },
 
     onToolFinish(tool) {
       store.finishTool(tool.id);
+      // A tool result is sent back to the model for the next step. The turn is
+      // still active until onDone, so never show Ready here.
+      store.setStatus("Thinking...");
     },
 
     onToolError(tool) {
       store.failTool(tool.id);
       store.addSystemMessage(`${tool.name} failed: ${tool.error}`);
+      store.setStatus("Thinking...");
     },
 
     onText(text) {
@@ -113,7 +121,13 @@ export async function runAgent() {
     // Coalescing them prevents Ink from repainting the full transcript for
     // every individual report.
     scrollFrame = setTimeout(() => {
-      store.scrollBy(pendingScrollLines);
+      if (store.getState().pendingEdit) {
+        // The diff is a normal top-to-bottom viewport, unlike the
+        // bottom-anchored conversation timeline.
+        store.scrollPendingEditBy(-pendingScrollLines);
+      } else {
+        store.scrollBy(pendingScrollLines);
+      }
       pendingScrollLines = 0;
       scrollFrame = undefined;
     }, 16);

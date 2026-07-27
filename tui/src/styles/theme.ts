@@ -42,8 +42,14 @@ export const colors = {
   agentReview: "#f87171",   // Red 400
 
   // Diff colors
-  diffAdd: "#34d399",
-  diffRemove: "#f87171",
+  // OpenCode's default ANSI diff palette: normal colors for counts and
+  // bright variants for the actual change markers.
+  diffAdd: "#008000",
+  diffRemove: "#800000",
+  diffAddHighlight: "#00ff00",
+  diffRemoveHighlight: "#ff0000",
+  diffAddBg: "#082408",
+  diffRemoveBg: "#240808",
   diffModified: "#fbbf24",
 };
 

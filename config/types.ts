@@ -58,11 +58,16 @@ export interface ToolResult extends ToolCall {
   output: string;
 }
 
+export interface ToolFailure extends ToolCall {
+  error: string;
+}
+
 export interface AgentCallbacks {
   onStatus?(status: string): void;
   onText?(text: string): void;
   onToolStart?(tool: ToolCall): void;
   onToolFinish?(tool: ToolResult): void;
+  onToolError?(tool: ToolFailure): void;
   onDone?(): void;
   onError?(error: Error): void;
   onCancel?(): void;

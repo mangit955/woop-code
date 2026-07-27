@@ -157,11 +157,20 @@ describe("Tool Registry Contract", () => {
     }
   });
 
-  test("getTool returns undefined for unknown tool", async () => {
-    const { getTool } = await import("../../../tools");
+  test("registry resolver returns undefined for an unknown tool", async () => {
+    const { resolveTool } = await import("../../../tools");
     
-    const unknown = getTool("unknown_tool_name");
+    const unknown = resolveTool("unknown_tool_name");
     expect(unknown).toBeUndefined();
+  });
+
+  test("list file aliases resolve to the canonical tool", async () => {
+    const { resolveTool } = await import("../../../tools");
+
+    const canonicalTool = resolveTool("list_files");
+    expect(canonicalTool?.name).toBe("list_files");
+    expect(resolveTool("list_file")).toBe(canonicalTool);
+    expect(resolveTool("list_Files")).toBe(canonicalTool);
   });
 
   test("all tools have non-empty descriptions", async () => {

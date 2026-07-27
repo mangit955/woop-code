@@ -15,12 +15,12 @@ export const editFileTool: Tool = {
     },
     {
       name: "oldText",
-      description: "Text to replace",
+      description: "Exact current text to replace, copied verbatim from read_file output.",
       required: true,
     },
     {
       name: "newText",
-      description: "Replacement text",
+      description: "Exact replacement text.",
       required: true,
     },
   ],

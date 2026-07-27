@@ -159,20 +159,26 @@ describe("agentLoop - Tool Execution", () => {
     expect(callbackSpy.getCallsByName("onError")).toHaveLength(1);
   });
 
-  test("propagates tool execution errors", async () => {
+  test("returns tool execution errors to the model so it can recover", async () => {
     const toolError = new Error("Tool execution failed");
     mockTool.setThrowError(toolError);
-    
-    mockClient.setEvents([
-      createToolCallEvent("test_tool", {}),
-      createDoneEvent(),
-    ]);
 
-    await expect(
-      agentLoop(mockClient, messages, "", callbackSpy),
-    ).rejects.toThrow("Tool execution failed");
-    
-    expect(callbackSpy.getCallsByName("onError")).toHaveLength(1);
+    let iterationCount = 0;
+    const recoveringClient: any = {
+      async *stream() {
+        if (iterationCount++ === 0) {
+          yield createToolCallEvent("test_tool", {});
+        } else {
+          yield createTextEvent("Recovered");
+        }
+        yield createDoneEvent();
+      },
+    };
+
+    await expect(agentLoop(recoveringClient, messages, "", callbackSpy)).resolves.toBe("Recovered");
+    expect(callbackSpy.getCallsByName("onToolError")).toHaveLength(1);
+    expect(callbackSpy.getCallsByName("onError")).toHaveLength(0);
+    expect(messages[2]).toMatchObject({ role: "tool", content: "Tool failed: Tool execution failed" });
   });
 
   test("truncates tool result at MAX_TOOL_RESULT", async () => {
@@ -298,32 +304,25 @@ describe("agentLoop - Tool Loop Detection", () => {
     mockToolRegistry.register(mockTool);
   });
 
-  test("detects identical tool calls and throws", async () => {
-    // Simulate the agent calling the same tool THREE times (threshold is 2)
+  test("skips excessive identical tool calls and lets the model continue", async () => {
     let iterationCount = 0;
     const dynamicClient: any = {
       async *stream() {
-        if (iterationCount === 0) {
-          iterationCount++;
+        if (iterationCount < 5) {
+          iterationCount += 1;
           yield createToolCallEvent("looping_tool", { param: "value" });
           yield createDoneEvent();
-        } else if (iterationCount === 1) {
-          iterationCount++;
-          // Second call - still allowed (threshold is 2)
-          yield createToolCallEvent("looping_tool", { param: "value" });
-          yield createDoneEvent();
-        } else if (iterationCount === 2) {
-          iterationCount++;
-          // Third call - should trigger loop detection
-          yield createToolCallEvent("looping_tool", { param: "value" });
+        } else {
+          yield createTextEvent("Now editing the file");
           yield createDoneEvent();
         }
-      }
+      },
     };
 
-    await expect(
-      agentLoop(dynamicClient, messages, "", callbackSpy),
-    ).rejects.toThrow("Tool loop detected");
+    await expect(agentLoop(dynamicClient, messages, "", callbackSpy)).resolves.toBe("Now editing the file");
+    expect(mockTool.executionCount).toBe(4);
+    expect(callbackSpy.getCallsByName("onToolFinish")).toHaveLength(5);
+    expect(messages.find((message) => message.role === "tool" && message.content.startsWith("Skipped duplicate"))).toBeDefined();
   });
 
   test("allows same tool with different arguments", async () => {

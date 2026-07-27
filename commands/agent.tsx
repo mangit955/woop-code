@@ -46,6 +46,11 @@ export async function runAgent() {
       store.finishTool(tool.id);
     },
 
+    onToolError(tool) {
+      store.failTool(tool.id);
+      store.addSystemMessage(`${tool.name} failed: ${tool.error}`);
+    },
+
     onText(text) {
       store.appendAssistantText(text);
     },

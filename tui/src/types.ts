@@ -20,7 +20,7 @@ export type TimeLineItem =
       type: "tool";
       name: string;
       arguments: Record<string, unknown>;
-      status: "running" | "completed";
+      status: "running" | "completed" | "failed";
     };
 
 export interface PendingEdit {

@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
 import { useUIStore } from "./store/useUIStore";
 import { colors } from "./styles/theme";
+import { StatusSpinner } from "./components/StatusSpinner";
 
 // ─── Pure presentational component ───────────────────────────────────────────
 
@@ -29,11 +29,7 @@ export function StatusBar({ status, message }: StatusBarProps) {
 
 function StatusIcon({ status }: { status: StatusState }) {
   if (status === "thinking" || status === "tool") {
-    return (
-      <Text color={colors.primary}>
-        <Spinner type="dots" />
-      </Text>
-    );
+    return <StatusSpinner />;
   }
   if (status === "ready") return <Text color="green">●</Text>;
   if (status === "error") return <Text color={colors.dangerBase}>●</Text>;

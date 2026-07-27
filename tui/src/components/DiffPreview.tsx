@@ -2,7 +2,7 @@ import { Box, Text, useInput } from "ink";
 import type { PendingEdit } from "../types";
 import { DiffViewer } from "./DiffViewer";
 import { store } from "../store/ui-store";
-import { parseDiff } from "diff";
+import { colors } from "../styles/theme";
 
 interface DiffPreviewProps {
   pendingEdit: PendingEdit;
@@ -20,54 +20,56 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
     }
   });
 
-  // Calculate diff stats
-  const lines = pendingEdit.diff.split("\n");
-  const additions = lines.filter((l) => l.startsWith("+") && !l.startsWith("+++")).length;
-  const deletions = lines.filter((l) => l.startsWith("-") && !l.startsWith("---")).length;
-
-  // Extract filename parts for breadcrumb-style display
-  const pathParts = pendingEdit.filePath.split("/");
-  const filename = pathParts[pathParts.length - 1];
-  const directory = pathParts.slice(0, -1).join("/");
+  const additions = pendingEdit.diff
+    .split("\n")
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+    .length;
+  const deletions = pendingEdit.diff
+    .split("\n")
+    .filter((line) => line.startsWith("-") && !line.startsWith("---"))
+    .length;
 
   return (
-    <Box flexDirection="column" paddingX={2}>
-      {/* Header - keeping agent visible */}
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Proposed Changes</Text>
-        <Text dimColor>
-          1 file changed{" "}
-          <Text color="green">+{additions}</Text>{" "}
-          <Text color="red">-{deletions}</Text>
-        </Text>
+    <Box flexDirection="column" paddingX={1} gap={1}>
+      <Box justifyContent="space-between" alignItems="center">
+        <Box gap={1}>
+          <Text bold color={colors.textStrong}>Review changes</Text>
+          <Text color={colors.textFaint}>1 file</Text>
+        </Box>
+        <Box gap={1}>
+          <Text color={colors.diffAdd}>+{additions}</Text>
+          <Text color={colors.diffRemove}>−{deletions}</Text>
+        </Box>
       </Box>
 
-      {/* Separator - subtle, no borders */}
-      <Text dimColor>{"─".repeat(60)}</Text>
-
-      {/* File header - modern breadcrumb style */}
-      <Box flexDirection="column" marginY={1}>
-        {directory && <Text dimColor>{directory}/</Text>}
-        <Text bold color="cyan">
-          📄 {filename}
-        </Text>
+      <Box
+        flexDirection="column"
+        borderStyle="single"
+        borderColor={colors.borderBase}
+      >
+        <Box justifyContent="space-between" paddingX={1}>
+          <Box gap={1} flexShrink={1}>
+            <Text color={colors.warningBase}>M</Text>
+            <Text bold color={colors.textBase} wrap="truncate-end">
+              {pendingEdit.filePath}
+            </Text>
+          </Box>
+          <Text color={colors.textFaint}>unified</Text>
+        </Box>
+        <DiffViewer diff={pendingEdit.diff} />
       </Box>
 
-      {/* Diff content - no border, just content */}
-      <DiffViewer diff={pendingEdit.diff} />
-
-      {/* Footer separator */}
-      <Text dimColor marginTop={1}>
-        {"─".repeat(60)}
-      </Text>
-
-      {/* Modern footer - minimal, spacious */}
-      <Box flexDirection="row" justifyContent="space-between" marginTop={1} paddingX={2}>
-        <Text dimColor>
-          <Text color="red">←</Text> Esc Reject
+      <Box
+        justifyContent="space-between"
+        paddingX={1}
+        borderStyle="single"
+        borderColor={colors.borderMuted}
+      >
+        <Text color={colors.textMuted}>
+          <Text color={colors.dangerBase}>Esc</Text> reject
         </Text>
-        <Text dimColor>
-          Apply Enter <Text color="green">→</Text>
+        <Text color={colors.textMuted}>
+          <Text color={colors.successBase}>Enter</Text> apply
         </Text>
       </Box>
     </Box>

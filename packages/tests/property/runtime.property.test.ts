@@ -28,13 +28,13 @@ mock.module("../../../tools", () => ({ getTool }));
  * - ∀ text chunks → concatenation equals final assistant message
  * - ∀ iterations → messages only grow monotonically  
  * - ∀ unicode input → output preserves it exactly
- * - ∀ same (tool, args) pair → tool loop detected
+ * - ∀ same (tool, args) pair → duplicate work is skipped without aborting
  * 
  * Production bugs prevented:
  * - Text streaming corruption
  * - Unicode edge cases crashing runtime
  * - Message array mutations
- * - Tool loop detection failures
+ * - Repeated-tool recovery failures
  */
 
 describe("Runtime - Property Tests", () => {
@@ -150,7 +150,7 @@ describe("Runtime - Property Tests", () => {
     );
   });
 
-  test("PROPERTY: ∀ (tool, args) duplicates → loop detection triggers", async () => {
+  test("PROPERTY: ∀ (tool, args) duplicates → duplicate work is skipped", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.record({
@@ -164,16 +164,20 @@ describe("Runtime - Property Tests", () => {
           const callbacks = new CallbackSpy();
           const messages: Message[] = [createUserMessage("Test")];
 
-          // INVARIANT: Calling same tool with same args THREE times = loop detection (threshold is 2)
+          // INVARIANT: the fifth identical call is not executed, but the
+          // model receives a result and can choose a different action.
           const provider = createStreamingProvider([
             [createToolCallEvent("test_tool", args), createDoneEvent()],
-            [createToolCallEvent("test_tool", args), createDoneEvent()], // Second call - allowed
-            [createToolCallEvent("test_tool", args), createDoneEvent()], // Third call - should trigger
+            [createToolCallEvent("test_tool", args), createDoneEvent()],
+            [createToolCallEvent("test_tool", args), createDoneEvent()],
+            [createToolCallEvent("test_tool", args), createDoneEvent()],
+            [createToolCallEvent("test_tool", args), createDoneEvent()],
+            [createTextEvent("Recovered"), createDoneEvent()],
           ]);
 
-          await expect(
-            agentLoop(provider, messages, "", callbacks)
-          ).rejects.toThrow("Tool loop detected");
+          await expect(agentLoop(provider, messages, "", callbacks)).resolves.toBe("Recovered");
+          expect(tool.executionCount).toBe(4);
+          expect(messages.some((message) => message.role === "tool" && message.content.startsWith("Skipped duplicate"))).toBe(true);
         }
       ),
       { numRuns: 30 }

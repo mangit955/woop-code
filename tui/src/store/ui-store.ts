@@ -120,6 +120,18 @@ export class UIStore {
     this.emit();
   }
 
+  failTool(id: string) {
+    this.state = {
+      ...this.state,
+      timeline: this.state.timeline.map((item) =>
+        item.type === "tool" && item.id === id
+          ? { ...item, status: "failed" }
+          : item,
+      ),
+    };
+    this.emit();
+  }
+
   startAssistantMessage() {
     const id = crypto.randomUUID();
     this.activeAssistantId = id;

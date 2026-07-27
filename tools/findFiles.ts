@@ -87,13 +87,13 @@ export const findFilesTool: Tool = {
       try {
         const stat = await Bun.file(queryPath).stat();
         if (stat.isDirectory) {
-          return `"${query}" is a directory. Use list_Files with path="${query}" to see its contents.`;
+          return `"${query}" is a directory. Use list_files with path="${query}" to see its contents.`;
         }
       } catch {
         // Not a valid path
       }
       
-      return `No matching files found for "${query}". Try:\n- Use list_Files to see directory contents\n- Use a more specific or different search term\n- Check if the file exists in the project`;
+      return `No matching files found for "${query}". Try:\n- Use list_files to see directory contents\n- Use a more specific or different search term\n- Check if the file exists in the project`;
     }
 
     const output = matches.join("\n");

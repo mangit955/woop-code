@@ -16,7 +16,7 @@ export async function agentLoop(
 ) {
   const MAX_ITERATIONS = 20; // Allow complex tasks to complete
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
-  const SAME_TOOL_THRESHOLD = 2; // Allow re-reading files after edits
+  const SAME_TOOL_THRESHOLD = 4;
   
   const executedTools = new Map<string, number>();
 
@@ -96,12 +96,39 @@ export async function agentLoop(
 
       const callCount = executedTools.get(toolKey) || 0;
 
-      // Detect tool loops: if same tool+args called more than once, it's a loop
+      // A model may legitimately re-read a file while it plans an edit. After
+      // several identical calls, avoid wasted work but leave it enough context
+      // to choose a different next step instead of aborting the whole task.
       if (callCount >= SAME_TOOL_THRESHOLD) {
-        throw new Error(
-          `Tool loop detected: ${toolCall.name} called ${callCount + 1} times with identical arguments. ` +
-          `This usually indicates the tool result is being ignored or the task cannot be completed.`
-        );
+        const output =
+          `Skipped duplicate ${toolCall.name} call. The result for these exact arguments ` +
+          `is already in the conversation; use it and continue with a different action.`;
+
+        callbacks.onToolStart?.({
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+        });
+        messages.push({
+          role: "assistant_tool_call",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          arguments: toolCall.arguments,
+          thoughtSignature: toolCall.thoughtSignature,
+        });
+        callbacks.onToolFinish?.({
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+          output,
+        });
+        messages.push({
+          role: "tool",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          content: output,
+        });
+        continue;
       }
 
       executedTools.set(toolKey, callCount + 1);
@@ -119,7 +146,25 @@ export async function agentLoop(
         thoughtSignature: toolCall.thoughtSignature,
       });
 
-      const result = await tool.execute(toolCall.arguments);
+      let result: string;
+      try {
+        result = await tool.execute(toolCall.arguments);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        callbacks.onToolError?.({
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+          error: message,
+        });
+        messages.push({
+          role: "tool",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          content: `Tool failed: ${message}`,
+        });
+        continue;
+      }
       const MAX_TOOL_RESULT = 4000;
       const toolResult =
         result.length > MAX_TOOL_RESULT

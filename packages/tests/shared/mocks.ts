@@ -136,6 +136,10 @@ export class CallbackSpy {
     this.calls.push({ name: "onToolFinish", args: [tool] });
   };
 
+  onToolError = (tool: any) => {
+    this.calls.push({ name: "onToolError", args: [tool] });
+  };
+
   onDone = () => {
     this.calls.push({ name: "onDone", args: [] });
   };

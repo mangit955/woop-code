@@ -16,6 +16,7 @@ export interface ProviderClient {
     message: Message[],
     repoContext: string,
     signal?: AbortSignal,
+    useTools?: boolean,
   ): AsyncGenerator<StreamEvent>;
 }
 

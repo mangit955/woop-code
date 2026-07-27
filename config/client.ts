@@ -37,6 +37,7 @@ export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): Provider
       messages: Message[],
       repoContext: string,
       signal?: AbortSignal,
+      useTools = true,
     ): AsyncGenerator<StreamEvent> {
       const contents = messages.map((message) => {
         switch (message.role) {
@@ -138,8 +139,10 @@ export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): Provider
           contents,
 
           config: {
-            systemInstruction: `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`,
-            tools,
+            systemInstruction: repoContext
+              ? `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`
+              : SYSTEM_PROMPT,
+            tools: useTools ? tools : undefined,
             abortSignal: requestController.signal,
           },
         });

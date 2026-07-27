@@ -85,18 +85,16 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
       flexGrow={1}
       flexShrink={1}
       minHeight={0}
-      backgroundColor="#000000"
     >
       <Box
         flexDirection="column"
         flexGrow={1}
         flexShrink={1}
         minHeight={0}
-        backgroundColor="#000000"
         borderStyle="single"
         borderColor={colors.borderBase}
       >
-        <Box justifyContent="space-between" paddingX={1} flexShrink={0} backgroundColor="#000000">
+        <Box justifyContent="space-between" paddingX={1} flexShrink={0}>
           <Box gap={1} flexShrink={1}>
             <Text color={colors.warningBase}>M</Text>
             <Text bold color={colors.textBase} wrap="truncate-end">
@@ -115,7 +113,6 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
           flexShrink={1}
           minHeight={0}
           overflow="hidden"
-          backgroundColor="#000000"
         >
           <Box
             ref={contentRef}
@@ -131,7 +128,6 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
           justifyContent="space-between"
           paddingX={1}
           flexShrink={0}
-          backgroundColor="#000000"
           borderStyle="single"
           borderTop
           borderRight={false}

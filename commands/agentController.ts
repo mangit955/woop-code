@@ -8,6 +8,21 @@ import { agentLoop } from "../config/runtime";
 import type { AgentCallbacks, Message } from "../config/types";
 import { store } from "../tui/src";
 
+/**
+ * Keep casual conversation out of the coding-agent path. This is deliberately
+ * narrow: anything that looks like a repository task still receives tools.
+ */
+export function isConversationalPrompt(prompt: string) {
+  const text = prompt.trim().toLowerCase().replace(/\s+/g, " ");
+  if (text.length === 0 || text.length > 160) return false;
+
+  const workSignal = /\b(add|build|change|check|code|create|debug|delete|deploy|edit|error|explain|file|fix|implement|install|investigate|look at|project|read|refactor|remove|repo|run|test|update|write)\b/;
+  if (workSignal.test(text)) return false;
+
+  return /^(hi|hey|hello|yo|thanks|thank you|okay|ok|cool|great|nice|goodbye|bye|good morning|good afternoon|good evening)[!?. ]*$/.test(text)
+    || /^(how are you|who are you|what can you do|what do you do|can you help me)[!?. ]*$/.test(text);
+}
+
 export class AgentController {
   private conversation: Message[] = [];
   private repoContext = "";
@@ -53,6 +68,7 @@ export class AgentController {
     this.pendingUserMessage = userMessage;
 
     const conversation = [...this.conversation];
+    const conversational = isConversationalPrompt(prompt);
     this.pendingAssistantText = "";
 
     // Update UI before starting the agent
@@ -67,8 +83,8 @@ export class AgentController {
       agentLoopStarted = true;
       response = await agentLoop(
         client,
-        conversation,
-        this.repoContext,
+        conversational ? [userMessage] : conversation,
+        conversational ? "" : this.repoContext,
         {
           ...this.callbacks,
           onText: (text) => {
@@ -81,6 +97,7 @@ export class AgentController {
           },
         },
         this.abortController.signal,
+        !conversational,
       );
 
       const assistantText = response || this.pendingAssistantText;

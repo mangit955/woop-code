@@ -13,6 +13,7 @@ export async function agentLoop(
   repoContext: string,
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
+  useTools = true,
 ) {
   const MAX_ITERATIONS = 20; // Allow complex tasks to complete
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
@@ -40,6 +41,7 @@ export async function agentLoop(
         recentMessages(messages, MAX_TURNS),
         repoContext,
         signal,
+        useTools,
       )) {
         switch (event.type) {
           case "text":

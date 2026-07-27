@@ -1,268 +1,178 @@
 # Woopcode
 
-[![npm version](https://badge.fury.io/js/woopcode.svg)](https://www.npmjs.com/package/woopcode)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=000000)](https://bun.sh)
+[![TypeScript](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg)](LICENSE)
 
-**Open-source AI coding agent for developers who live in the terminal.**
+**A terminal-native coding agent that understands your repository, shows its work, and keeps you in control of code changes.**
 
-Woopcode is a terminal-native AI assistant that understands your repository, executes tools, and streams every step in real time. No context switching, no web UI—just you, your terminal, and an AI that actually sees your codebase.
+Woopcode runs where you work: in the terminal and inside the current repository. Ask it to investigate, explain, implement, review, or test a change; it streams progress, uses focused tools, and presents edits as a readable diff before it writes to an existing file.
 
-<!-- Demo GIF: Terminal recording showing interactive agent session -->
+> **Status:** an early-stage project with a production-ready Google Gemini workflow. Other provider entries may appear in configuration, but Google Gemini is the only runtime provider currently implemented.
 
----
+## Why Woopcode
 
-## Features
+| | |
+|---|---|
+| **Repository-aware** | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. |
+| **Terminal-first** | A focused React Ink interface with a pinned header, scrollable conversation, keyboard navigation, and no browser tab required. |
+| **Visible execution** | Streams assistant output and tool activity so you can follow the work instead of waiting behind an opaque progress screen. |
+| **Review before overwrite** | Existing-file edits and overwrites pause on a unified diff for approval. |
+| **Practical guardrails** | Detects duplicate tool calls, limits tool iterations, supports cancellation, and returns recoverable tool errors to the agent. |
 
-- **Streaming agent runtime** - Watch the AI think and act in real-time
-- **Repository-aware** - Automatically loads your project context
-- **Tool execution** - Read files, run commands, make edits—autonomously
-- **Diff approvals** - Review every file change before it's applied
-- **Multi-provider** - Swap between Gemini, Claude, GPT without config changes
-- **Terminal-first** - Full keyboard control, no mouse required
-- **Slash commands** - Quick commands like `/status`, `/help`, `/new`
-- **Built with Bun** - Fast, modern, native TypeScript support
+## Quick start
 
----
+### 1. Install or run
 
-## Installation
+Woopcode requires [Bun](https://bun.sh) 1.0 or later.
 
 ```bash
 # Run without installing
 bunx woopcode
 
-# Install globally
+# Or install globally
 bun add -g woopcode
-# or
-npm install -g woopcode
 ```
 
----
-
-## Quick Start
+### 2. Start it in a repository
 
 ```bash
-# First run launches setup wizard
-woopcode
-
-# Agent starts in your current directory
-cd ~/my-project
+cd path/to/your-project
 woopcode
 ```
 
-**Example prompts:**
-```
-> Explain the architecture of this repository
-> Fix the failing tests in auth.test.ts
-> Refactor database.ts to use async/await
-> Find all TODO comments
-> Generate unit tests for the API handlers
-```
-
-**Slash commands:**
-```
-/help       Show available commands
-/status     System status (provider, model, workspace)
-/new        Start fresh conversation
-/provider   Switch AI provider
-/exit       Quit
-```
-
----
-
-## Why Woopcode?
-
-Most AI coding tools run in your editor or browser. Woopcode is different:
-
-**Terminal-native**  
-No context switching. Stay in your terminal, stay in flow.
-
-**Repository context**  
-Automatically loads `package.json`, `README.md`, file tree. The AI knows your project.
-
-**Real-time streaming**  
-See the agent's reasoning as it happens. Watch tools execute. Cancel anytime.
-
-**Approval-based edits**  
-Every file change shown as a unified diff. Accept, reject, or cancel.
-
-**Provider-agnostic**  
-Switch between Google Gemini, Anthropic Claude, OpenAI GPT. Same workflow, different model.
-
-**Extensible**  
-Add custom tools in ~10 lines of TypeScript. Plugin system coming soon.
-
----
-
-## Architecture
-
-```
-User Input
-    ↓
-Agent Controller (manages conversation state)
-    ↓
-Streaming Runtime (LLM → tool calls → results)
-    ↓
-Tool Registry (9 built-in tools: read, write, edit, search, run, test)
-    ↓
-Provider Client (Gemini | Claude | GPT)
-    ↓
-Terminal UI (React Ink)
-```
-
-**Core loop:**
-1. User sends prompt
-2. LLM streams response + tool calls
-3. Tools execute (with approval for file edits)
-4. Results feed back to LLM
-5. Loop continues until completion (max 10 iterations)
-
-**Safety:**
-- Tool loop detection (no infinite cycles)
-- File change approvals (unified diff preview)
-- Cancellation support (Ctrl+C anytime)
-- Conversation persistence (all history saved locally)
-
-[Full architecture docs →](./docs/architecture.md)
-
----
-
-## Built-in Tools
-
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read file contents |
-| `write_file` | Overwrite existing file |
-| `edit_file` | Replace text within file |
-| `create_file` | Create new file |
-| `list_files` | List repository structure |
-| `find_files` | Find files by name/pattern |
-| `grep` | Search file contents |
-| `run_terminal` | Execute shell commands |
-| `run_tests` | Run project tests |
-
-File-modifying tools (`write`, `edit`, `create`) trigger approval workflow with diff preview.
-
-[Tool reference →](./docs/tools.md)
-
----
-
-## Provider Support
-
-| Provider | Status | Models |
-|----------|--------|--------|
-| **Google Gemini** | ✅ Supported | gemini-3.5-flash-lite |
-| **Anthropic** | 🚧 Planned | claude-sonnet-4 |
-| **OpenAI** | 🚧 Planned | gpt-5.5 |
-| **Groq** | 🚧 Planned | - |
+On first launch, Woopcode opens the setup flow and asks for a Google Gemini API key. You can also configure it from the command line:
 
 ```bash
-# Manage providers
+woopcode providers login --provider google --api-key "$GOOGLE_API_KEY"
 woopcode providers list
-woopcode providers login -p google -a YOUR_KEY
-woopcode providers set -p google
-
-# Or use slash commands in-app
-/provider           # Show current provider
-/login google KEY   # Login from within app
-/logout             # Logout
 ```
 
-[Provider setup →](./docs/providers.md)
+Get a Google Gemini key from [Google AI Studio](https://aistudio.google.com/apikey).
 
----
+### 3. Give it a task
+
+```text
+Explain how authentication is structured in this repository.
+Find the failing test and fix the underlying bug.
+Add validation to the create-user endpoint and cover it with tests.
+Review the recent changes for race conditions.
+```
+
+## The workflow
+
+```text
+Prompt → repository context → streaming agent → focused tools → review diff → verified result
+```
+
+1. Woopcode loads lightweight context from the current repository.
+2. The agent inspects only the files and symbols needed for the request.
+3. It calls tools to search, read, edit, test, or fetch documentation.
+4. Changes to an existing file are shown as a unified diff.
+5. Press **Enter** to apply the diff or **Esc** to reject it.
+
+The conversation, provider configuration, and local state are stored in:
+
+- macOS and Linux: `~/.config/woopcode/`
+- Windows: `%LOCALAPPDATA%\\woopcode\\`
+
+## Built-in tools
+
+Woopcode currently ships with 13 tools.
+
+| Area | Tools | Purpose |
+|---|---|---|
+| Explore | `find_files`, `glob`, `list_files`, `grep` | Locate files, patterns, directories, and text. |
+| Read | `read_file`, `web_fetch`, `web_search` | Read local files or retrieve relevant external documentation. |
+| Change | `edit_file`, `write_file`, `create_file` | Make targeted replacements, overwrite an existing file, or create a new one. |
+| Verify | `run_tests`, `run_terminal` | Run focused test, build, lint, or inspection commands. |
+| Collaborate | `ask_user` | Ask for clarification when a decision requires your input. |
+
+### Change safety
+
+- `edit_file` and `write_file` show a diff and wait for approval before modifying an existing file.
+- `create_file` creates a genuinely new file directly; review the agent’s output and your version control diff before committing.
+- `run_terminal` and `run_tests` are intended for short, non-interactive commands. They do not start servers or watch processes.
+- Tool failures and repeated calls are returned to the agent so it can adjust rather than silently retrying the same action.
+
+## In-app commands and controls
+
+Type `/` in the prompt to browse and autocomplete commands.
+
+| Command | Description |
+|---|---|
+| `/help` | Show all available commands. |
+| `/new` | Start a new conversation. |
+| `/provider [name]` | View or switch the configured provider. |
+| `/login <provider> <api-key>` | Authenticate from inside the app. |
+| `/logout [provider]` | Remove a saved provider key. |
+| `/model` | Show the active model and available model entries. |
+| `/workspace` | Show repository, path, branch, and file count. |
+| `/status` | Show workspace, provider, session, and version details. |
+| `/exit` | Quit Woopcode. |
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Scroll the conversation. |
+| `Page Up` / `Page Down` | Move through the conversation by a page. |
+| `Home` / `End` | Jump to the oldest message or back to the latest one. |
+| `Ctrl+C` | Cancel an active request, or exit when idle. |
+| `Enter` / `Esc` | Apply or reject a pending file-change preview. |
+
+## Command line
+
+```bash
+# Launch the interactive agent
+woopcode
+woopcode agent
+
+# Inspect configured providers and models
+woopcode providers list
+woopcode models
+```
+
+Run `woopcode --help`, `woopcode providers --help`, or `woopcode models --help` for the full command reference.
 
 ## Development
 
 ```bash
-# Clone repository
 git clone https://github.com/mangit955/woop-code.git
 cd woop-code
 
-# Install dependencies
 bun install
+bun run start
 
-# Run locally
-bun cli.ts
-
-# Run tests
+# Run the full test suite
 bun test
-
-# Type checking
-bunx tsc --noEmit
 ```
 
-**Add a custom tool:**
-```typescript
-// tools/myTool.ts
-export const myTool: Tool = {
-  name: "my_tool",
-  description: "What the tool does",
-  parameters: [
-    { name: "input", description: "Input param", required: true }
-  ],
-  async execute(args) {
-    return "Result";
-  }
-};
-```
+The project is TypeScript throughout and uses:
 
-Register in `tools/index.ts` and you're done.
+- [Bun](https://bun.sh) for the runtime, package management, filesystem APIs, and test runner
+- [React](https://react.dev) and [Ink](https://github.com/vadimdemedes/ink) for the terminal UI
+- [Google Gen AI](https://ai.google.dev) for the current streaming provider integration
 
-[Development guide →](./docs/development.md)
+Useful implementation entry points:
 
----
-
-## Roadmap
-
-- [x] Streaming agent runtime
-- [x] Tool execution system
-- [x] Diff approval workflow
-- [x] Google Gemini provider
-- [x] Slash commands
-- [x] Onboarding wizard
-- [ ] Anthropic Claude provider
-- [ ] OpenAI GPT provider
-- [ ] Plugin system
-- [ ] Multi-file editing
-- [ ] Conversation search
-- [ ] Custom system prompts
-
-[Full roadmap →](./docs/roadmap.md)
-
----
-
-## Documentation
-
-- [Architecture](./docs/architecture.md) - How Woopcode works under the hood
-- [Tools](./docs/tools.md) - Built-in tools and how to add custom ones
-- [Providers](./docs/providers.md) - AI provider setup and configuration
-- [Slash Commands](./docs/slash-commands.md) - Quick reference for all commands
-- [Testing](./docs/testing.md) - Test philosophy and running tests
-- [Development](./docs/development.md) - Contributing and extending Woopcode
-- [Configuration](./docs/configuration.md) - Config files and customization
-
----
+| Path | Responsibility |
+|---|---|
+| [`cli.ts`](cli.ts) | Command-line entry point. |
+| [`commands/agent.tsx`](commands/agent.tsx) | Interactive agent lifecycle and terminal input. |
+| [`config/runtime.ts`](config/runtime.ts) | Streaming agent loop, tool execution, recovery, and limits. |
+| [`tools/index.ts`](tools/index.ts) | Built-in tool registry and provider-name compatibility. |
+| [`tui/src/`](tui/src) | The React Ink interface, timeline, prompt, scrolling, and diff preview. |
+| [`commands/slash/README.md`](commands/slash/README.md) | Slash-command implementation notes. |
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+Issues and pull requests are welcome. Keep changes focused, follow the existing TypeScript style, and include relevant tests.
 
-**Quick start:**
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
+```bash
+bun test
+```
 
----
+Please do not commit API keys, conversation history, or generated local configuration.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## Credits
-
-Built with [Bun](https://bun.sh), [Ink](https://github.com/vadimdemedes/ink), and [Google Gemini](https://ai.google.dev/).
-
-Inspired by [Aider](https://github.com/paul-gauthier/aider), [Claude Code](https://www.anthropic.com/), and [Cursor](https://cursor.sh).
+[MIT](LICENSE)

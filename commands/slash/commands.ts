@@ -113,9 +113,9 @@ const providerCommand: SlashCommand = {
 };
 
 const modelCommand: SlashCommand = {
-  name: "model",
-  aliases: ["m"],
-  description: "Show current model and available models",
+  name: "models",
+  aliases: ["model", "m"],
+  description: "Choose the model for this session",
   category: "configuration",
 
   async execute(context, args) {

@@ -4,7 +4,7 @@ import type { AgentCallbacks } from "../config/types";
 import { App, store } from "../tui/src";
 import { render } from "ink";
 import { AgentController } from "./agentController";
-import { ACTIVE_PROVIDER_MODELS } from "../config/client";
+import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from "../config/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
@@ -27,6 +27,8 @@ export async function runAgent() {
   const config = await getConfig();
   const provider = config.defaultProvider;
   const apiKey = config.providers[provider].apiKey;
+  const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
+  store.setSelectedModel(selectedModel);
 
   const callbacks: AgentCallbacks = {
     onStatus(status) {
@@ -91,9 +93,9 @@ export async function runAgent() {
       }, 1000);
     },
   };
-  const controller = new AgentController(provider, apiKey, callbacks);
+  const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
   await controller.initialize();
-  const homeScreen = await buildHomeScreen(provider);
+  const homeScreen = await buildHomeScreen(provider, selectedModel);
 
   const customStdin = new PassThrough() as any;
   customStdin.ref = () => {
@@ -193,7 +195,7 @@ export async function runAgent() {
   });
 }
 
-async function buildHomeScreen(provider: string): Promise<HomeScreenData> {
+async function buildHomeScreen(provider: string, model: string): Promise<HomeScreenData> {
   const repository =
     process.cwd().split("/").filter(Boolean).at(-1) ?? "workspace";
   const branch = await getBranch();
@@ -222,7 +224,7 @@ async function buildHomeScreen(provider: string): Promise<HomeScreenData> {
     repository,
     branch,
     providerName: providerLabel,
-    provider: ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
+    provider: provider === "google" ? getModelDisplayName(model) : ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
   };
 }
 

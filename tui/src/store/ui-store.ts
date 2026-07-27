@@ -6,6 +6,8 @@ export class UIStore {
     timeline: [],
     status: "Ready",
     isThinking: false,
+    modelPickerOpen: false,
+    selectedModel: null,
     pendingEdit: null,
     pendingEditScrollOffset: 0,
     scrollOffset: 0,
@@ -198,6 +200,21 @@ export class UIStore {
   setStatus(status: string) {
     const isThinking = status.toLowerCase().includes("thinking");
     this.state = { ...this.state, status, isThinking };
+    this.emit();
+  }
+
+  openModelPicker() {
+    this.state = { ...this.state, modelPickerOpen: true };
+    this.emit();
+  }
+
+  closeModelPicker() {
+    this.state = { ...this.state, modelPickerOpen: false };
+    this.emit();
+  }
+
+  setSelectedModel(model: string) {
+    this.state = { ...this.state, selectedModel: model, modelPickerOpen: false };
     this.emit();
   }
 

@@ -36,6 +36,8 @@ export interface UIState {
   timeline: TimeLineItem[];
   status: string;
   isThinking: boolean;
+  modelPickerOpen: boolean;
+  selectedModel: string | null;
   pendingEdit: PendingEdit | null;
   pendingEditScrollOffset: number;
   scrollOffset: number;

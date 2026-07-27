@@ -83,7 +83,7 @@ export function Prompt({
           return;
         }
         if (key.downArrow) {
-          setSelectedIndex((prev) => Math.min(Math.min(slashMatches.length, 5) - 1, prev + 1));
+          setSelectedIndex((prev) => Math.min(slashMatches.length - 1, prev + 1));
           return;
         }
       } else {
@@ -137,11 +137,19 @@ export function Prompt({
       return;
     }
 
+    if (prompt === "/models" || prompt === "/model" || prompt === "/m") {
+      store.openModelPicker();
+      onValueChange("");
+      return;
+    }
+
     // Auto-complete the selected slash command
     if (prompt.startsWith("/") && slashMatches.length > 0) {
       const activeIndex = Math.min(selectedIndex, slashMatches.length - 1);
       const selected = slashMatches[activeIndex];
-      if (selected && prompt !== `/${selected.name}`) {
+      const commandToken = prompt.slice(1).trim().split(/\s+/, 1)[0] ?? "";
+      const isExactCommand = registry.get(commandToken) !== undefined;
+      if (selected && !isExactCommand) {
          onValueChange(`/${selected.name} `);
          return;
       }
@@ -206,7 +214,17 @@ export function Prompt({
   }
 
   return (
-    <Box flexDirection="column" width="100%">
+    <Box
+      flexDirection="column"
+      width="100%"
+      position="relative"
+      borderStyle="single"
+      borderTop={false}
+      borderRight={false}
+      borderBottom
+      borderLeft={false}
+      borderColor="#000000"
+    >
       {slashMatches.length > 0 && (
         <Box position="absolute" bottom={4} left={0} width="100%">
           <CommandPreview matches={slashMatches} query={value.slice(1)} selectedIndex={selectedIndex} />
@@ -223,7 +241,13 @@ export function Prompt({
         borderBottom={false}
         borderColor={colors.primary}
       >
-        <Box flexDirection="column" flexGrow={1} paddingY={1} paddingLeft={1} paddingRight={1}>
+        <Box
+          flexDirection="column"
+          flexGrow={1}
+          paddingTop={1}
+          paddingLeft={1}
+          paddingRight={1}
+        >
           <Box minHeight={1}>
             <TextInput
               value={value}

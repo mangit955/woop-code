@@ -11,16 +11,11 @@ export interface CommandPreviewProps {
 export function CommandPreview({ matches, query, selectedIndex }: CommandPreviewProps) {
   if (matches.length === 0) return null;
 
-  // Limit to top 5 matches to not take over the screen
-  const displayMatches = matches.slice(0, 5);
-  // Ensure selectedIndex is within the displayed bounds
-  const activeIndex = Math.min(selectedIndex, displayMatches.length - 1);
+  const activeIndex = Math.min(selectedIndex, matches.length - 1);
 
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
-      borderColor={colors.borderMuted}
       paddingX={1}
       marginBottom={0}
       backgroundColor="#1a1a1a"
@@ -29,16 +24,25 @@ export function CommandPreview({ matches, query, selectedIndex }: CommandPreview
         <Text color={colors.textFaint} bold>COMMANDS</Text>
       </Box>
       
-      {displayMatches.map((cmd, index) => {
+      {matches.map((cmd, index) => {
         const isSelected = index === activeIndex;
+        const aliases = cmd.aliases?.length ? ` (${cmd.aliases.map((alias) => `/${alias}`).join(", ")})` : "";
         
         return (
-          <Box key={cmd.name} width="100%" paddingX={1} backgroundColor={isSelected ? "#fb923c" : undefined}>
-            <Box width={20}>
+          <Box
+            key={cmd.name}
+            width="100%"
+            height={1}
+            paddingX={1}
+            backgroundColor={isSelected ? "#fb923c" : undefined}
+          >
+            <Box width={20} flexShrink={0}>
               <Text color={isSelected ? "#000000" : colors.primary}>/</Text>
               <Text bold color={isSelected ? "#000000" : colors.textBase}>{cmd.name}</Text>
             </Box>
-            <Text color={isSelected ? "#431407" : colors.textMuted}>{cmd.description}</Text>
+            <Text color={isSelected ? "#431407" : colors.textMuted} wrap="truncate-end">
+              {cmd.description}{aliases}
+            </Text>
           </Box>
         );
       })}

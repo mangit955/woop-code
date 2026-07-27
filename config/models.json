@@ -1,5 +1,47 @@
 [
   {
+    "id": "gemini-3.6-pro",
+    "provider": "google",
+    "name": "Gemini 3.6 Pro",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3.6-flash",
+    "provider": "google",
+    "name": "Gemini 3.6 Flash",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3.6-flash-lite",
+    "provider": "google",
+    "name": "Gemini 3.6 Flash Lite",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3.5-pro",
+    "provider": "google",
+    "name": "Gemini 3.5 Pro",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3-pro",
+    "provider": "google",
+    "name": "Gemini 3 Pro",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3.5-flash",
+    "provider": "google",
+    "name": "Gemini 3.5 Flash",
+    "contextWindow": 1000000
+  },
+  {
+    "id": "gemini-3.5-flash-lite",
+    "provider": "google",
+    "name": "Gemini 3.5 Flash Lite",
+    "contextWindow": 1000000
+  },
+  {
     "id": "gpt-5.5",
     "provider": "openai",
     "name": "GPT-5.5",

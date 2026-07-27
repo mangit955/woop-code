@@ -7,9 +7,29 @@ export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
 };
 
+export const DEFAULT_MODEL_ID = "gemini-3.5-flash-lite";
+
+export const GOOGLE_MODELS = [
+  { id: "gemini-3.6-pro", name: "Gemini 3.6 Pro" },
+  { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash" },
+  { id: "gemini-3.6-flash-lite", name: "Gemini 3.6 Flash Lite" },
+  { id: "gemini-3.5-pro", name: "Gemini 3.5 Pro" },
+  { id: "gemini-3-pro", name: "Gemini 3 Pro" },
+  { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash" },
+  { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite" },
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+  { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash Lite" },
+] as const;
+
+export function getModelDisplayName(modelId: string | undefined) {
+  return GOOGLE_MODELS.find((model) => model.id === modelId)?.name ?? modelId ?? ACTIVE_PROVIDER_MODELS.google;
+}
+
 const GEMINI_REQUEST_TIMEOUT_MS = 60_000;
 
-export function geminiClient(apiKey: string): ProviderClient {
+export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): ProviderClient {
   const ai = new GoogleGenAI({ apiKey });
 
   return {
@@ -114,7 +134,7 @@ export function geminiClient(apiKey: string): ProviderClient {
 
       try {
         const stream = await ai.models.generateContentStream({
-          model: "gemini-3.5-flash-lite",
+          model,
           contents,
 
           config: {
@@ -190,12 +210,13 @@ export function anthropicClient(apiKey: string) {}
 export function createProviderClient(
   provider: string,
   apiKey: string,
+  model?: string,
 ): ProviderClient {
   switch (provider) {
     case "google":
 
     case "gemini":
-      return geminiClient(apiKey);
+      return geminiClient(apiKey, model);
     // case "groq":
     //   return groqClient(apiKey);
 

@@ -1,4 +1,4 @@
-import { createProviderClient } from "../config/client";
+import { createProviderClient, DEFAULT_MODEL_ID } from "../config/client";
 import {
   buildRepositoryContext,
   getConversation,
@@ -16,12 +16,24 @@ export class AgentController {
   private abortController: AbortController | null = null;
   private isRunning = false;
   private wasCancelled = false;
+  private model: string;
+  private readonly callbacks: AgentCallbacks;
 
   constructor(
     private readonly provider: string,
     private readonly apiKey: string,
-    private readonly callbacks: AgentCallbacks,
-  ) {}
+    modelOrCallbacks: string | AgentCallbacks,
+    callbacks?: AgentCallbacks,
+  ) {
+    this.model = typeof modelOrCallbacks === "string" ? modelOrCallbacks : DEFAULT_MODEL_ID;
+    this.callbacks = typeof modelOrCallbacks === "string" ? callbacks! : modelOrCallbacks;
+  }
+
+  setModel(model: string) {
+    if (this.isRunning) return false;
+    this.model = model;
+    return true;
+  }
 
   async run(prompt: string) {
     if (this.isRunning) {
@@ -51,7 +63,7 @@ export class AgentController {
     let agentLoopStarted = false;
 
     try {
-      const client = createProviderClient(this.provider, this.apiKey);
+      const client = createProviderClient(this.provider, this.apiKey, this.model);
       agentLoopStarted = true;
       response = await agentLoop(
         client,

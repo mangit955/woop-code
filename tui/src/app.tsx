@@ -7,11 +7,13 @@ import { useUIStore } from "./store/useUIStore";
 import { store } from "./store/ui-store";
 import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
+import { ModelPicker } from "./components/ModelPicker";
 import type { AgentController } from "../../commands/agentController";
 import type { TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { colors } from "./styles/theme";
+import { getModelDisplayName } from "../../config/client";
 
 interface AppProps {
   controller: AgentController;
@@ -32,7 +34,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
     value: promptValue,
     onValueChange: setPromptValue,
     providerName: homeScreen.providerName,
-    modelName: homeScreen.provider,
+    modelName: getModelDisplayName(state.selectedModel ?? undefined),
   };
 
   return (
@@ -46,6 +48,11 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       <Box flexShrink={0} paddingX={1}>
         <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
       </Box>
+
+      {state.modelPickerOpen ? (
+        <ModelPicker controller={controller} selectedModel={state.selectedModel} />
+      ) : (
+        <>
 
       {/* Main content */}
       <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} backgroundColor="#000000">
@@ -97,6 +104,8 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           <Prompt {...promptProps} variant="block" />
           <ConnectedStatusBar />
         </Box>
+      )}
+        </>
       )}
     </Box>
   );

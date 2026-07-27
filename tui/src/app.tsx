@@ -24,9 +24,6 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const showHome = state.timeline.length === 0;
   const hasPendingEdit = state.pendingEdit !== null;
 
-  const endIdx = state.timeline.length - (state.scrollOffset || 0);
-  const visibleTimeline = state.timeline.slice(0, Math.max(0, endIdx));
-
   const promptProps = {
     controller,
     onExit,
@@ -48,7 +45,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
       </Box>
 
-      {/* Main content — fills all available space */}
+      {/* Main content */}
       <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1}>
         {showHome ? (
           <HomeScreen
@@ -60,20 +57,24 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         ) : hasPendingEdit ? (
           /* Split layout: Timeline on top, Diff below */
           <Box flexDirection="column" flexGrow={1} minHeight={0}>
-            {/* Agent conversation - compressed but visible */}
             <Box flexDirection="column-reverse" flexShrink={1} overflow="hidden">
-              <Timeline items={visibleTimeline} isThinking={state.isThinking && state.scrollOffset === 0} />
+              <Box flexGrow={1} />
+              <Box flexDirection="column" flexShrink={0} marginBottom={-(state.scrollOffset || 0)}>
+                <Timeline items={state.timeline} isThinking={state.isThinking} />
+              </Box>
             </Box>
 
             {/* Diff preview - takes remaining space */}
-            <Box flexDirection="column" flexGrow={1} minHeight={0}>
+            <Box flexDirection="column" flexGrow={1} minHeight={0} marginTop={1}>
               <DiffPreview pendingEdit={state.pendingEdit!} />
             </Box>
           </Box>
         ) : (
-          /* Normal timeline view — scrolls within available space */
           <Box flexDirection="column-reverse" flexGrow={1} minHeight={0} overflow="hidden">
-            <Timeline items={visibleTimeline} isThinking={state.isThinking && state.scrollOffset === 0} />
+            <Box flexGrow={1} />
+            <Box flexDirection="column" flexShrink={0} marginBottom={-(state.scrollOffset || 0)}>
+              <Timeline items={state.timeline} isThinking={state.isThinking} />
+            </Box>
           </Box>
         )}
       </Box>

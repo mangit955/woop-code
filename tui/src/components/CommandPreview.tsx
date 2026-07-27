@@ -23,6 +23,7 @@ export function CommandPreview({ matches, query, selectedIndex }: CommandPreview
       borderColor={colors.borderMuted}
       paddingX={1}
       marginBottom={0}
+      backgroundColor="#1a1a1a"
     >
       <Box marginBottom={1}>
         <Text color={colors.textFaint} bold>COMMANDS</Text>
@@ -32,12 +33,12 @@ export function CommandPreview({ matches, query, selectedIndex }: CommandPreview
         const isSelected = index === activeIndex;
         
         return (
-          <Box key={cmd.name} width="100%" paddingX={1} backgroundColor={isSelected ? colors.primary : undefined}>
+          <Box key={cmd.name} width="100%" paddingX={1} backgroundColor={isSelected ? "#fb923c" : undefined}>
             <Box width={20}>
-              <Text color={isSelected ? colors.bgBase : colors.primary}>/</Text>
-              <Text bold color={isSelected ? colors.bgBase : colors.textBase}>{cmd.name}</Text>
+              <Text color={isSelected ? "#000000" : colors.primary}>/</Text>
+              <Text bold color={isSelected ? "#000000" : colors.textBase}>{cmd.name}</Text>
             </Box>
-            <Text color={isSelected ? colors.bgLayer02 : colors.textMuted}>{cmd.description}</Text>
+            <Text color={isSelected ? "#431407" : colors.textMuted}>{cmd.description}</Text>
           </Box>
         );
       })}

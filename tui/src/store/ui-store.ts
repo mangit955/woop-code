@@ -265,7 +265,7 @@ export class UIStore {
   scrollUp() {
     this.state = {
       ...this.state,
-      scrollOffset: Math.min(this.state.scrollOffset + 1, Math.max(0, this.state.timeline.length - 1)),
+      scrollOffset: Math.min(this.state.scrollOffset + 3, this.state.timeline.length * 50),
     };
     this.emit();
   }

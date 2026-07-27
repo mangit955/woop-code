@@ -72,44 +72,47 @@ export function Prompt({
     onValueChange(newValue);
   };
 
-  useInput((input, key) => {
-    lastActivityTime.current = Date.now();
-    setShowCursor(true);
+  useInput(
+    (input, key) => {
+      lastActivityTime.current = Date.now();
+      setShowCursor(true);
 
-    if (value.startsWith("/") && slashMatches.length > 0) {
-      if (key.upArrow) {
-        setSelectedIndex((prev) => Math.max(0, prev - 1));
+      if (value.startsWith("/") && slashMatches.length > 0) {
+        if (key.upArrow) {
+          setSelectedIndex((prev) => Math.max(0, prev - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setSelectedIndex((prev) => Math.min(Math.min(slashMatches.length, 5) - 1, prev + 1));
+          return;
+        }
+      } else {
+        if (key.upArrow || key.pageUp) {
+          store.scrollUp();
+          return;
+        }
+        if (key.downArrow || key.pageDown) {
+          store.scrollDown();
+          return;
+        }
+      }
+
+      if (!(key.ctrl && input.toLowerCase() === "c")) {
         return;
       }
-      if (key.downArrow) {
-        setSelectedIndex((prev) => Math.min(Math.min(slashMatches.length, 5) - 1, prev + 1));
+
+      if (controller.isBusy()) {
+        controller.cancel();
         return;
       }
-    } else {
-      if (key.upArrow || key.pageUp) {
-        store.scrollUp();
-        return;
+
+      if (!isExiting.current) {
+        isExiting.current = true;
+        void onExit();
       }
-      if (key.downArrow || key.pageDown) {
-        store.scrollDown();
-        return;
-      }
-    }
-
-    if (!(key.ctrl && input.toLowerCase() === "c")) {
-      return;
-    }
-
-    if (controller.isBusy()) {
-      controller.cancel();
-      return;
-    }
-
-    if (!isExiting.current) {
-      isExiting.current = true;
-      void onExit();
-    }
-  });
+    },
+    { isActive: true }
+  );
 
   async function handleSubmit(input: string) {
     const prompt = input.trim();
@@ -215,10 +218,10 @@ export function Prompt({
             />
           </Box>
           <Box marginTop={1}>
-            <Text bold color={colors.textMuted}>Agent</Text>
-            <Text color={colors.textFaint}>
-              {" · "}{providerName ?? "Provider"} {modelName ?? "Model"}
-            </Text>
+            <Text color={colors.primary}>Build</Text>
+            <Text color={colors.textFaint}>{" · "}</Text>
+            <Text color={colors.textBase}>{modelName ?? "Model"}</Text>
+            <Text color={colors.textFaint}> Google</Text>
           </Box>
         </Box>
       </Box>

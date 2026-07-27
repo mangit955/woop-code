@@ -6,22 +6,22 @@
 
 export const colors = {
   // Text colors
-  textBase: "#e2e8f0",      // Slate 200 (cooler white)
-  textMuted: "#94a3b8",     // Slate 400 (cool gray)
-  textFaint: "#64748b",     // Slate 500
+  textBase: "#e5e5e5",      // Neutral 200
+  textMuted: "#a3a3a3",     // Neutral 400
+  textFaint: "#737373",     // Neutral 500
   textStrong: "#ffffff",
   textAccent: "#38bdf8",    // Sky 400 (cool blue)
   textCode: "#2dd4bf",      // Teal 400
 
   // Background colors
-  bgBase: "#020617",        // Slate 950 (cool near-black)
-  bgLayer01: "#0f172a",     // Slate 900
-  bgLayer02: "#1e293b",     // Slate 800
+  bgBase: "#0a0a0a",        // Neutral 950
+  bgLayer01: "#171717",     // Neutral 900
+  bgLayer02: "#262626",     // Neutral 800
 
   // Border colors
-  borderBase: "#334155",    // Slate 700
-  borderMuted: "#1e293b",   // Slate 800
-  borderStrong: "#475569",  // Slate 600
+  borderBase: "#404040",    // Neutral 700
+  borderMuted: "#262626",   // Neutral 800
+  borderStrong: "#525252",  // Neutral 600
   borderActive: "#38bdf8",  // Sky 400
 
   // Primary and accent

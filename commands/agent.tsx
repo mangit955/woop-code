@@ -83,7 +83,7 @@ export async function runAgent() {
 
   const { unmount } = render(
     <App controller={controller} onExit={handleExit} homeScreen={homeScreen} />,
-    { exitOnCtrlC: false, fullScreen: true },
+    { exitOnCtrlC: false, fullScreen: true }
   );
 
   let exiting = false;

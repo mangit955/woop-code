@@ -46,26 +46,28 @@ export function HomeScreen({
   );
 
   return (
-    <Box flexDirection="column" flexGrow={1} justifyContent="center">
-      <Box flexDirection="column" alignItems="center">
-        <AsciiLogo word={logoWord} />
-        <Box marginTop={1} marginBottom={3}>
-          <Text color={colors.textMuted}>{subtitle}</Text>
+    <Box flexDirection="column" flexGrow={1} justifyContent="space-between">
+      <Box flexGrow={1} flexDirection="column" justifyContent="center">
+        <Box flexDirection="column" alignItems="center">
+          <AsciiLogo word={logoWord} />
+          <Box marginTop={1} marginBottom={3}>
+            <Text color={colors.textMuted}>{subtitle}</Text>
+          </Box>
+        </Box>
+
+        <Box justifyContent="center" width="100%" marginTop={3}>
+          <PromptCard width={promptWidth} examples={promptExamples}>
+            {renderPrompt}
+          </PromptCard>
+        </Box>
+
+        <Box justifyContent="center" width="100%" marginTop={1}>
+          <CapabilityRow capabilities={capabilities} />
         </Box>
       </Box>
 
-      <Box justifyContent="center" width="100%" marginTop={3}>
-        <PromptCard width={promptWidth} examples={promptExamples}>
-          {renderPrompt}
-        </PromptCard>
-      </Box>
-
-      <Box justifyContent="center" width="100%" marginTop={1}>
-        <CapabilityRow capabilities={capabilities} />
-      </Box>
-
-      <Box justifyContent="center" width="100%" marginTop={3}>
-        <HomeFooter repository={repository} branch={branch} provider={provider} />
+      <Box width="100%" marginBottom={1}>
+        <HomeFooter />
       </Box>
     </Box>
   );

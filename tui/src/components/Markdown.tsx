@@ -5,6 +5,21 @@ import { InlineCode } from "./InlineCode";
 import type { ReactNode } from "react";
 import { colors } from "../styles/theme";
 
+// OpenCode dark theme markdown colors
+const md = {
+  text: "#eeeeee",
+  heading: "#9d7cd8",
+  strong: "#f5a742",
+  emph: "#e5c07b",
+  code: "#7fd88f",
+  link: "#fab283",
+  linkText: "#56b6c2",
+  blockQuote: "#e5c07b",
+  listItem: "#fab283",
+  listEnum: "#56b6c2",
+  hr: "#808080",
+} as const;
+
 interface MarkdownProps {
   tokens: Token[];
 }
@@ -29,12 +44,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const t = token as Tokens.Heading;
       const prefix = "#".repeat(t.depth) + " ";
       // OpenCode theme: accent purple for headings
-      const color =
-        t.depth === 1
-          ? colors.accent
-          : t.depth === 2
-            ? colors.accent
-            : colors.textMuted;
+      const color = md.heading;
       return (
         <Box marginTop={t.depth === 1 ? 2 : 1} marginBottom={1}>
           <Text bold color={color}>
@@ -49,7 +59,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const t = token as Tokens.Paragraph;
       return (
         <Box marginBottom={1}>
-          <Text color={colors.textBase}>{renderInline(t.tokens)}</Text>
+          <Text color={md.text}>{renderInline(t.tokens)}</Text>
         </Box>
       );
     }
@@ -69,7 +79,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
           borderTop={false}
           borderBottom={false}
           borderRight={false}
-          borderColor={colors.borderBase}
+          borderColor={md.blockQuote}
           paddingLeft={1}
         >
           <Box flexDirection="column">
@@ -140,7 +150,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
         );
         return (
           <Box marginBottom={1}>
-            <Text color={colors.borderBase}>{[top, headerRow, mid, ...dataRows, bot].join("\n")}</Text>
+            <Text color={md.hr}>{[top, headerRow, mid, ...dataRows, bot].join("\n")}</Text>
           </Box>
         );
       } else {
@@ -156,7 +166,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
                   {t.header.map((h, ci) => (
                     <Box key={ci}>
                       <Text color={colors.textMuted}>{`  ${pad(cellPlain(h.tokens), labelWidth)}  `}</Text>
-                      <Text color={colors.textBase}>{renderInline(row[ci]?.tokens ?? [])}</Text>
+                      <Text color={md.text}>{renderInline(row[ci]?.tokens ?? [])}</Text>
                     </Box>
                   ))}
                 </Box>
@@ -174,7 +184,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const hrWidth = Math.min((process.stdout.columns || 80) - 6, 60);
       return (
         <Box marginY={1}>
-          <Text color={colors.borderBase}>{"─".repeat(hrWidth)}</Text>
+          <Text color={md.hr}>{"─".repeat(hrWidth)}</Text>
         </Box>
       );
     }
@@ -185,7 +195,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
     default:
       // Unknown block types — show raw text if non-empty
       if (token.raw?.trim()) {
-        return <Text color={colors.textBase}>{token.raw}</Text>;
+        return <Text color={md.text}>{token.raw}</Text>;
       }
       return null;
   }
@@ -204,21 +214,21 @@ function ListItem({
 }) {
   return (
     <Box>
-      <Text color={colors.textMuted}>{prefix}</Text>
+      <Text color={md.listItem}>{prefix}</Text>
       <Box flexDirection="column" flexShrink={1}>
         {item.tokens.map((inner, j) => {
           // In tight lists, unwrap paragraphs to avoid extra spacing
           if (inner.type === "paragraph") {
             const p = inner as Tokens.Paragraph;
-            return <Text key={j} color={colors.textBase}>{renderInline(p.tokens)}</Text>;
+            return <Text key={j} color={md.text}>{renderInline(p.tokens)}</Text>;
           }
           // Tight list items use a bare "text" token instead of paragraph
           if (inner.type === "text") {
             const txt = inner as Tokens.Text;
             if (txt.tokens && txt.tokens.length > 0) {
-              return <Text key={j} color={colors.textBase}>{renderInline(txt.tokens)}</Text>;
+              return <Text key={j} color={md.text}>{renderInline(txt.tokens)}</Text>;
             }
-            return <Text key={j} color={colors.textBase}>{txt.text}</Text>;
+            return <Text key={j} color={md.text}>{txt.text}</Text>;
           }
           // Nested lists, code blocks, etc.
           return <MarkdownBlock key={j} token={inner} />;
@@ -246,7 +256,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
       case "strong": {
         const t = token as Tokens.Strong;
         return (
-          <Text key={i} bold color={colors.primary}>
+          <Text key={i} bold color={md.strong}>
             {renderInline(t.tokens)}
           </Text>
         );
@@ -255,7 +265,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
       case "em": {
         const t = token as Tokens.Em;
         return (
-          <Text key={i} italic color={colors.warningBase}>
+          <Text key={i} italic color={md.emph}>
             {renderInline(t.tokens)}
           </Text>
         );
@@ -270,7 +280,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
         const t = token as Tokens.Link;
         // Render link text with accent color
         return (
-          <Text key={i} color={colors.textAccent}>
+          <Text key={i} color={md.linkText}>
             {renderInline(t.tokens)}
           </Text>
         );

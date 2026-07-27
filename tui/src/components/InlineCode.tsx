@@ -7,7 +7,7 @@ interface InlineCodeProps {
 
 export function InlineCode({ text }: InlineCodeProps) {
   return (
-    <Text color={colors.textCode} backgroundColor={colors.bgLayer02}>
+    <Text color="#7fd88f" backgroundColor="#1e1e1e">
       {` ${text} `}
     </Text>
   );

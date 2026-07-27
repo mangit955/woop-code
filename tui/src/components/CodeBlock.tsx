@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { highlight } from "cli-highlight";
+import { highlight, supportsLanguage } from "cli-highlight";
 import chalk from "chalk";
 import { colors } from "../styles/theme";
 
@@ -15,8 +15,9 @@ function stripAnsi(str: string): string {
 export function CodeBlock({ code, language }: CodeBlockProps) {
   let highlighted: string;
   try {
+    const validLang = language && supportsLanguage(language) ? language : undefined;
     highlighted = highlight(code.trimEnd(), {
-      language: language || undefined,
+      language: validLang,
       ignoreIllegals: true,
     });
   } catch {

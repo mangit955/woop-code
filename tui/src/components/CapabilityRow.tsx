@@ -10,7 +10,7 @@ export function CapabilityRow({ capabilities }: CapabilityRowProps) {
     <Box flexWrap="wrap" justifyContent="center">
       {capabilities.map((capability, index) => (
         <Box key={capability} marginRight={index === capabilities.length - 1 ? 0 : 2}>
-          <Text color="#475569">#{capability}</Text>
+          <Text color={colors.borderStrong}>#{capability}</Text>
         </Box>
       ))}
     </Box>

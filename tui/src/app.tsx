@@ -1,13 +1,15 @@
-import { Box, Text } from "ink";
+import { Box, measureElement, type DOMElement } from "ink";
 import { Header } from "./header";
 import { Timeline } from "./timeline";
 import { ConnectedStatusBar } from "./statusBar";
 import { Prompt } from "./prompt";
 import { useUIStore } from "./store/useUIStore";
+import { store } from "./store/ui-store";
 import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
 import type { AgentController } from "../../commands/agentController";
-import { useState } from "react";
+import type { TimeLineItem } from "./types";
+import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { colors } from "./styles/theme";
 
@@ -57,12 +59,14 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         ) : hasPendingEdit ? (
           /* Split layout: Timeline on top, Diff below */
           <Box flexDirection="column" flexGrow={1} minHeight={0}>
-            <Box flexDirection="column-reverse" flexShrink={1} overflow="hidden">
-              <Box flexGrow={1} />
-              <Box flexDirection="column" flexShrink={0} marginBottom={-(state.scrollOffset || 0)}>
-                <Timeline items={state.timeline} isThinking={state.isThinking} />
-              </Box>
-            </Box>
+            <ConversationViewport
+              items={state.timeline}
+              isThinking={state.isThinking}
+              scrollOffset={state.scrollOffset}
+              updateKey={state}
+              layoutKey={`${width}:${height}`}
+              flexShrink={1}
+            />
 
             {/* Diff preview - takes remaining space */}
             <Box flexDirection="column" flexGrow={1} minHeight={0} marginTop={1}>
@@ -70,12 +74,14 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
             </Box>
           </Box>
         ) : (
-          <Box flexDirection="column-reverse" flexGrow={1} minHeight={0} overflow="hidden">
-            <Box flexGrow={1} />
-            <Box flexDirection="column" flexShrink={0} marginBottom={-(state.scrollOffset || 0)}>
-              <Timeline items={state.timeline} isThinking={state.isThinking} />
-            </Box>
-          </Box>
+          <ConversationViewport
+            items={state.timeline}
+            isThinking={state.isThinking}
+            scrollOffset={state.scrollOffset}
+            updateKey={state}
+            layoutKey={`${width}:${height}`}
+            flexGrow={1}
+          />
         )}
       </Box>
 
@@ -86,6 +92,78 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           <ConnectedStatusBar />
         </Box>
       )}
+    </Box>
+  );
+}
+
+interface ConversationViewportProps {
+  items: TimeLineItem[];
+  isThinking: boolean;
+  scrollOffset: number;
+  updateKey: object;
+  layoutKey: string;
+  flexGrow?: number;
+  flexShrink?: number;
+}
+
+/**
+ * Keeps the transcript pinned to its latest line until the user scrolls, while
+ * clipping only this middle region. Header and composer live outside it.
+ */
+function ConversationViewport({
+  items,
+  isThinking,
+  scrollOffset,
+  updateKey,
+  layoutKey,
+  flexGrow,
+  flexShrink,
+}: ConversationViewportProps) {
+  const viewportRef = useRef<DOMElement>(null);
+  const contentRef = useRef<DOMElement>(null);
+
+  const measurementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (measurementTimer.current) return;
+
+    // Streaming can cause dozens of updates per second. Measuring every frame
+    // forces repeated terminal layouts, so coalesce it to a short interval.
+    measurementTimer.current = setTimeout(() => {
+      measurementTimer.current = undefined;
+      if (!viewportRef.current || !contentRef.current) return;
+
+      const viewportHeight = measureElement(viewportRef.current).height;
+      const contentHeight = measureElement(contentRef.current).height;
+      store.setScrollLimit(contentHeight - viewportHeight);
+    }, 75);
+  }, [updateKey, layoutKey]);
+
+  useEffect(
+    () => () => {
+      if (measurementTimer.current) clearTimeout(measurementTimer.current);
+    },
+    [],
+  );
+
+  return (
+    <Box
+      ref={viewportRef}
+      flexDirection="column-reverse"
+      flexGrow={flexGrow}
+      flexShrink={flexShrink}
+      minHeight={0}
+      overflow="hidden"
+    >
+      <Box flexGrow={1} />
+      <Box
+        ref={contentRef}
+        flexDirection="column"
+        flexShrink={0}
+        marginBottom={-scrollOffset}
+      >
+        <Timeline items={items} isThinking={isThinking} />
+      </Box>
     </Box>
   );
 }

@@ -87,12 +87,28 @@ export function Prompt({
           return;
         }
       } else {
-        if (key.upArrow || key.pageUp) {
+        if (key.upArrow) {
           store.scrollUp();
           return;
         }
-        if (key.downArrow || key.pageDown) {
+        if (key.downArrow) {
           store.scrollDown();
+          return;
+        }
+        if (key.pageUp) {
+          store.pageUp();
+          return;
+        }
+        if (key.pageDown) {
+          store.pageDown();
+          return;
+        }
+        if (key.home) {
+          store.scrollToTop();
+          return;
+        }
+        if (key.end) {
+          store.resetScroll();
           return;
         }
       }

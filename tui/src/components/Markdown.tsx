@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import type { Token, Tokens } from "marked";
 import { CodeBlock } from "./CodeBlock";
+import { MermaidDiagram } from "./MermaidDiagram";
 import { InlineCode } from "./InlineCode";
 import type { ReactNode } from "react";
 import { colors } from "../styles/theme";
@@ -66,6 +67,9 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
 
     case "code": {
       const t = token as Tokens.Code;
+      if (t.lang?.toLowerCase() === "mermaid" || t.lang?.toLowerCase() === "mmd") {
+        return <MermaidDiagram code={t.text} />;
+      }
       return <CodeBlock code={t.text} language={t.lang || undefined} />;
     }
 

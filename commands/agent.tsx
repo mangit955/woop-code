@@ -8,6 +8,7 @@ import { ACTIVE_PROVIDER_MODELS } from "../config/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
+import { PassThrough } from "stream";
 
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
@@ -81,9 +82,73 @@ export async function runAgent() {
   await controller.initialize();
   const homeScreen = await buildHomeScreen(provider);
 
+  const customStdin = new PassThrough() as any;
+  customStdin.ref = () => {
+    process.stdin.ref?.();
+  };
+  customStdin.unref = () => {
+    process.stdin.unref?.();
+  };
+  customStdin.setRawMode = (mode: boolean) => {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(mode);
+    }
+  };
+  customStdin.isTTY = process.stdin.isTTY;
+
+  const MOUSE_REGEX = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;
+  let pendingScrollLines = 0;
+  let scrollFrame: ReturnType<typeof setTimeout> | undefined;
+
+  const queueScroll = (lines: number) => {
+    pendingScrollLines += lines;
+    if (scrollFrame) return;
+
+    // Trackpads can emit several wheel reports in a single display frame.
+    // Coalescing them prevents Ink from repainting the full transcript for
+    // every individual report.
+    scrollFrame = setTimeout(() => {
+      store.scrollBy(pendingScrollLines);
+      pendingScrollLines = 0;
+      scrollFrame = undefined;
+    }, 16);
+  };
+
+  const onData = (data: Buffer) => {
+    const str = data.toString();
+    let hasMouse = false;
+    let match;
+    while ((match = MOUSE_REGEX.exec(str)) !== null) {
+      hasMouse = true;
+      const button = Number(match[1]);
+      const isPress = match[4] === "M";
+      if (isPress) {
+        if (button === 64) {
+          queueScroll(1);
+        } else if (button === 65) {
+          queueScroll(-1);
+        }
+      }
+    }
+
+    if (hasMouse) {
+      const remainingStr = str.replace(MOUSE_REGEX, "");
+      if (remainingStr.length > 0) {
+        customStdin.write(Buffer.from(remainingStr));
+      }
+    } else {
+      customStdin.write(data);
+    }
+  };
+
+  if (process.stdin.isTTY) {
+    process.stdin.on("data", onData);
+    process.stdout.write("\x1b[?1000h\x1b[?1006h");
+  }
+
   const { unmount } = render(
     <App controller={controller} onExit={handleExit} homeScreen={homeScreen} />,
-    { exitOnCtrlC: false, fullScreen: true }
+    { stdin: customStdin, exitOnCtrlC: false }
   );
 
   let exiting = false;
@@ -91,6 +156,12 @@ export async function runAgent() {
   async function handleExit() {
     if (exiting) return;
     exiting = true;
+
+    if (process.stdin.isTTY) {
+      process.stdin.off("data", onData);
+      process.stdout.write("\x1b[?1006l\x1b[?1000l");
+    }
+    if (scrollFrame) clearTimeout(scrollFrame);
 
     controller.cancel();
     await controller.dispose();

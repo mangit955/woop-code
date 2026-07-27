@@ -2,11 +2,9 @@ import { useMemo } from "react";
 import { Box, Text } from "ink";
 import { lexer, type Token } from "marked";
 import { Markdown } from "./Markdown";
-import { StreamingCursor } from "./StreamingCursor";
 
 interface MessageRendererProps {
   content: string;
-  streaming?: boolean;
 }
 
 /**
@@ -53,7 +51,7 @@ function healMarkdown(text: string): string {
   return text;
 }
 
-export function MessageRenderer({ content, streaming }: MessageRendererProps) {
+export function MessageRenderer({ content }: MessageRendererProps) {
   const tokens = useMemo((): Token[] => {
     if (!content?.trim()) return [];
 
@@ -78,11 +76,6 @@ export function MessageRenderer({ content, streaming }: MessageRendererProps) {
   return (
     <Box flexDirection="column">
       <Markdown tokens={tokens} />
-      {streaming && (
-        <Box marginTop={0}>
-          <StreamingCursor />
-        </Box>
-      )}
     </Box>
   );
 }

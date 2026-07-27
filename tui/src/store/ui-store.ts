@@ -12,6 +12,7 @@ export class UIStore {
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
   private pendingEmit = false;
+  private maxScrollOffset = 0;
   private editResolvers: Map<
     string,
     { resolve: (approved: boolean) => void; reject: (error: Error) => void }
@@ -251,6 +252,7 @@ export class UIStore {
   }
 
   clearTimeline() {
+    this.maxScrollOffset = 0;
     this.state = {
       ...this.state,
       timeline: [],
@@ -263,18 +265,53 @@ export class UIStore {
   }
 
   scrollUp() {
+    this.scrollBy(1);
+  }
+
+  scrollDown() {
+    this.scrollBy(-1);
+  }
+
+  scrollBy(lines: number) {
+    if (lines === 0) return;
+
+    const scrollOffset = Math.max(
+      0,
+      Math.min(this.state.scrollOffset + lines, this.maxScrollOffset),
+    );
+
+    if (scrollOffset === this.state.scrollOffset) return;
+
     this.state = {
       ...this.state,
-      scrollOffset: Math.min(this.state.scrollOffset + 3, this.state.timeline.length * 50),
+      scrollOffset,
     };
     this.emit();
   }
 
-  scrollDown() {
+  pageUp() {
+    this.scrollBy(8);
+  }
+
+  pageDown() {
+    this.scrollBy(-8);
+  }
+
+  scrollToTop() {
     this.state = {
       ...this.state,
-      scrollOffset: Math.max(0, this.state.scrollOffset - 1),
+      scrollOffset: this.maxScrollOffset,
     };
+    this.emit();
+  }
+
+  setScrollLimit(maxScrollOffset: number) {
+    this.maxScrollOffset = Math.max(0, maxScrollOffset);
+    const scrollOffset = Math.min(this.state.scrollOffset, this.maxScrollOffset);
+
+    if (scrollOffset === this.state.scrollOffset) return;
+
+    this.state = { ...this.state, scrollOffset };
     this.emit();
   }
 

@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { memo } from "react";
 import type { TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
@@ -19,7 +20,7 @@ export function Timeline({ items, isThinking }: TimelineProps) {
   );
 }
 
-function TimelineItem({ item }: { item: TimeLineItem }) {
+const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }) {
   switch (item.type) {
     case "user":
       return (
@@ -46,7 +47,7 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
             )}
           </Box>
           <Box paddingLeft={2}>
-            <MessageRenderer content={item.content} streaming={item.streaming} />
+            <MessageRenderer content={item.content} />
           </Box>
         </Box>
       );
@@ -78,7 +79,7 @@ function TimelineItem({ item }: { item: TimeLineItem }) {
       );
     }
   }
-}
+});
 
 function formatToolArgument(arguments_: Record<string, unknown>) {
   const value =

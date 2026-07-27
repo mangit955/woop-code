@@ -20,6 +20,7 @@ export function StatusBar({ status, message }: StatusBarProps) {
         <StatusLabel status={status} message={message} />
       </Box>
       <Box gap={2} flexShrink={0}>
+        <Text color={colors.textFaint}>↑↓ scroll</Text>
         <Text color={colors.textFaint}>ctrl+c</Text>
       </Box>
     </Box>

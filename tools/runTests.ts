@@ -6,7 +6,7 @@ export const runTestsTool: Tool = {
   description: "Runs the project's test command. For quick test execution only - do not use to start servers.",
   parameters: [
     { name: "command", required: false, description: "defaults to bun test" },
-    { name: "timeout", required: false, description: "timeout in seconds (default: 60)" },
+    { name: "timeout", required: false, description: "timeout in seconds (default: 60)", type: "number" },
   ],
   async execute(args) {
     const command =

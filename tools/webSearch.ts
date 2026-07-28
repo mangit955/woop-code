@@ -24,6 +24,7 @@ Current year: ${new Date().getFullYear()}`,
       name: "numResults",
       description: "Number of search results to return (default: 5, max: 10)",
       required: false,
+      type: "number",
     },
   ],
 

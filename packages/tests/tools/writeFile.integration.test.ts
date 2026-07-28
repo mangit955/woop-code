@@ -26,6 +26,7 @@ describe("writeFile Tool - Integration Tests", () => {
     mockStore = {
       setPendingEdit: mock(async () => true), // Auto-approve
       setPendingCommand: mock(async () => true),
+      setPendingQuestion: mock(async () => []),
       addSystemMessage: mock(() => {}),
     };
 

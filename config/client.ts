@@ -95,8 +95,11 @@ export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): Provider
                 tool.parameters.map((param) => [
                   param.name,
                   {
-                    type: Type.STRING,
+                    type: toolParameterType(param.type),
                     description: param.description,
+                    ...(param.type === "array"
+                      ? { items: { type: Type.STRING } }
+                      : {}),
                   },
                 ]),
               ),
@@ -204,6 +207,17 @@ export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): Provider
       }
     },
   };
+}
+
+function toolParameterType(type: string | undefined) {
+  switch (type) {
+    case "number":
+      return Type.NUMBER;
+    case "array":
+      return Type.ARRAY;
+    default:
+      return Type.STRING;
+  }
 }
 
 export function groqClient(apiKey: string) {}

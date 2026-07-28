@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { resolveWorkspacePath } from "./workspace";
 
 export const listFilesTool: Tool = {
   name: "list_files",
@@ -12,7 +13,9 @@ export const listFilesTool: Tool = {
   ],
 
   async execute(args) {
-    const path = (args.path as string) || process.cwd();
+    const path = await resolveWorkspacePath((args.path as string) || process.cwd(), {
+      mustExist: true,
+    });
 
     const files: string[] = [];
 

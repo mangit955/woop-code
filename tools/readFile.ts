@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
 import { statSync } from "fs";
+import { resolveWorkspacePath } from "./workspace";
 
 export const readFileTool: Tool = {
   name: "read_file",
@@ -13,10 +14,20 @@ export const readFileTool: Tool = {
   ],
 
   async execute(args) {
-    const path = args.path as string;
+    const requestedPath = args.path as string;
 
-    if (!path) {
+    if (!requestedPath) {
       throw Error("File path is required");
+    }
+
+    let path: string;
+    try {
+      path = await resolveWorkspacePath(requestedPath, { mustExist: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw Error(`File ${requestedPath} does not exist`);
+      }
+      throw error;
     }
 
     const file = Bun.file(path);

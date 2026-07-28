@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
 import { existsSync } from "fs";
+import { resolveWorkspacePath } from "./workspace";
 
 export const createFileTool: Tool = {
   name: "create_file",
@@ -9,11 +10,13 @@ export const createFileTool: Tool = {
     { name: "content", description: "File content", required: true },
   ],
   async execute(args) {
-    const path = args.path as string;
+    const requestedPath = args.path as string;
     const content = args.content as string;
 
-    if (!path) throw new Error("Missing required argument: path");
+    if (!requestedPath) throw new Error("Missing required argument: path");
     if (!content) throw new Error("Missing required argument: content");
+
+    const path = await resolveWorkspacePath(requestedPath);
 
     if (existsSync(path)) {
       throw new Error(`File already exists: ${path}`);

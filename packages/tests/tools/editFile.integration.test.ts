@@ -1,8 +1,7 @@
-import { test, expect, describe, beforeEach, mock } from "bun:test";
+import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
 import { editFileTool } from "../../../tools/editFile";
-import { tmpdir } from "os";
 import { join } from "path";
-import { mkdirSync } from "fs";
+import { mkdirSync, rmSync } from "fs";
 
 /**
  * INTEGRATION TESTS for editFile tool
@@ -15,7 +14,7 @@ describe("editFile Tool - Integration Tests", () => {
   let mockStore: any;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `woop-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.cwd(), `.woop-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
     mockStore = {
@@ -26,6 +25,10 @@ describe("editFile Tool - Integration Tests", () => {
     mock.module("../../../tui/src/store/ui-store", () => ({
       store: mockStore,
     }));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   const createFile = async (name: string, content: string) => {

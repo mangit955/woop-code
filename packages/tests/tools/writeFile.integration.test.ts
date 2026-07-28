@@ -1,6 +1,5 @@
-import { test, expect, describe, beforeEach, mock } from "bun:test";
+import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
 import { writeFileTool } from "../../../tools/writeFile";
-import { tmpdir } from "os";
 import { join } from "path";
 import { mkdirSync, rmSync } from "fs";
 
@@ -20,7 +19,7 @@ describe("writeFile Tool - Integration Tests", () => {
 
   beforeEach(() => {
     // Create temp directory for this test run
-    testDir = join(tmpdir(), `woop-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.cwd(), `.woop-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
     // Mock the UI store (only thing we CAN mock)
@@ -32,6 +31,10 @@ describe("writeFile Tool - Integration Tests", () => {
     mock.module("../../../tui/src/store/ui-store", () => ({
       store: mockStore,
     }));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   // Helper to create test file

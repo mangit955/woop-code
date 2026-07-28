@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { resolveWorkspacePath } from "./workspace";
 
 export const grepTool: Tool = {
   name: "grep",
@@ -17,8 +18,9 @@ export const grepTool: Tool = {
       throw new Error("Parameter 'pattern' is required and must be a string.");
     }
 
-    const path =
+    const requestedPath =
       args.path && typeof args.path === "string" ? args.path : process.cwd();
+    const path = await resolveWorkspacePath(requestedPath, { mustExist: true });
 
     const proc = Bun.spawn({
       cmd: [

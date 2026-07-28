@@ -2,6 +2,8 @@ import { describe, test, expect } from "bun:test";
 import type { Tool } from "../../../config/types";
 import { readFileTool } from "../../../tools/readFile";
 import { listFilesTool } from "../../../tools/listFiles";
+import { join } from "node:path";
+import { rmSync } from "node:fs";
 
 /**
  * Tool Contract Tests
@@ -85,7 +87,7 @@ describe("Real Tool Contract Compliance", () => {
 
   test("readFileTool - returns string on success", async () => {
     // Create a temp file for testing
-    const tempPath = `/tmp/test-${Date.now()}.txt`;
+    const tempPath = join(process.cwd(), `.tool-contract-${Date.now()}.txt`);
     await Bun.write(tempPath, "test content");
 
     try {
@@ -94,12 +96,12 @@ describe("Real Tool Contract Compliance", () => {
       expect(result).toBe("test content");
     } finally {
       // Cleanup
-      await Bun.write(tempPath, "").catch(() => {});
+      rmSync(tempPath, { force: true });
     }
   });
 
   test("readFileTool - throws error for non-existent file", async () => {
-    const nonExistentPath = `/tmp/nonexistent-${Date.now()}.txt`;
+    const nonExistentPath = join(process.cwd(), `.nonexistent-${Date.now()}.txt`);
     
     await expect(readFileTool.execute({ path: nonExistentPath })).rejects.toThrow(
       "does not exist",

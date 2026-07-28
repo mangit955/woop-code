@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { resolveWorkspacePath } from "./workspace";
 
 export const findFilesTool: Tool = {
   name: "find_files",
@@ -26,8 +27,9 @@ export const findFilesTool: Tool = {
       return "Error: Query too broad or too short. Please provide a specific filename or pattern with at least 2 characters (e.g., 'websocket', 'config', 'auth', 'index').";
     }
     
-    const rootPath =
+    const requestedPath =
       args.path && typeof args.path === "string" ? args.path : process.cwd();
+    const rootPath = await resolveWorkspacePath(requestedPath, { mustExist: true });
 
     const matches: string[] = [];
     const lowerQuery = query.toLowerCase();

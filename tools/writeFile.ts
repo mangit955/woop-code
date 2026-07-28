@@ -2,6 +2,7 @@ import type { Tool } from "../config/types";
 import { createTwoFilesPatch } from "diff";
 import { store } from "../tui/src/store/ui-store";
 import type { PendingEdit } from "../tui/src/types";
+import { resolveWorkspacePath } from "./workspace";
 
 export const writeFileTool: Tool = {
   name: "write_file",
@@ -22,8 +23,17 @@ export const writeFileTool: Tool = {
   ],
 
   async execute(args) {
-    const path = args.path as string;
+    const requestedPath = args.path as string;
     const content = args.content as string;
+    let path: string;
+    try {
+      path = await resolveWorkspacePath(requestedPath, { mustExist: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error(`File not found: ${requestedPath}`);
+      }
+      throw error;
+    }
 
     const file = Bun.file(path);
 

@@ -1,6 +1,5 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { globTool } from "../../../tools/glob";
-import { tmpdir } from "os";
 import { join } from "path";
 import { mkdirSync, rmSync } from "fs";
 
@@ -9,7 +8,7 @@ describe("glob tool - integration tests", () => {
 
   beforeEach(async () => {
     // Create unique test directory
-    testDir = join(tmpdir(), `glob-test-${Date.now()}`);
+    testDir = join(process.cwd(), `.glob-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
 
     // Create test file structure
@@ -157,18 +156,10 @@ describe("glob tool - integration tests", () => {
       ).rejects.toThrow("Pattern is required");
     });
 
-    test("resolves relative paths correctly", async () => {
-      // Create files in current directory for this test
-      const cwd = process.cwd();
-      const relativePath = join("..", "..", "..");
-      
-      const result = await globTool.execute({
-        pattern: "*.json",
-        path: relativePath,
-      });
-
-      // Should resolve path and find files
-      expect(typeof result).toBe("string");
+    test("rejects paths outside the workspace", async () => {
+      await expect(
+        globTool.execute({ pattern: "*.json", path: "../" }),
+      ).rejects.toThrow("Path escapes the workspace");
     });
   });
 

@@ -1,8 +1,7 @@
-import { test, expect, describe, beforeEach } from "bun:test";
+import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { readFileTool } from "../../../tools/readFile";
-import { tmpdir } from "os";
 import { join } from "path";
-import { mkdirSync } from "fs";
+import { mkdirSync, rmSync } from "fs";
 
 /**
  * INTEGRATION TESTS for readFile tool
@@ -14,8 +13,12 @@ describe("readFile Tool - Integration Tests", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `woop-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.cwd(), `.woop-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   const createFile = async (name: string, content: string) => {

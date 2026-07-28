@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
 import path from "path";
+import { resolveWorkspacePath } from "./workspace";
 
 export const globTool: Tool = {
   name: "glob",
@@ -35,9 +36,7 @@ Returns up to 100 matching file paths.`,
     }
 
     // Resolve search path
-    const resolvedPath = path.isAbsolute(searchPath)
-      ? searchPath
-      : path.resolve(process.cwd(), searchPath);
+    const resolvedPath = await resolveWorkspacePath(searchPath, { mustExist: true });
 
     // Check if path is a file (not a directory)
     try {

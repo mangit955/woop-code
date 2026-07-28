@@ -14,7 +14,7 @@ export async function saveConfig(config: any) {
 }
 
 // for storing and apending the conversation history
-export async function getConversation() {
+export async function getConversation(): Promise<Message[]> {
   await initializeConfig();
   const conversationPath = getConversationPath();
   const file = Bun.file(conversationPath);
@@ -23,7 +23,7 @@ export async function getConversation() {
     return [];
   }
 
-  return JSON.parse(await file.text());
+  return JSON.parse(await file.text()) as Message[];
 }
 
 export async function saveConversation(messages: Message[]) {

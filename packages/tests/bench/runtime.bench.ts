@@ -1,4 +1,5 @@
-import { bench, describe } from "bun:test";
+import { describe } from "bun:test";
+import { bench } from "./bench";
 import { agentLoop } from "../../../config/runtime";
 import { MockTool, MockToolRegistry, CallbackSpy } from "../shared/mocks";
 import { createStreamingProvider } from "../shared/testHelpers";

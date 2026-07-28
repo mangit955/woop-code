@@ -72,8 +72,8 @@ function inactiveColor(
   // Blend from the terminal background into the inactive blue. True-color
   // interpolation avoids the hard brightness jumps that make a TUI spinner
   // look jittery at its turnaround points.
-  const start = [10, 10, 10];
-  const end = [30, 58, 95];
+  const start: [number, number, number] = [10, 10, 10];
+  const end: [number, number, number] = [30, 58, 95];
   const channel = (index: number) =>
     Math.round(start[index] + (end[index] - start[index]) * amount)
       .toString(16)

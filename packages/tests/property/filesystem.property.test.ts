@@ -324,7 +324,7 @@ describe("Filesystem - Property Tests", () => {
             const filePath = join(testDir, `concurrent-${i}.txt`);
             const file = Bun.file(filePath);
             const readContent = await file.text();
-            expect(readContent).toBe(contents[i]);
+            expect(readContent).toBe(contents[i]!);
           }
         }
       ),

@@ -227,7 +227,7 @@ async function buildHomeScreen(provider: string, model: string): Promise<HomeScr
     repository,
     branch,
     providerName: providerLabel,
-    provider: provider === "google" ? getModelDisplayName(model) : ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
+    provider: provider === "google" ? getModelDisplayName(model) ?? providerLabel : ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
   };
 }
 

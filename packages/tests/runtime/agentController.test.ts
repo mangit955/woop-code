@@ -555,7 +555,7 @@ describe("AgentController - Callbacks", () => {
     await expect(controller.run("Test")).rejects.toThrow();
 
     expect(errorReceived).toBeDefined();
-    expect(errorReceived?.message).toBe("Provider failed");
+    expect((errorReceived as Error | null)?.message).toBe("Provider failed");
   });
 
   test("onCancel callback called on cancellation", async () => {

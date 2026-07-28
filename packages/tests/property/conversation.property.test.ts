@@ -188,7 +188,7 @@ describe("Conversation - Property Tests", () => {
 
           // INVARIANT: Messages must remain immutable
           for (let i = 0; i < messages.length; i++) {
-            expect(JSON.stringify(messages[i])).toBe(snapshots[i]);
+            expect(JSON.stringify(messages[i]!)).toBe(snapshots[i]!);
           }
         }
       ),
@@ -258,7 +258,7 @@ describe("Conversation - Property Tests", () => {
           // INVARIANT: Unicode content must be preserved exactly
           for (let i = 0; i < messages.length; i++) {
             const msg = messages[i] as Extract<Message, { role: "user" }>;
-            expect(msg.content).toBe(unicodeContents[i]);
+            expect(msg.content).toBe(unicodeContents[i]!);
           }
         }
       ),

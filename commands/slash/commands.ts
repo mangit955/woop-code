@@ -151,6 +151,9 @@ const loginCommand: SlashCommand = {
     }
 
     const provider = args[0];
+    if (!provider) {
+      return `Provider name required.\nUsage: /login <provider> <api-key>`;
+    }
     const apiKey = args.slice(1).join(" "); // Allow API keys with spaces
 
     const config = await getConfig();

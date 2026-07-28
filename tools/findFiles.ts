@@ -88,7 +88,7 @@ export const findFilesTool: Tool = {
       const queryPath = `${rootPath}/${query}`;
       try {
         const stat = await Bun.file(queryPath).stat();
-        if (stat.isDirectory) {
+        if (stat.isDirectory()) {
           return `"${query}" is a directory. Use list_files with path="${query}" to see its contents.`;
         }
       } catch {

@@ -1,4 +1,5 @@
-import { bench, describe, beforeAll, mock } from "bun:test";
+import { describe, beforeAll, mock } from "bun:test";
+import { bench } from "./bench";
 import { readFileTool } from "../../../tools/readFile";
 import { writeFileTool } from "../../../tools/writeFile";
 import { editFileTool } from "../../../tools/editFile";
@@ -29,6 +30,8 @@ beforeAll(() => {
   // Mock UI store
   mockStore = {
     setPendingEdit: mock(async () => true),
+    setPendingCommand: mock(async () => true),
+    setPendingQuestion: mock(async () => []),
   };
 
   mock.module("../../../tui/src/store/ui-store", () => ({

@@ -1,4 +1,5 @@
-import { bench, describe } from "bun:test";
+import { describe } from "bun:test";
+import { bench } from "./bench";
 import { createTwoFilesPatch, applyPatch } from "diff";
 import { marked } from "marked";
 

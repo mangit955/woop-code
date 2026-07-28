@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { store } from "../tui/src/store/ui-store";
 
 export const runTestsTool: Tool = {
   name: "run_tests",
@@ -14,6 +15,15 @@ export const runTestsTool: Tool = {
         : "bun test";
     
     const timeoutSeconds = (args.timeout as number) || 60;
+
+    const approved = await store.setPendingCommand({
+      id: crypto.randomUUID(),
+      command,
+      toolName: "run_tests",
+    });
+    if (!approved) {
+      return "Command rejected by user. It was not run.";
+    }
 
     // Warn about server commands
     if (command.includes("run src/index") || command.includes("run index") || command.includes("start")) {

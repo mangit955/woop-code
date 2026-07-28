@@ -1,4 +1,4 @@
-import type { Listener, PendingEdit, TimeLineItem, UIState } from "../types";
+import type { Listener, PendingCommand, PendingEdit, TimeLineItem, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
 export class UIStore {
@@ -9,6 +9,7 @@ export class UIStore {
     modelPickerOpen: false,
     selectedModel: null,
     pendingEdit: null,
+    pendingCommand: null,
     pendingEditScrollOffset: 0,
     scrollOffset: 0,
   };
@@ -21,6 +22,7 @@ export class UIStore {
     string,
     { resolve: (approved: boolean) => void; reject: (error: Error) => void }
   > = new Map();
+  private commandResolvers: Map<string, { resolve: (approved: boolean) => void }> = new Map();
 
   getState() {
     return this.state;
@@ -287,7 +289,40 @@ export class UIStore {
     this.emit();
   }
 
+  setPendingCommand(command: PendingCommand): Promise<boolean> {
+    this.state = { ...this.state, pendingCommand: command };
+    this.emit();
+
+    return new Promise((resolve) => {
+      this.commandResolvers.set(command.id, { resolve });
+    });
+  }
+
+  approvePendingCommand() {
+    this.resolvePendingCommand(true);
+  }
+
+  rejectPendingCommand() {
+    this.resolvePendingCommand(false);
+  }
+
+  clearPendingCommand() {
+    this.resolvePendingCommand(false);
+  }
+
+  private resolvePendingCommand(approved: boolean) {
+    const command = this.state.pendingCommand;
+    if (!command) return;
+
+    this.commandResolvers.get(command.id)?.resolve(approved);
+    this.commandResolvers.delete(command.id);
+    this.state = { ...this.state, pendingCommand: null };
+    this.emit();
+  }
+
   clearTimeline() {
+    this.clearPendingEdit();
+    this.clearPendingCommand();
     this.maxScrollOffset = 0;
     this.maxPendingEditScrollOffset = 0;
     this.state = {
@@ -296,6 +331,7 @@ export class UIStore {
       status: "Ready",
       isThinking: false,
       pendingEditScrollOffset: 0,
+      pendingCommand: null,
       scrollOffset: 0,
     };
     this.activeAssistantId = null;

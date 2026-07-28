@@ -90,9 +90,8 @@ Woopcode currently ships with 13 tools.
 
 ### Change safety
 
-- `edit_file` and `write_file` show a diff and wait for approval before modifying an existing file.
-- `create_file` creates a genuinely new file directly; review the agent’s output and your version control diff before committing.
-- `run_terminal` and `run_tests` are intended for short, non-interactive commands. They do not start servers or watch processes.
+- `edit_file`, `write_file`, and `create_file` show a diff and wait for approval before changing the workspace.
+- `run_terminal` and `run_tests` show the exact command and wait for approval before execution. They are intended for short, non-interactive commands and do not start servers or watch processes.
 - Tool failures and repeated calls are returned to the agent so it can adjust rather than silently retrying the same action.
 
 ## In-app commands and controls

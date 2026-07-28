@@ -32,6 +32,12 @@ export interface PendingEdit {
   toolCallId: string;
 }
 
+export interface PendingCommand {
+  id: string;
+  command: string;
+  toolName: "run_terminal" | "run_tests";
+}
+
 export interface UIState {
   timeline: TimeLineItem[];
   status: string;
@@ -39,6 +45,7 @@ export interface UIState {
   modelPickerOpen: boolean;
   selectedModel: string | null;
   pendingEdit: PendingEdit | null;
+  pendingCommand: PendingCommand | null;
   pendingEditScrollOffset: number;
   scrollOffset: number;
 }

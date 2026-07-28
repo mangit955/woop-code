@@ -184,6 +184,8 @@ export async function runAgent() {
     }
     if (scrollFrame) clearTimeout(scrollFrame);
 
+    store.clearPendingEdit();
+    store.clearPendingCommand();
     controller.cancel();
     await controller.dispose();
     unmount();

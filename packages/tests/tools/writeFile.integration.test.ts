@@ -25,6 +25,7 @@ describe("writeFile Tool - Integration Tests", () => {
     // Mock the UI store (only thing we CAN mock)
     mockStore = {
       setPendingEdit: mock(async () => true), // Auto-approve
+      setPendingCommand: mock(async () => true),
       addSystemMessage: mock(() => {}),
     };
 

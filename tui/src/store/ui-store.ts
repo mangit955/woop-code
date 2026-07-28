@@ -1,4 +1,4 @@
-import type { Listener, PendingCommand, PendingEdit, TimeLineItem, UIState } from "../types";
+import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
 export class UIStore {
@@ -10,6 +10,7 @@ export class UIStore {
     selectedModel: null,
     pendingEdit: null,
     pendingCommand: null,
+    pendingQuestion: null,
     pendingEditScrollOffset: 0,
     scrollOffset: 0,
   };
@@ -23,6 +24,7 @@ export class UIStore {
     { resolve: (approved: boolean) => void; reject: (error: Error) => void }
   > = new Map();
   private commandResolvers: Map<string, { resolve: (approved: boolean) => void }> = new Map();
+  private questionResolvers: Map<string, { resolve: (answers: string[] | null) => void }> = new Map();
 
   getState() {
     return this.state;
@@ -320,9 +322,37 @@ export class UIStore {
     this.emit();
   }
 
+  setPendingQuestion(question: PendingQuestion): Promise<string[] | null> {
+    this.state = { ...this.state, pendingQuestion: question };
+    this.emit();
+
+    return new Promise((resolve) => {
+      this.questionResolvers.set(question.id, { resolve });
+    });
+  }
+
+  answerPendingQuestion(answers: string[]) {
+    this.resolvePendingQuestion(answers);
+  }
+
+  cancelPendingQuestion() {
+    this.resolvePendingQuestion(null);
+  }
+
+  private resolvePendingQuestion(answers: string[] | null) {
+    const question = this.state.pendingQuestion;
+    if (!question) return;
+
+    this.questionResolvers.get(question.id)?.resolve(answers);
+    this.questionResolvers.delete(question.id);
+    this.state = { ...this.state, pendingQuestion: null };
+    this.emit();
+  }
+
   clearTimeline() {
     this.clearPendingEdit();
     this.clearPendingCommand();
+    this.cancelPendingQuestion();
     this.maxScrollOffset = 0;
     this.maxPendingEditScrollOffset = 0;
     this.state = {
@@ -332,6 +362,7 @@ export class UIStore {
       isThinking: false,
       pendingEditScrollOffset: 0,
       pendingCommand: null,
+      pendingQuestion: null,
       scrollOffset: 0,
     };
     this.activeAssistantId = null;

@@ -14,6 +14,7 @@ export const terminalTool: Tool = {
       name: "timeout",
       description: "Timeout in seconds (default: 30). Command will be killed if it exceeds this time.",
       required: false,
+      type: "number",
     },
   ],
 

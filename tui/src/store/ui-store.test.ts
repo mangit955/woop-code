@@ -82,3 +82,26 @@ describe("UIStore edit approvals", () => {
     });
   });
 });
+
+describe("UIStore questions", () => {
+  test("keeps the request pending until the user answers", async () => {
+    const store = new UIStore();
+    const pending = store.setPendingQuestion({
+      id: "question-1",
+      questions: ["Which database?"],
+    });
+
+    expect(store.getState().pendingQuestion?.questions).toEqual(["Which database?"]);
+    store.answerPendingQuestion(["SQLite"]);
+
+    await expect(pending).resolves.toEqual(["SQLite"]);
+    expect(store.getState().pendingQuestion).toBeNull();
+  });
+
+  test("returns null when the user cancels", async () => {
+    const store = new UIStore();
+    const pending = store.setPendingQuestion({ id: "question-2", questions: ["Continue?"] });
+    store.cancelPendingQuestion();
+    await expect(pending).resolves.toBeNull();
+  });
+});

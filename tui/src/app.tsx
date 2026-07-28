@@ -9,6 +9,7 @@ import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
 import { ModelPicker } from "./components/ModelPicker";
 import { CommandApproval } from "./components/CommandApproval";
+import { QuestionDialog } from "./components/QuestionDialog";
 import type { AgentController } from "../../commands/agentController";
 import type { TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
@@ -29,6 +30,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const showHome = state.timeline.length === 0;
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
+  const hasPendingQuestion = state.pendingQuestion !== null;
 
   const promptProps = {
     controller,
@@ -55,6 +57,8 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         <ModelPicker controller={controller} selectedModel={state.selectedModel} />
       ) : hasPendingCommand ? (
         <CommandApproval command={state.pendingCommand!} />
+      ) : hasPendingQuestion ? (
+        <QuestionDialog question={state.pendingQuestion!} />
       ) : (
         <>
 
@@ -103,7 +107,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       </Box>
 
       {/* Footer — pinned at bottom */}
-      {!showHome && !hasPendingEdit && !hasPendingCommand && (
+      {!showHome && !hasPendingEdit && !hasPendingCommand && !hasPendingQuestion && (
         <Box flexDirection="column" flexShrink={0} paddingX={1} gap={1} marginBottom={1}>
           <Prompt {...promptProps} variant="block" />
           <ConnectedStatusBar />

@@ -38,6 +38,11 @@ export interface PendingCommand {
   toolName: "run_terminal" | "run_tests";
 }
 
+export interface PendingQuestion {
+  id: string;
+  questions: string[];
+}
+
 export interface UIState {
   timeline: TimeLineItem[];
   status: string;
@@ -46,6 +51,7 @@ export interface UIState {
   selectedModel: string | null;
   pendingEdit: PendingEdit | null;
   pendingCommand: PendingCommand | null;
+  pendingQuestion: PendingQuestion | null;
   pendingEditScrollOffset: number;
   scrollOffset: number;
 }

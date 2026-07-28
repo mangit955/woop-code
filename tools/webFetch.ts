@@ -34,6 +34,7 @@ Default timeout: 30 seconds`,
       name: "timeout",
       description: "Timeout in seconds (default: 30, max: 120)",
       required: false,
+      type: "number",
     },
   ],
 

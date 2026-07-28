@@ -186,6 +186,7 @@ export async function runAgent() {
 
     store.clearPendingEdit();
     store.clearPendingCommand();
+    store.cancelPendingQuestion();
     controller.cancel();
     await controller.dispose();
     unmount();

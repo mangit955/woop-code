@@ -1,4 +1,5 @@
 import type { Tool } from "../config/types";
+import { store } from "../tui/src/store/ui-store";
 
 export const terminalTool: Tool = {
   name: "run_terminal",
@@ -22,6 +23,15 @@ export const terminalTool: Tool = {
 
     if (!command) {
       throw Error("command is required");
+    }
+
+    const approved = await store.setPendingCommand({
+      id: crypto.randomUUID(),
+      command,
+      toolName: "run_terminal",
+    });
+    if (!approved) {
+      return "Command rejected by user. It was not run.";
     }
     
     // Warn about potentially problematic commands (only single & for background, not &&)

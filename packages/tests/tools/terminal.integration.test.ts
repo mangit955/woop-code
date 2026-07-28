@@ -1,5 +1,6 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { terminalTool } from "../../../tools/terminal";
+import { store } from "../../../tui/src/store/ui-store";
 
 /**
  * INTEGRATION TESTS for terminal tool
@@ -12,6 +13,16 @@ import { terminalTool } from "../../../tools/terminal";
  */
 
 describe("terminal Tool - Integration Tests", () => {
+  const originalSetPendingCommand = store.setPendingCommand;
+
+  beforeEach(() => {
+    store.setPendingCommand = async () => true;
+  });
+
+  afterEach(() => {
+    store.setPendingCommand = originalSetPendingCommand;
+  });
+
   describe("Basic Execution", () => {
     test("executes simple command", async () => {
       const result = await terminalTool.execute({

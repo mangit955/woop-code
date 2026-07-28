@@ -35,7 +35,7 @@ export async function agentLoop(
       }
 
       let assistantText = "";
-      let toolCall: Extract<StreamEvent, { type: "tool_call" }> | null = null;
+      const toolCalls: Extract<StreamEvent, { type: "tool_call" }>[] = [];
 
       for await (const event of client.stream(
         recentMessages(messages, MAX_TURNS),
@@ -50,7 +50,7 @@ export async function agentLoop(
             break;
 
           case "tool_call":
-            toolCall = event;
+            toolCalls.push(event);
             break;
 
           case "done":
@@ -63,7 +63,7 @@ export async function agentLoop(
         return "";
       }
 
-      if (!toolCall) {
+      if (toolCalls.length === 0) {
         messages.push({
           role: "assistant",
           content: assistantText,
@@ -74,143 +74,92 @@ export async function agentLoop(
         return assistantText;
       }
 
-      const tool = getTool(toolCall.name);
+      // A provider can request several independent tools in one response. Run
+      // every requested call before asking the model for its next turn.
+      for (const toolCall of toolCalls) {
+        const tool = getTool(toolCall.name);
 
-      if (!tool) {
-        throw new Error(`Unknown tool: ${toolCall.name}`);
-      }
+        if (!tool) {
+          throw new Error(`Unknown tool: ${toolCall.name}`);
+        }
 
-      // Create normalized key for better duplicate detection
-      let toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
-      
-      // Special handling for terminal commands - normalize to catch duplicates
-      if (toolCall.name === "run_terminal" && toolCall.arguments.command) {
-        const cmd = String(toolCall.arguments.command).trim();
-        // Normalize: remove "cd X &&", normalize package managers, trim whitespace
-        const normalizedCmd = cmd
-          .replace(/^cd\s+\S+\s+&&\s+/, "") // remove cd prefix
-          .replace(/bun (add|install)/, "install") // normalize bun
-          .replace(/npm (i|install)/, "install") // normalize npm
-          .replace(/\s+/g, " ") // normalize whitespace
-          .trim();
-        toolKey = `run_terminal:${normalizedCmd}`;
-      }
+        let toolKey = `${toolCall.name}:${JSON.stringify(toolCall.arguments)}`;
 
-      const callCount = executedTools.get(toolKey) || 0;
+        if (toolCall.name === "run_terminal" && toolCall.arguments.command) {
+          const cmd = String(toolCall.arguments.command).trim();
+          const normalizedCmd = cmd
+            .replace(/^cd\s+\S+\s+&&\s+/, "")
+            .replace(/bun (add|install)/, "install")
+            .replace(/npm (i|install)/, "install")
+            .replace(/\s+/g, " ")
+            .trim();
+          toolKey = `run_terminal:${normalizedCmd}`;
+        }
 
-      // A model may legitimately re-read a file while it plans an edit. After
-      // several identical calls, avoid wasted work but leave it enough context
-      // to choose a different next step instead of aborting the whole task.
-      if (callCount >= SAME_TOOL_THRESHOLD) {
-        const output =
-          `Skipped duplicate ${toolCall.name} call. The result for these exact arguments ` +
-          `is already in the conversation; use it and continue with a different action.`;
+        const callCount = executedTools.get(toolKey) || 0;
 
+        if (callCount >= SAME_TOOL_THRESHOLD) {
+          const output =
+            `Skipped duplicate ${toolCall.name} call. The result for these exact arguments ` +
+            `is already in the conversation; use it and continue with a different action.`;
+
+          callbacks.onToolStart?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments });
+          messages.push({
+            role: "assistant_tool_call", toolName: toolCall.name, toolCallId: toolCall.id,
+            arguments: toolCall.arguments, thoughtSignature: toolCall.thoughtSignature,
+          });
+          callbacks.onToolFinish?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, output });
+          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: output });
+          continue;
+        }
+
+        executedTools.set(toolKey, callCount + 1);
         callbacks.onToolStart?.({
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
+          id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments,
         });
+
         messages.push({
-          role: "assistant_tool_call",
-          toolName: toolCall.name,
-          toolCallId: toolCall.id,
-          arguments: toolCall.arguments,
-          thoughtSignature: toolCall.thoughtSignature,
+          role: "assistant_tool_call", toolName: toolCall.name, toolCallId: toolCall.id,
+          arguments: toolCall.arguments, thoughtSignature: toolCall.thoughtSignature,
         });
+
+        let result: string;
+        try {
+          result = await tool.execute(toolCall.arguments);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          callbacks.onToolError?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, error: message });
+          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: `Tool failed: ${message}` });
+          continue;
+        }
+        const MAX_TOOL_RESULT = 4000;
+        const toolResult =
+          result.length > MAX_TOOL_RESULT
+            ? result.slice(0, MAX_TOOL_RESULT) + "\n\n...output truncated..."
+            : result;
+
+        const editWasDeclined =
+          toolResult.startsWith("Edit rejected") || toolResult.startsWith("Edit cancelled");
+
+        if (editWasDeclined) {
+          callbacks.onToolError?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, error: "Rejected by user" });
+          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: toolResult });
+
+          const outcome = "The proposed file change was not applied because it was rejected.";
+          messages.push({ role: "assistant", content: outcome });
+          callbacks.onText?.(outcome);
+          callbacks.onDone?.();
+          return outcome;
+        }
+
         callbacks.onToolFinish?.({
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
-          output,
+          id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, output: toolResult,
         });
+
         messages.push({
-          role: "tool",
-          toolName: toolCall.name,
-          toolCallId: toolCall.id,
-          content: output,
-        });
-        continue;
+          role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: toolResult,
+        } as Message);
       }
-
-      executedTools.set(toolKey, callCount + 1);
-      callbacks.onToolStart?.({
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-      });
-
-      messages.push({
-        role: "assistant_tool_call",
-        toolName: toolCall.name,
-        toolCallId: toolCall.id,
-        arguments: toolCall.arguments,
-        thoughtSignature: toolCall.thoughtSignature,
-      });
-
-      let result: string;
-      try {
-        result = await tool.execute(toolCall.arguments);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        callbacks.onToolError?.({
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
-          error: message,
-        });
-        messages.push({
-          role: "tool",
-          toolName: toolCall.name,
-          toolCallId: toolCall.id,
-          content: `Tool failed: ${message}`,
-        });
-        continue;
-      }
-      const MAX_TOOL_RESULT = 4000;
-      const toolResult =
-        result.length > MAX_TOOL_RESULT
-          ? result.slice(0, MAX_TOOL_RESULT) + "\n\n...output truncated..."
-          : result;
-
-      const editWasDeclined =
-        toolResult.startsWith("Edit rejected") ||
-        toolResult.startsWith("Edit cancelled");
-
-      if (editWasDeclined) {
-        callbacks.onToolError?.({
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
-          error: "Rejected by user",
-        });
-        messages.push({
-          role: "tool",
-          toolName: toolCall.name,
-          toolCallId: toolCall.id,
-          content: toolResult,
-        });
-
-        const outcome = "The proposed file change was not applied because it was rejected.";
-        messages.push({ role: "assistant", content: outcome });
-        callbacks.onText?.(outcome);
-        callbacks.onDone?.();
-        return outcome;
-      }
-
-      callbacks.onToolFinish?.({
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-        output: toolResult,
-      });
-
-      messages.push({
-        role: "tool",
-        toolName: toolCall.name,
-        toolCallId: toolCall.id,
-        content: toolResult,
-      } as Message);
     }
 
     throw new Error(

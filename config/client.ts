@@ -151,28 +151,25 @@ export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): Provider
         });
 
         for await (const chunk of stream) {
-          const part = chunk.candidates?.[0]?.content?.parts?.find(
-            (p) => p.functionCall,
-          );
-
-          if (part?.functionCall) {
-            yield {
-              type: "tool_call",
-              id: part.functionCall.id ?? crypto.randomUUID(),
-              name: part.functionCall.name!,
-              arguments: part.functionCall.args ?? {},
-              thoughtSignature: part.thoughtSignature,
-            };
-
-            continue;
+          const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+          for (const part of parts) {
+            if (part.functionCall) {
+              yield {
+                type: "tool_call",
+                id: part.functionCall.id ?? crypto.randomUUID(),
+                name: part.functionCall.name!,
+                arguments: part.functionCall.args ?? {},
+                thoughtSignature: part.thoughtSignature,
+              };
+            } else if (part.text) {
+              yield { type: "text", content: part.text };
+            }
           }
-          const text = chunk.text;
 
-          if (text) {
-            yield {
-              type: "text",
-              content: text,
-            };
+          // Some provider chunks expose text only through the convenience
+          // property rather than a content part.
+          if (parts.length === 0 && chunk.text) {
+            yield { type: "text", content: chunk.text };
           }
         }
 

@@ -100,28 +100,26 @@ describe("agentLoop - Robustness", () => {
 
     const { callbacks, messages } = createRuntimeTest();
 
+    let streamCount = 0;
     const provider: any = {
       async *stream() {
-        // First iteration: only one tool call should be processed
-        // Using same args would trigger loop detection, so use different args
-        yield createToolCallEvent("test_tool", { first: true }, "call-1");
-        yield createToolCallEvent("test_tool", { second: true }, "call-2");
+        if (streamCount++ === 0) {
+          yield createToolCallEvent("test_tool", { first: true }, "call-1");
+          yield createToolCallEvent("test_tool", { second: true }, "call-2");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Done");
         yield createDoneEvent();
       },
     };
 
-    // Current implementation takes the last tool_call event
-    // This will execute once with the second set of args
-    const provider2 = createStreamingProvider([
-      [createToolCallEvent("test_tool", { second: true }, "call-2"), createDoneEvent()],
-      [createTextEvent("Done"), createDoneEvent()],
-    ]);
+    await agentLoop(provider, messages, "", callbacks);
 
-    await agentLoop(provider2, messages, "", callbacks);
-
-    // Should have executed the tool once
-    expect(tool.executionCount).toBe(1);
+    expect(tool.executionCount).toBe(2);
     expect(tool.lastArgs).toEqual({ second: true });
+    expect(messages.filter((message) => message.role === "assistant_tool_call")).toHaveLength(2);
+    expect(messages.filter((message) => message.role === "tool")).toHaveLength(2);
   });
 
   test("handles stream ending without done event", async () => {

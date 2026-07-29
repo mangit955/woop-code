@@ -8,6 +8,10 @@ program
   .name("woopcode")
   .description("Coding agent cli")
   .version("0.1.0")
+  // Several subcommands declare their own `-p` (`providers login/logout
+  // --provider`). Without positional options commander binds those to the
+  // root's `-p, --prompt` and the subcommand silently sees an empty value.
+  .enablePositionalOptions()
   .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
   .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
   .action(runAgent)

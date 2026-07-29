@@ -23,11 +23,24 @@ export const logoutCommand = new Command("logout")
 
     delete config.providers[options.provider].apiKey;
 
+    // Logging out of the active provider must not leave it selected, or the
+    // next run picks a provider with no API key. Fall back to another
+    // logged-in provider when there is one, matching the /logout slash command.
     if (config.defaultProvider === options.provider) {
-      config.defaultProviders === "";
+      const fallback = Object.entries(config.providers).find(
+        ([name, details]: [string, any]) =>
+          name !== options.provider && details?.apiKey,
+      );
+
+      config.defaultProvider = fallback ? fallback[0] : "";
     }
 
     await saveConfig(config);
 
     console.log("logging out for provider " + options.provider);
+    console.log(
+      config.defaultProvider
+        ? `Active provider: ${config.defaultProvider}`
+        : "No providers logged in. Use 'woopcode providers login' to authenticate.",
+    );
   });

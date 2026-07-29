@@ -28,9 +28,8 @@ export const agentCommand = new Command("agent")
  * agent runs one non-interactive turn and exits; otherwise it launches the TUI.
  */
 export async function runAgent(options: RunAgentOptions = {}, command?: Command) {
-  // The root program and `agent` both declare `-p`. Commander records the
-  // parsed value on the root in that case, so the subcommand only sees its
-  // own (empty) default — merge the ancestors' values back in.
+  // `woopcode -p` records the value on the root program and `woopcode agent -p`
+  // on the subcommand, so consult both.
   const globals = command?.optsWithGlobals?.() as RunAgentOptions | undefined;
   const prompt = (options.prompt || globals?.prompt || "").trim();
   const autoApprove =

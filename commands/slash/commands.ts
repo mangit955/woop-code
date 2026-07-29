@@ -7,9 +7,12 @@ import {
   saveConversation,
 } from "../../config/config";
 import {
+  getProviderInfo,
   isProviderEnabled,
   unsupportedProviderMessage,
 } from "../../config/providerRegistry";
+import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../config/client";
+import { toolRegistery } from "../../tools";
 
 // Read version from package.json
 const packageJsonPath = `${import.meta.dir}/../../package.json`;
@@ -25,6 +28,23 @@ const models = modelsData as Array<{
   name: string;
   contextWindow: number | string;
 }>;
+
+/**
+ * The model the next turn will use. The running controller is authoritative —
+ * a model chosen in the picker is applied there first — with the saved
+ * selection as the fallback for contexts without a live controller.
+ */
+function activeModel(
+  context: SlashCommandContext,
+  config: { selectedModel?: string },
+): string {
+  return context.controller?.getModel?.() ?? config.selectedModel ?? DEFAULT_MODEL_ID;
+}
+
+/** Human-readable provider name, from the same registry the rest of the CLI uses. */
+function providerLabel(provider: string): string {
+  return getProviderInfo(provider)?.name ?? provider ?? "none";
+}
 
 /**
  * Keeps the selected model consistent with the provider. Returns a model id
@@ -156,25 +176,28 @@ const providerCommand: SlashCommand = {
 const modelCommand: SlashCommand = {
   name: "models",
   aliases: ["model", "m"],
-  description: "Choose the model for this session",
+  description: "Show the active model and those available for this provider",
   category: "configuration",
 
   async execute(context, args) {
     const config = await getConfig();
     const provider = config.defaultProvider;
+    const current = activeModel(context, config);
 
-    // Show current model (read-only for now)
-    let output = `Current Model: gemini-3.5-flash-lite\n\n`;
+    let output = `Current Model: ${getModelDisplayName(current)} (${current})\n\n`;
 
-    // List available models for current provider
     const providerModels = models.filter((m) => m.provider === provider);
 
-    if (providerModels.length > 0) {
-      output += `Available models for ${provider}:\n`;
-      providerModels.forEach((m) => {
-        output += `  ${m.id} - ${m.name}\n`;
-      });
+    if (providerModels.length === 0) {
+      output += `No models are listed for ${providerLabel(provider)}.`;
+      return output.trim();
     }
+
+    output += `Available models for ${providerLabel(provider)}:\n`;
+    providerModels.forEach((m) => {
+      const marker = m.id === current ? " (current)" : "";
+      output += `  ${m.id} - ${m.name}${marker}\n`;
+    });
 
     return output.trim();
   },
@@ -376,18 +399,18 @@ const statusCommand: SlashCommand = {
     } catch {}
 
     const provider = config.defaultProvider;
-    const providerLabel = provider === "google" ? "Google Gemini" : provider;
+    const model = activeModel(context, config);
 
     return [
       `Workspace: ${repoName}`,
       `Path: ${cwd}`,
       `Branch: ${branch}`,
       ``,
-      `Provider: ${providerLabel}`,
-      `Model: gemini-3.5-flash-lite`,
+      `Provider: ${providerLabel(provider)}`,
+      `Model: ${getModelDisplayName(model)} (${model})`,
       ``,
       `Conversation: ${conversation.length} messages`,
-      `Tools: 9 registered`,
+      `Tools: ${toolRegistery.length} registered`,
       `Version: ${version}`,
     ].join("\n");
   },

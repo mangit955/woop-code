@@ -7,7 +7,7 @@ import path from "path";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
-mock.module("../../../tools", () => ({ getTool }));
+mock.module("../../../tools", () => ({ getTool, toolRegistery: [] }));
 
 interface GoldenTest {
   description: string;

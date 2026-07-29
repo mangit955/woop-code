@@ -17,7 +17,7 @@ import { CallbackSpy } from "../shared/mocks";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
-mock.module("../../../tools", () => ({ getTool }));
+mock.module("../../../tools", () => ({ getTool, toolRegistery: [] }));
 
 /**
  * PROPERTY-BASED TESTS FOR RUNTIME

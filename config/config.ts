@@ -117,13 +117,40 @@ export async function getConversation(): Promise<Message[]> {
   );
 }
 
+/**
+ * How many messages are kept on disk. History exists to give a new session
+ * context, not to be a complete archive, and the provider is only sent a few
+ * recent turns anyway (see recentMessages).
+ */
+export const MAX_PERSISTED_MESSAGES = 100;
+
+/**
+ * Trims a conversation to what is worth keeping between sessions.
+ *
+ * Tool calls and their results are dropped: they are the bulk of a long
+ * transcript, they are only meaningful to the turn that produced them, and
+ * persisting one half of a call/result pair would make the restored history
+ * invalid for the provider.
+ */
+export function prepareConversationForDisk(messages: Message[]): Message[] {
+  const conversational = messages.filter(
+    (message) => message.role === "user" || message.role === "assistant",
+  );
+
+  return conversational.slice(-MAX_PERSISTED_MESSAGES);
+}
+
 export async function saveConversation(messages: Message[]) {
   await initializeConfig();
   const conversationPath = getConversationPath();
-  await Bun.write(
-    conversationPath,
-    JSON.stringify(messages, null, 2),
-  );
+  const payload = JSON.stringify(prepareConversationForDisk(messages), null, 2);
+
+  // Saving now happens after every turn, so a crash mid-write would be much
+  // easier to hit. Write to a sibling file and rename, which is atomic on the
+  // same filesystem: readers see either the old file or the new one.
+  const temporaryPath = `${conversationPath}.tmp`;
+  await Bun.write(temporaryPath, payload);
+  renameSync(temporaryPath, conversationPath);
 }
 
 export async function appendMessage(message: any) {

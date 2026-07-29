@@ -9,9 +9,15 @@ const previousConfigHome = process.env.XDG_CONFIG_HOME;
 const configHome = mkdtempSync(join(tmpdir(), "woopcode-config-"));
 process.env.XDG_CONFIG_HOME = configHome;
 
-const { getConfig, getConversation, normalizeConfig, saveConfig } = await import(
-  "../../../config/config"
-);
+const {
+  MAX_PERSISTED_MESSAGES,
+  getConfig,
+  getConversation,
+  normalizeConfig,
+  prepareConversationForDisk,
+  saveConfig,
+  saveConversation,
+} = await import("../../../config/config");
 
 const configDir = join(configHome, "woopcode");
 const providersPath = join(configDir, "providers.json");
@@ -121,5 +127,58 @@ describe("corrupt file recovery", () => {
     await expect(getConversation()).resolves.toEqual([
       { role: "user", content: "hi" },
     ]);
+  });
+});
+
+describe("conversation persistence", () => {
+  beforeEach(() => {
+    rmSync(configDir, { recursive: true, force: true });
+  });
+
+  test("does not persist tool calls or their results", async () => {
+    await saveConversation([
+      { role: "user", content: "hi" },
+      {
+        role: "assistant_tool_call",
+        toolName: "read_file",
+        toolCallId: "1",
+        arguments: { path: "a.ts" },
+      },
+      { role: "tool", toolName: "read_file", toolCallId: "1", content: "x".repeat(5_000) },
+      { role: "assistant", content: "done" },
+    ]);
+
+    const stored = await getConversation();
+
+    expect(stored.map((message) => message.role)).toEqual(["user", "assistant"]);
+  });
+
+  test("keeps only the most recent messages", async () => {
+    const messages = Array.from({ length: MAX_PERSISTED_MESSAGES + 40 }, (_, index) => ({
+      role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+      content: `message ${index}`,
+    }));
+
+    await saveConversation(messages);
+    const stored = await getConversation();
+
+    expect(stored).toHaveLength(MAX_PERSISTED_MESSAGES);
+    expect(stored.at(-1)).toEqual(messages.at(-1)!);
+  });
+
+  test("prepareConversationForDisk leaves a short conversation alone", () => {
+    const messages = [
+      { role: "user" as const, content: "hi" },
+      { role: "assistant" as const, content: "hello" },
+    ];
+
+    expect(prepareConversationForDisk(messages)).toEqual(messages);
+  });
+
+  test("writes atomically, leaving no partial file behind", async () => {
+    await saveConversation([{ role: "user", content: "hi" }]);
+
+    expect(readdirSync(configDir).filter((name) => name.endsWith(".tmp"))).toHaveLength(0);
+    expect(await getConversation()).toEqual([{ role: "user", content: "hi" }]);
   });
 });

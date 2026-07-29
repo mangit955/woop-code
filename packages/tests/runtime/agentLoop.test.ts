@@ -23,6 +23,7 @@ const getTool = mock((name: string) => mockToolRegistry.get(name));
 // Patch the import
 mock.module("../../../tools", () => ({
   getTool,
+  toolRegistery: [],
 }));
 
 describe("agentLoop - Basic Streaming", () => {

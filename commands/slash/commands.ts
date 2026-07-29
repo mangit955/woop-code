@@ -14,10 +14,13 @@ import {
 import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../config/client";
 import { toolRegistery } from "../../tools";
 import { VERSION } from "../../config/version";
+// Imported rather than read through import.meta.dir at load time, which was a
+// path-resolution failure waiting to happen and diverged from commands/models.ts.
+// This is a shipped asset, not user data: if it is unreadable the install is
+// broken, and failing loudly is the right outcome. User-owned files
+// (providers.json, conversation.json) are recovered instead — see config.ts.
+import modelsData from "../../config/models.json";
 
-// Read models from models.json
-const modelsJsonPath = `${import.meta.dir}/../../config/models.json`;
-const modelsData = await Bun.file(modelsJsonPath).json();
 const models = modelsData as Array<{
   id: string;
   provider: string;

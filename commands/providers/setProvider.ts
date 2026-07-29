@@ -16,7 +16,9 @@ export const setProviderCommand = new Command("set")
     const config = await getConfig();
     console.log("provider is  " + JSON.stringify(options));
 
-    if (!config.providers[options.provider]) {
+    const providerConfig = config.providers[options.provider];
+
+    if (!providerConfig) {
       console.error(`${options.provider} does not exist`);
       return;
     }
@@ -26,7 +28,7 @@ export const setProviderCommand = new Command("set")
       return;
     }
 
-    if (!config.providers[options.provider].apiKey) {
+    if (!providerConfig.apiKey) {
       console.error(`${options.provider} is not logged in`);
       return;
     }

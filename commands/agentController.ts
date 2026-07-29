@@ -35,8 +35,8 @@ export class AgentController {
   private readonly callbacks: AgentCallbacks;
 
   constructor(
-    private readonly provider: string,
-    private readonly apiKey: string,
+    private provider: string,
+    private apiKey: string,
     modelOrCallbacks: string | AgentCallbacks,
     callbacks?: AgentCallbacks,
   ) {
@@ -50,8 +50,37 @@ export class AgentController {
     return true;
   }
 
+  /**
+   * Switches the credentials used for the next turn. The provider client is
+   * created per run, so changing them here is enough — without this, /provider
+   * and /login only rewrite the config file while the session keeps talking to
+   * the provider it started with.
+   *
+   * Returns false when a turn is in flight, so the caller can report that
+   * instead of swapping credentials underneath a running request.
+   */
+  setProvider(provider: string, apiKey: string, model?: string) {
+    if (this.isRunning) return false;
+    this.provider = provider;
+    this.apiKey = apiKey;
+    if (model) this.model = model;
+    return true;
+  }
+
+  getProvider() {
+    return this.provider;
+  }
+
   async run(prompt: string) {
     if (this.isRunning) {
+      return;
+    }
+
+    // Reachable once /logout clears the active provider mid-session.
+    if (!this.provider || !this.apiKey) {
+      this.callbacks.onError?.(
+        new Error("No provider is logged in. Use /login <provider> <api-key>."),
+      );
       return;
     }
 

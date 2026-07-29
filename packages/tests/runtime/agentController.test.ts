@@ -42,7 +42,7 @@ mock.module("../../../config/config", () => ({
 // Mock provider client creation
 let globalMockClient: MockProviderClient;
 
-const createProviderClient = mock((provider: string, apiKey: string) => {
+const createProviderClient = mock((provider: string, apiKey: string, model?: string) => {
   return globalMockClient;
 });
 
@@ -57,6 +57,7 @@ const mockStore = {
   startAssistantMessage: mock(() => {}),
   appendAssistantText: mock(() => {}),
   finishAssistantMessage: mock(() => {}),
+  setSelectedModel: mock(() => {}),
   startTool: mock(() => {}),
   finishTool: mock(() => {}),
   clearPendingEdit: mock(() => {}),
@@ -682,5 +683,81 @@ describe("AgentController - Edge Cases", () => {
 
     // Each controller should have called saveConversation at least once
     expect(saveConversation.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("AgentController - Provider switching", () => {
+  beforeEach(() => {
+    mockConversation = [];
+    mockRepoContext = "test repo";
+    globalMockClient = new MockProviderClient();
+    mockToolRegistry.clear();
+    createProviderClient.mockClear();
+  });
+
+  test("setProvider changes the credentials used by the next turn", async () => {
+    globalMockClient.setEvents([createTextEvent("ok"), createDoneEvent()]);
+
+    const controller = new AgentController("google", "old-key", {});
+    await controller.initialize();
+    await controller.run("First");
+
+    expect(createProviderClient.mock.calls[0]?.slice(0, 2)).toEqual([
+      "google",
+      "old-key",
+    ]);
+
+    expect(controller.setProvider("google", "new-key")).toBe(true);
+    expect(controller.getProvider()).toBe("google");
+
+    globalMockClient.setEvents([createTextEvent("ok"), createDoneEvent()]);
+    await controller.run("Second");
+
+    expect(createProviderClient.mock.calls[1]?.slice(0, 2)).toEqual([
+      "google",
+      "new-key",
+    ]);
+  });
+
+  test("setProvider also switches the model when one is given", async () => {
+    globalMockClient.setEvents([createTextEvent("ok"), createDoneEvent()]);
+
+    const controller = new AgentController("google", "key", "gemini-3.5-flash-lite", {});
+    await controller.initialize();
+    controller.setProvider("google", "key", "gemini-3.6-pro");
+    await controller.run("Prompt");
+
+    expect(createProviderClient.mock.calls[0]?.[2]).toBe("gemini-3.6-pro");
+  });
+
+  test("setProvider is refused while a turn is in flight", async () => {
+    globalMockClient.setEvents([createTextEvent("streaming"), createDoneEvent()]);
+    globalMockClient.setDelay(20);
+
+    const controller = new AgentController("google", "old-key", {});
+    await controller.initialize();
+
+    const running = controller.run("Prompt");
+    await wait(1);
+
+    expect(controller.isBusy()).toBe(true);
+    expect(controller.setProvider("google", "new-key")).toBe(false);
+
+    await running;
+    expect(createProviderClient.mock.calls[0]?.[1]).toBe("old-key");
+  });
+
+  test("reports a clear error instead of running without a provider", async () => {
+    const errors: Error[] = [];
+    const controller = new AgentController("google", "key", {
+      onError: (error) => errors.push(error),
+    });
+    await controller.initialize();
+
+    controller.setProvider("", "");
+    await controller.run("Prompt");
+
+    expect(createProviderClient).not.toHaveBeenCalled();
+    expect(errors[0]?.message).toContain("No provider is logged in");
   });
 });

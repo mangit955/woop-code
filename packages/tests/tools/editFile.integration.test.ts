@@ -22,6 +22,7 @@ describe("editFile Tool - Integration Tests", () => {
       setPendingCommand: mock(async () => true),
       setPendingQuestion: mock(async () => []),
       addSystemMessage: mock(() => {}),
+      setSelectedModel: mock(() => {}),
     };
 
     mock.module("../../../tui/src/store/ui-store", () => ({

@@ -22,6 +22,22 @@ const models = modelsData as Array<{
   contextWindow: number | string;
 }>;
 
+/**
+ * Keeps the selected model consistent with the provider. Returns a model id
+ * when the current selection belongs to a different provider, and undefined
+ * when the user's choice is still valid (or the provider lists no models).
+ */
+function modelForProvider(provider: string, currentModel: string | undefined) {
+  const providerModels = models.filter((model) => model.provider === provider);
+
+  if (providerModels.length === 0) return undefined;
+  if (currentModel && providerModels.some((model) => model.id === currentModel)) {
+    return undefined;
+  }
+
+  return providerModels[0]?.id;
+}
+
 // ==================== SESSION COMMANDS ====================
 
 const helpCommand: SlashCommand = {
@@ -105,10 +121,26 @@ const providerCommand: SlashCommand = {
       return `Provider "${newProvider}" not configured.\nUse: /login ${newProvider} <api-key>`;
     }
 
+    if (context.controller.isBusy()) {
+      return `Cannot switch provider while the agent is running. Press Esc to cancel first.`;
+    }
+
+    const model = modelForProvider(newProvider, config.selectedModel);
+
+    // The running controller holds its own provider/key, so the config write
+    // alone would leave this session on the previous provider.
+    context.controller.setProvider(newProvider, providerConfig.apiKey, model);
+
     config.defaultProvider = newProvider;
+    if (model) config.selectedModel = model;
     await saveConfig(config);
 
-    return `Switched to: ${newProvider}`;
+    if (model) {
+      const { store } = await import("../../tui/src/store/ui-store");
+      store.setSelectedModel(model);
+    }
+
+    return `Switched to: ${newProvider}${model ? ` (${model})` : ""}`;
   },
 };
 
@@ -171,10 +203,26 @@ const loginCommand: SlashCommand = {
       return `Invalid API key for ${provider}.\nPlease check your API key and try again.`;
     }
 
+    if (context.controller.isBusy()) {
+      return `Cannot change provider while the agent is running. Press Esc to cancel first.`;
+    }
+
     // Save the API key
     config.providers[provider].apiKey = apiKey;
     config.defaultProvider = provider;
+
+    const model = modelForProvider(provider, config.selectedModel);
+    if (model) config.selectedModel = model;
     await saveConfig(config);
+
+    // A re-login with a fresh key must reach the running session too, not just
+    // the config file.
+    context.controller.setProvider(provider, apiKey, model);
+
+    if (model) {
+      const { store } = await import("../../tui/src/store/ui-store");
+      store.setSelectedModel(model);
+    }
 
     return `Successfully logged in to ${provider}!\nThis is now your active provider.`;
   },
@@ -202,6 +250,13 @@ const logoutCommand: SlashCommand = {
       return `Already logged out from ${provider}.`;
     }
 
+    if (
+      config.defaultProvider === provider &&
+      context.controller.isBusy()
+    ) {
+      return `Cannot log out of the active provider while the agent is running. Press Esc to cancel first.`;
+    }
+
     // Remove API key
     delete config.providers[provider].apiKey;
 
@@ -216,6 +271,23 @@ const logoutCommand: SlashCommand = {
         config.defaultProvider = otherProvider[0];
       } else {
         config.defaultProvider = "";
+      }
+
+      // Drop the revoked key from the live session as well. With no provider
+      // left, the next turn reports that instead of using stale credentials.
+      const nextKey = config.defaultProvider
+        ? config.providers[config.defaultProvider]?.apiKey ?? ""
+        : "";
+      const nextModel = modelForProvider(
+        config.defaultProvider,
+        config.selectedModel,
+      );
+      if (nextModel) config.selectedModel = nextModel;
+      context.controller.setProvider(config.defaultProvider, nextKey, nextModel);
+
+      if (nextModel) {
+        const { store } = await import("../../tui/src/store/ui-store");
+        store.setSelectedModel(nextModel);
       }
     }
 

@@ -21,7 +21,9 @@ import { clone } from "../shared/helpers";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
-mock.module("../../../tools", () => ({ getTool, toolRegistery: [] }));
+// Keep the real registry exports; only tool lookup is faked.
+const actualTools = await import("../../../tools");
+mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
 describe("agentLoop - Invariants", () => {
   beforeEach(() => {

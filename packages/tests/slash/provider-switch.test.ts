@@ -14,6 +14,7 @@ process.env.XDG_CONFIG_HOME = configHome;
 const { registry } = await import("../../../commands/slash/registry");
 const { registerCommands } = await import("../../../commands/slash/commands");
 const { getConfig, saveConfig } = await import("../../../config/config");
+const { toolRegistery } = await import("../../../tools");
 
 registerCommands();
 
@@ -156,5 +157,74 @@ describe("provider slash commands update the running session", () => {
 
     expect(output).toContain("not supported yet");
     expect(controller.calls).toHaveLength(0);
+  });
+});
+
+describe("status and model reporting", () => {
+  beforeEach(async () => {
+    await saveConfig({
+      defaultProvider: "google",
+      selectedModel: "gemini-3.5-flash-lite",
+      providers: { google: { type: "api", apiKey: "google-key" } },
+    });
+  });
+
+  function controllerOn(model: string) {
+    return { isBusy: () => false, getModel: () => model, setProvider: () => true };
+  }
+
+  test("/status reports the real tool count", async () => {
+    const output = await registry
+      .get("status")!
+      .execute(createContext(controllerOn("gemini-3.6-pro")), []);
+
+    expect(output).toContain(`Tools: ${toolRegistery.length} registered`);
+    expect(output).not.toContain("Tools: 9 registered");
+  });
+
+  test("/status reports the model the session is actually using", async () => {
+    const output = await registry
+      .get("status")!
+      .execute(createContext(controllerOn("gemini-3.6-pro")), []);
+
+    expect(output).toContain("gemini-3.6-pro");
+    expect(output).not.toContain("Model: gemini-3.5-flash-lite");
+  });
+
+  test("/status falls back to the saved selection without a controller", async () => {
+    const output = await registry
+      .get("status")!
+      .execute(createContext({ isBusy: () => false }), []);
+
+    expect(output).toContain("gemini-3.5-flash-lite");
+  });
+
+  test("/status names the provider from the registry", async () => {
+    const output = await registry
+      .get("status")!
+      .execute(createContext(controllerOn("gemini-3.6-pro")), []);
+
+    expect(output).toContain("Provider: Google Gemini");
+  });
+
+  test("/models reports the active model, not a hard-coded one", async () => {
+    const output = await registry
+      .get("models")!
+      .execute(createContext(controllerOn("gemini-3.6-flash")), []);
+
+    expect(output).toContain("Current Model: Gemini 3.6 Flash (gemini-3.6-flash)");
+  });
+
+  test("/models marks the active model in the list", async () => {
+    const output = await registry
+      .get("models")!
+      .execute(createContext(controllerOn("gemini-3.6-flash")), []);
+
+    const marked = output
+      .split("\n")
+      .filter((line) => line.includes("(current)"));
+
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toContain("gemini-3.6-flash");
   });
 });

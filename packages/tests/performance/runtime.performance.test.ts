@@ -12,7 +12,9 @@ import {
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
-mock.module("../../../tools", () => ({ getTool, toolRegistery: [] }));
+// Keep the real registry exports; only tool lookup is faked.
+const actualTools = await import("../../../tools");
+mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
 /**
  * PERFORMANCE REGRESSION TESTS

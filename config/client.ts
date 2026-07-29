@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type { Message, ProviderClient, StreamEvent } from "./types";
+import { unsupportedProviderMessage } from "./providerRegistry";
 
 export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
@@ -220,10 +221,6 @@ function toolParameterType(type: string | undefined) {
   }
 }
 
-export function groqClient(apiKey: string) {}
-export function openAIClient(apiKey: string) {}
-export function anthropicClient(apiKey: string) {}
-
 export function createProviderClient(
   provider: string,
   apiKey: string,
@@ -231,19 +228,13 @@ export function createProviderClient(
 ): ProviderClient {
   switch (provider) {
     case "google":
-
     case "gemini":
       return geminiClient(apiKey, model);
-    // case "groq":
-    //   return groqClient(apiKey);
-
-    // case "openai":
-    //   return openAIClient(apiKey);
-
-    // case "anthropic":
-    //   return anthropicClient(apiKey);
 
     default:
-      throw new Error(`Unsupported provider: ${provider}`);
+      // Providers listed as disabled in the registry are refused at login and
+      // provider-selection time, so reaching here means a config written by an
+      // older version (or by hand).
+      throw new Error(unsupportedProviderMessage(provider));
   }
 }

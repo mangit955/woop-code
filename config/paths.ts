@@ -71,10 +71,6 @@ export async function initializeConfig(): Promise<void> {
           type: "api",
           apiKey: ""
         },
-        groq: {
-          type: "api",
-          apiKey: ""
-        },
         openai: {
           type: "api",
           apiKey: ""
@@ -87,10 +83,42 @@ export async function initializeConfig(): Promise<void> {
     };
     
     await Bun.write(providersPath, JSON.stringify(defaultProviders, null, 2));
+  } else {
+    await removeRetiredProviders(providersPath);
   }
-  
+
   // Create empty conversation.json if it doesn't exist
   if (!existsSync(conversationPath)) {
     await Bun.write(conversationPath, JSON.stringify([], null, 2));
+  }
+}
+
+/** Providers that were offered by an earlier version and have since been dropped. */
+const RETIRED_PROVIDERS = ["groq"];
+
+/**
+ * Drops retired providers from an existing config. A stored API key is left
+ * alone — that is the user's data, and removing the entry silently would hide
+ * a credential they may still want to delete themselves.
+ */
+async function removeRetiredProviders(providersPath: string): Promise<void> {
+  try {
+    const config = JSON.parse(await Bun.file(providersPath).text());
+    const providers = config?.providers;
+    if (!providers) return;
+
+    const removed = RETIRED_PROVIDERS.filter(
+      (name) => providers[name] && !providers[name].apiKey,
+    );
+    if (removed.length === 0) return;
+
+    for (const name of removed) {
+      delete providers[name];
+      if (config.defaultProvider === name) config.defaultProvider = "";
+    }
+
+    await Bun.write(providersPath, JSON.stringify(config, null, 2));
+  } catch {
+    // A malformed config is surfaced by getConfig(); never block startup here.
   }
 }

@@ -1,5 +1,9 @@
 import { Command } from "commander";
 import { getConfig, saveConfig } from "../../config/config";
+import {
+  isProviderEnabled,
+  unsupportedProviderMessage,
+} from "../../config/providerRegistry";
 
 export const setProviderCommand = new Command("set")
   .description("Lets user set the default provider")
@@ -14,6 +18,11 @@ export const setProviderCommand = new Command("set")
 
     if (!config.providers[options.provider]) {
       console.error(`${options.provider} does not exist`);
+      return;
+    }
+
+    if (!isProviderEnabled(options.provider)) {
+      console.error(unsupportedProviderMessage(options.provider));
       return;
     }
 

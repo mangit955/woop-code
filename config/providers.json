@@ -5,10 +5,6 @@
       "type": "api",
       "apiKey": ""
     },
-    "groq": {
-      "type": "api",
-      "apiKey": ""
-    },
     "openai": {
       "type": "api",
       "apiKey": ""

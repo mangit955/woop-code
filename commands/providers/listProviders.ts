@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { getConfig } from "../../config/config";
+import { isProviderEnabled } from "../../config/providerRegistry";
 
 export const listCommand = new Command("list")
   .description("Returns all the Providers with their default & auth status)")
@@ -19,6 +20,7 @@ export const listCommand = new Command("list")
         return {
           provider,
           status: loggedIn ? "Logged in" : "Not Logged in",
+          supported: isProviderEnabled(provider) ? "✔︎" : "not yet",
           default: isDefault ? "✔︎" : "",
         };
       },

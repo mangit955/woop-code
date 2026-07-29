@@ -2,6 +2,7 @@ import { render } from "ink";
 import React from "react";
 import { SetupWizard } from "./setupWizard";
 import { getConfig } from "../config/config";
+import { isProviderEnabled } from "../config/providerRegistry";
 
 /**
  * Ensures a provider is configured. If not, launches the onboarding wizard.
@@ -15,8 +16,10 @@ export async function ensureProviderConfigured(): Promise<void> {
   const provider = config.defaultProvider;
   const apiKey = config.providers[provider]?.apiKey;
 
-  // Already configured
-  if (provider && apiKey) {
+  // Already configured. A provider that can no longer run (a key stored by an
+  // older version) counts as unconfigured, so the wizard offers a working one
+  // instead of letting the first turn fail.
+  if (provider && apiKey && isProviderEnabled(provider)) {
     return;
   }
 

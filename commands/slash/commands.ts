@@ -6,6 +6,10 @@ import {
   getConversation,
   saveConversation,
 } from "../../config/config";
+import {
+  isProviderEnabled,
+  unsupportedProviderMessage,
+} from "../../config/providerRegistry";
 
 // Read version from package.json
 const packageJsonPath = `${import.meta.dir}/../../package.json`;
@@ -98,7 +102,8 @@ const providerCommand: SlashCommand = {
         .map(([name, details]: [string, any]) => {
           const status = details.apiKey ? "✓" : "✗";
           const active = name === current ? "(active)" : "";
-          return `  ${status} ${name} ${active}`;
+          const support = isProviderEnabled(name) ? "" : "(not supported yet)";
+          return `  ${status} ${name} ${active}${support}`;
         })
         .join("\n");
 
@@ -114,6 +119,10 @@ const providerCommand: SlashCommand = {
 
     if (!available.includes(newProvider)) {
       return `Provider "${newProvider}" not found.\nAvailable: ${available.join(", ")}`;
+    }
+
+    if (!isProviderEnabled(newProvider)) {
+      return unsupportedProviderMessage(newProvider);
     }
 
     const providerConfig = config.providers[newProvider];
@@ -195,6 +204,10 @@ const loginCommand: SlashCommand = {
       return `Unknown provider "${provider}".\nAvailable: ${available.join(", ")}`;
     }
 
+    if (!isProviderEnabled(provider)) {
+      return unsupportedProviderMessage(provider);
+    }
+
     // Validate API key
     const { loginProvider } = await import("../../config/authProvider");
     const isValid = await loginProvider(provider, apiKey);
@@ -264,7 +277,8 @@ const logoutCommand: SlashCommand = {
     if (config.defaultProvider === provider) {
       // Find another logged-in provider
       const otherProvider = Object.entries(config.providers).find(
-        ([name, details]: [string, any]) => name !== provider && details.apiKey
+        ([name, details]: [string, any]) =>
+          name !== provider && details.apiKey && isProviderEnabled(name)
       );
 
       if (otherProvider) {

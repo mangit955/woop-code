@@ -1,6 +1,10 @@
 import { Command } from "commander";
 import { loginProvider } from "../../config/authProvider";
 import { getConfig, saveConfig } from "../../config/config";
+import {
+  isProviderEnabled,
+  unsupportedProviderMessage,
+} from "../../config/providerRegistry";
 
 export const loginCommand = new Command("login")
   .description("Lets user login into the provider (use it as default)")
@@ -11,6 +15,11 @@ export const loginCommand = new Command("login")
   )
   .option("-a, --api-key <apiKey>", "Your api key", "")
   .action(async (options) => {
+    if (!isProviderEnabled(options.provider)) {
+      console.error(unsupportedProviderMessage(options.provider));
+      process.exit(1);
+    }
+
     const success = await loginProvider(options.provider, options.apiKey);
 
     if (!success) {

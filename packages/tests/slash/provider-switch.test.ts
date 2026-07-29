@@ -126,4 +126,35 @@ describe("provider slash commands update the running session", () => {
     expect(controller.calls[0]?.[1]).toBe("");
     expect((await getConfig()).defaultProvider).toBe("");
   });
+
+  test("/provider refuses a provider with no runtime client", async () => {
+    await saveConfig({
+      defaultProvider: "google",
+      selectedModel: "gemini-3.5-flash-lite",
+      providers: {
+        google: { type: "api", apiKey: "google-key" },
+        openai: { type: "api", apiKey: "openai-key" },
+      },
+    });
+    const controller = createController();
+
+    const output = await registry
+      .get("provider")!
+      .execute(createContext(controller), ["openai"]);
+
+    expect(output).toContain("not supported yet");
+    expect(controller.calls).toHaveLength(0);
+    expect((await getConfig()).defaultProvider).toBe("google");
+  });
+
+  test("/login refuses a provider with no runtime client", async () => {
+    const controller = createController();
+
+    const output = await registry
+      .get("login")!
+      .execute(createContext(controller), ["openai", "sk-test"]);
+
+    expect(output).toContain("not supported yet");
+    expect(controller.calls).toHaveLength(0);
+  });
 });

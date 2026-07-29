@@ -1,17 +1,26 @@
 import { fetch } from "bun";
+import { isProviderEnabled, unsupportedProviderMessage } from "./providerRegistry";
 
+/**
+ * Verifies an API key. Providers without a runtime client are refused here so
+ * a key can never be stored for a provider that cannot answer a single turn.
+ */
 export async function loginProvider(provider: string, apiKey: string) {
+  if (!isProviderEnabled(provider)) {
+    throw new Error(unsupportedProviderMessage(provider));
+  }
+
   switch (provider) {
     case "google":
+    case "gemini":
       return verifyGemini(apiKey);
-    case "groq":
-      return verifyGroq(apiKey);
+    // Reachable once these flip to enabled in the registry.
     case "openai":
       return verifyOpenai(apiKey);
     case "anthropic":
       return verifyAnthropic(apiKey);
     default:
-      throw new Error(`Unsupported provider: ${provider}`);
+      throw new Error(unsupportedProviderMessage(provider));
   }
 }
 
@@ -20,16 +29,6 @@ async function verifyGemini(apiKey: string) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
   );
-  return res.ok;
-}
-
-async function verifyGroq(apiKey: string) {
-  const key = apiKey.trim();
-  const res = await fetch("https://api.groq.com/openai/v1/models", {
-    headers: {
-      Authorization: `Bearer ${key}`,
-    },
-  });
   return res.ok;
 }
 

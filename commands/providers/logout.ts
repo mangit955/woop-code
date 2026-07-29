@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { getConfig, saveConfig } from "../../config/config";
+import { isProviderEnabled } from "../../config/providerRegistry";
 
 export const logoutCommand = new Command("logout")
   .description("Lets user logout from the provider")
@@ -29,7 +30,7 @@ export const logoutCommand = new Command("logout")
     if (config.defaultProvider === options.provider) {
       const fallback = Object.entries(config.providers).find(
         ([name, details]: [string, any]) =>
-          name !== options.provider && details?.apiKey,
+          name !== options.provider && details?.apiKey && isProviderEnabled(name),
       );
 
       config.defaultProvider = fallback ? fallback[0] : "";

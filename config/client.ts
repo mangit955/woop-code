@@ -29,8 +29,11 @@ export function getModelDisplayName(modelId: string | undefined) {
 
 const GEMINI_REQUEST_TIMEOUT_MS = 60_000;
 
-export function geminiClient(apiKey: string, model = DEFAULT_MODEL_ID): ProviderClient {
-  const ai = new GoogleGenAI({ apiKey });
+export function geminiClient(
+  apiKey: string,
+  model = DEFAULT_MODEL_ID,
+  ai: Pick<GoogleGenAI, "models"> = new GoogleGenAI({ apiKey }),
+): ProviderClient {
 
   return {
     async *stream(

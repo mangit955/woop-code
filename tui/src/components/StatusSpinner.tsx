@@ -74,7 +74,7 @@ function inactiveColor(
   // look jittery at its turnaround points.
   const start: [number, number, number] = [10, 10, 10];
   const end: [number, number, number] = [30, 58, 95];
-  const channel = (index: number) =>
+  const channel = (index: 0 | 1 | 2) =>
     Math.round(start[index] + (end[index] - start[index]) * amount)
       .toString(16)
       .padStart(2, "0");

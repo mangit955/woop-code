@@ -24,7 +24,17 @@ export const writeFileTool: Tool = {
 
   async execute(args) {
     const requestedPath = args.path as string;
-    const content = args.content as string;
+    const content = args.content;
+
+    // Empty content is allowed here too — truncating a file is a real edit —
+    // but an absent or non-string value would reach Bun.write as garbage.
+    if (content === undefined || content === null) {
+      throw new Error("Missing required argument: content");
+    }
+    if (typeof content !== "string") {
+      throw new Error("Argument 'content' must be a string");
+    }
+
     let path: string;
     try {
       path = await resolveWorkspacePath(requestedPath, { mustExist: true });

@@ -7,17 +7,29 @@ import type { PendingEdit } from "../tui/src/types";
 
 export const createFileTool: Tool = {
   name: "create_file",
-  description: "Creates a new file with the provided content.",
+  description:
+    "Creates a new file with the provided content. Pass an empty string to create an empty file.",
   parameters: [
     { name: "path", description: "File path", required: true },
-    { name: "content", description: "File content", required: true },
+    {
+      name: "content",
+      description: "File content. May be an empty string for an empty file.",
+      required: true,
+    },
   ],
   async execute(args) {
     const requestedPath = args.path as string;
-    const content = args.content as string;
+    const content = args.content;
 
     if (!requestedPath) throw new Error("Missing required argument: path");
-    if (!content) throw new Error("Missing required argument: content");
+    // An empty file is a legitimate result (.gitkeep, __init__.py, a stub a
+    // later edit fills in), so only an absent value is an error.
+    if (content === undefined || content === null) {
+      throw new Error("Missing required argument: content");
+    }
+    if (typeof content !== "string") {
+      throw new Error("Argument 'content' must be a string");
+    }
 
     const path = await resolveWorkspacePath(requestedPath);
 
@@ -25,12 +37,18 @@ export const createFileTool: Tool = {
       throw new Error(`File already exists: ${path}`);
     }
 
+    const patch = createTwoFilesPatch(path, path, "", content, "", "", {
+      context: 3,
+    });
+
     const pendingEdit: PendingEdit = {
       id: crypto.randomUUID(),
       filePath: path,
       oldContent: "",
       newContent: content,
-      diff: createTwoFilesPatch(path, path, "", content, "", "", { context: 3 }),
+      // An empty file produces a header-only patch with no +/- lines, which
+      // reads as "nothing will happen". Say what is being approved instead.
+      diff: content === "" ? `${patch}(new empty file)\n` : patch,
       toolCallId: crypto.randomUUID(),
     };
 

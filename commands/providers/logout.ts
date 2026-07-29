@@ -11,18 +11,19 @@ export const logoutCommand = new Command("logout")
   )
   .action(async (options) => {
     const config = await getConfig();
+    const providerConfig = config.providers[options.provider];
 
-    if (!config.providers[options.provider]) {
+    if (!providerConfig) {
       console.error(`Unknown Provider ${options.provider}`);
       return;
     }
 
-    if (!config.providers[options.provider].apiKey) {
+    if (!providerConfig.apiKey) {
       console.error(`${options.provider} is not logged in`);
       return;
     }
 
-    delete config.providers[options.provider].apiKey;
+    delete providerConfig.apiKey;
 
     // Logging out of the active provider must not leave it selected, or the
     // next run picks a provider with no API key. Fall back to another

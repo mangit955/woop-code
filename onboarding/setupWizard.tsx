@@ -75,7 +75,12 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
       // Save configuration
       const config = await getConfig();
       config.defaultProvider = selectedProvider.id;
-      config.providers[selectedProvider.id].apiKey = value.trim();
+      // A provider chosen in the wizard may have no entry yet.
+      config.providers[selectedProvider.id] = {
+        ...config.providers[selectedProvider.id],
+        type: "api",
+        apiKey: value.trim(),
+      };
       await saveConfig(config);
 
       setStep("complete");

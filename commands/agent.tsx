@@ -45,11 +45,9 @@ export async function runAgent(options: RunAgentOptions = {}, command?: Command)
 /** Runs a single turn without the TUI, streaming the answer to stdout. */
 async function runHeadless(prompt: string, autoApprove: boolean) {
   registerCommands();
-  await ensureProviderConfigured();
+  const { provider, apiKey } = await ensureProviderConfigured();
 
   const config = await getConfig();
-  const provider = config.defaultProvider;
-  const apiKey = config.providers[provider].apiKey;
   const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
   store.setSelectedModel(selectedModel);
   store.setNonInteractive({ autoApprove });
@@ -102,12 +100,10 @@ async function runInteractive() {
   registerCommands();
 
   // Ensure provider is configured (launches onboarding if needed)
-  await ensureProviderConfigured();
+  const { provider, apiKey } = await ensureProviderConfigured();
 
   let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
   const config = await getConfig();
-  const provider = config.defaultProvider;
-  const apiKey = config.providers[provider].apiKey;
   const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
   store.setSelectedModel(selectedModel);
 

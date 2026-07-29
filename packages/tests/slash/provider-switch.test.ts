@@ -106,7 +106,7 @@ describe("provider slash commands update the running session", () => {
 
     expect(controller.calls[0]?.[0]).toBe("google");
     expect(controller.calls[0]?.[1]).toBe("google-key");
-    expect((await getConfig()).providers.openai.apiKey).toBeUndefined();
+    expect((await getConfig()).providers.openai?.apiKey).toBeUndefined();
   });
 
   test("/logout clears the session credentials when nothing is left", async () => {

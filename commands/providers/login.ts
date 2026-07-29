@@ -30,7 +30,13 @@ export const loginCommand = new Command("login")
     const config = await getConfig();
 
     config.defaultProvider = options.provider;
-    config.providers[options.provider].apiKey = options.apiKey;
+    // The entry can be absent in a config written by an older version or
+    // trimmed by hand, so create it rather than indexing into undefined.
+    config.providers[options.provider] = {
+      ...config.providers[options.provider],
+      type: "api",
+      apiKey: options.apiKey,
+    };
     await saveConfig(config);
 
     console.log("logging into " + options.provider);

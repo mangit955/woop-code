@@ -158,6 +158,11 @@ export class AgentController {
     }
 
     this.wasCancelled = true;
+    // Tool calls can be waiting for a UI decision. Resolve those promises
+    // before aborting so Ctrl+C never leaves the agent loop suspended.
+    store.clearPendingEdit();
+    store.clearPendingCommand();
+    store.cancelPendingQuestion();
     this.abortController?.abort();
   }
 

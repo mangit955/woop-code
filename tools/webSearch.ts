@@ -28,7 +28,7 @@ Current year: ${new Date().getFullYear()}`,
     },
   ],
 
-  async execute(args) {
+  async execute(args, signal) {
     const query = args.query as string;
     const numResults = Math.min((args.numResults as number) || 5, 10);
 
@@ -47,6 +47,7 @@ Current year: ${new Date().getFullYear()}`,
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; WoopCode/1.0)",
         },
+        signal,
       });
 
       if (!response.ok) {

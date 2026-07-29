@@ -125,12 +125,19 @@ export async function agentLoop(
 
         let result: string;
         try {
-          result = await tool.execute(toolCall.arguments);
+          result = await tool.execute(toolCall.arguments, signal);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           callbacks.onToolError?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, error: message });
           messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: `Tool failed: ${message}` });
           continue;
+        }
+
+        // A tool may have completed at the same time that the user cancelled
+        // the turn. Do not report its result or start another provider call.
+        if (signal?.aborted) {
+          callbacks.onCancel?.();
+          return "";
         }
         const MAX_TOOL_RESULT = 4000;
         const toolResult =

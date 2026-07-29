@@ -3,11 +3,12 @@ import { program } from "commander";
 import { modelsCommand } from "./commands/models";
 import { agentCommand, runAgent } from "./commands/agent";
 import { providerCommand } from "./commands/providers";
+import { VERSION } from "./config/version";
 
 program
   .name("woopcode")
   .description("Coding agent cli")
-  .version("0.1.0")
+  .version(VERSION)
   // Several subcommands declare their own `-p` (`providers login/logout
   // --provider`). Without positional options commander binds those to the
   // root's `-p, --prompt` and the subcommand silently sees an empty value.

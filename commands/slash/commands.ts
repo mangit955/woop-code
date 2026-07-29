@@ -13,11 +13,7 @@ import {
 } from "../../config/providerRegistry";
 import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../config/client";
 import { toolRegistery } from "../../tools";
-
-// Read version from package.json
-const packageJsonPath = `${import.meta.dir}/../../package.json`;
-const packageJson = await Bun.file(packageJsonPath).json();
-const version = packageJson.version as string;
+import { VERSION } from "../../config/version";
 
 // Read models from models.json
 const modelsJsonPath = `${import.meta.dir}/../../config/models.json`;
@@ -411,7 +407,7 @@ const statusCommand: SlashCommand = {
       ``,
       `Conversation: ${conversation.length} messages`,
       `Tools: ${toolRegistery.length} registered`,
-      `Version: ${version}`,
+      `Version: ${VERSION}`,
     ].join("\n");
   },
 };
@@ -425,7 +421,7 @@ const versionCommand: SlashCommand = {
   category: "other",
 
   async execute(context, args) {
-    return `Woopcode v${version}`;
+    return `Woopcode v${VERSION}`;
   },
 };
 

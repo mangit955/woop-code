@@ -59,6 +59,9 @@ const mockStore = {
   finishAssistantMessage: mock(() => {}),
   startTool: mock(() => {}),
   finishTool: mock(() => {}),
+  clearPendingEdit: mock(() => {}),
+  clearPendingCommand: mock(() => {}),
+  cancelPendingQuestion: mock(() => {}),
 };
 
 mock.module("../../../tui/src", () => ({
@@ -279,6 +282,9 @@ describe("AgentController - Cancellation", () => {
     
     expect(result).toBe("");
     expect(controller.isBusy()).toBe(false);
+    expect(mockStore.clearPendingEdit).toHaveBeenCalled();
+    expect(mockStore.clearPendingCommand).toHaveBeenCalled();
+    expect(mockStore.cancelPendingQuestion).toHaveBeenCalled();
   });
 
   test("cancel sets wasCancelled flag", async () => {

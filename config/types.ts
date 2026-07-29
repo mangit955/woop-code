@@ -80,7 +80,8 @@ export interface Tool {
   description: string;
   parameters: ToolParameter[];
 
-  execute(args: Record<string, unknown>): Promise<string>;
+  /** The signal is aborted when the user cancels the active agent turn. */
+  execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<string>;
 }
 
 export type StreamEvent =

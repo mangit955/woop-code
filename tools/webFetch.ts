@@ -38,7 +38,7 @@ Default timeout: 30 seconds`,
     },
   ],
 
-  async execute(args) {
+  async execute(args, signal) {
     const url = args.url as string;
     const format = (args.format as string) || "markdown";
     const timeoutSeconds = Math.min((args.timeout as number) || 30, 120);
@@ -55,6 +55,9 @@ Default timeout: 30 seconds`,
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+    const abortFromCaller = () => controller.abort();
+    if (signal?.aborted) abortFromCaller();
+    else signal?.addEventListener("abort", abortFromCaller, { once: true });
 
     try {
       const response = await fetch(url, {
@@ -118,13 +121,14 @@ Default timeout: 30 seconds`,
       return `Content from: ${url}\nContent-Type: ${contentType}\n\n${output}`;
     } catch (error: any) {
       if (error.name === "AbortError") {
-        throw new Error(`Request timed out after ${timeoutSeconds} seconds`);
+        throw new Error(signal?.aborted ? "Request cancelled" : `Request timed out after ${timeoutSeconds} seconds`);
       }
       throw new Error(
         `Failed to fetch URL: ${error instanceof Error ? error.message : String(error)}`
       );
     } finally {
       clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", abortFromCaller);
     }
   },
 };

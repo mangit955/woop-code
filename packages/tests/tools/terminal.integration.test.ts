@@ -23,13 +23,17 @@ describe("terminal Tool - Integration Tests", () => {
     store.setPendingCommand = originalSetPendingCommand;
   });
 
+  const stdoutOf = (result: string) =>
+    result.split("STDOUT:\n")[1]?.split("\n\nSTDERR:")[0] ?? "";
+
   describe("Basic Execution", () => {
     test("executes simple command", async () => {
       const result = await terminalTool.execute({
         command: "echo hello",
       });
 
-      expect(result).toBe("hello\n");
+      expect(result).toContain("Exit code: 0");
+      expect(stdoutOf(result)).toBe("hello\n");
     });
 
     test("returns stdout", async () => {
@@ -54,7 +58,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "true", // Exits 0, no output
       });
 
-      expect(result).toBe("");
+      expect(result).toBe("Exit code: 0\n\nSTDOUT:\n\n\nSTDERR:\n");
     });
   });
 
@@ -159,7 +163,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: `cat ${tmpFile}`,
       });
 
-      expect(result).toBe("test content");
+      expect(stdoutOf(result)).toBe("test content");
     });
 
     test("can write files", async () => {
@@ -206,7 +210,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "printf 'line1\\nline2\\nline3'",
       });
 
-      expect(result).toBe("line1\nline2\nline3");
+      expect(stdoutOf(result)).toBe("line1\nline2\nline3");
     });
   });
 
@@ -232,7 +236,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "seq 1 1000",
       });
 
-      const lines = result.trim().split("\n");
+      const lines = stdoutOf(result).trim().split("\n");
       expect(lines.length).toBe(1000);
       expect(lines[0]).toBe("1");
       expect(lines[999]).toBe("1000");
@@ -245,7 +249,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "exit 0",
       });
 
-      expect(result).toBe("");
+      expect(result).toContain("Exit code: 0");
     });
 
     test("handles non-zero exit code", async () => {
@@ -253,9 +257,33 @@ describe("terminal Tool - Integration Tests", () => {
         command: "exit 1",
       });
 
-      // Tool doesn't throw, but might return stderr
-      // Just verify it completes
-      expect(typeof result).toBe("string");
+      expect(result).toContain("Exit code: 1");
+    });
+  });
+
+  describe("Cancellation and timeouts", () => {
+    test("returns promptly when a command times out", async () => {
+      const start = Date.now();
+      const result = await terminalTool.execute({ command: "sleep 2", timeout: 0.05 });
+
+      expect(result).toContain("Command timed out after 0.05 seconds");
+      expect(Date.now() - start).toBeLessThan(1000);
+    });
+
+    test("stops a running command when its agent signal is aborted", async () => {
+      const controller = new AbortController();
+      const start = Date.now();
+      const command = terminalTool.execute({ command: "sleep 5" }, controller.signal);
+      setTimeout(() => controller.abort(), 25);
+
+      await expect(command).resolves.toBe("Command cancelled before completion.");
+      expect(Date.now() - start).toBeLessThan(1000);
+    });
+
+    test("rejects unquoted background operators without rejecting && or redirection", async () => {
+      await expect(terminalTool.execute({ command: "echo ready &" })).resolves.toContain("Background processes");
+      await expect(terminalTool.execute({ command: "echo ready && echo done" })).resolves.toContain("done");
+      await expect(terminalTool.execute({ command: "echo warning >&2" })).resolves.toContain("warning");
     });
   });
 
@@ -289,7 +317,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "echo '   '",
       });
 
-      expect(result).toBe("   \n");
+      expect(stdoutOf(result)).toBe("   \n");
     });
 
     test("handles command with tabs", async () => {
@@ -297,7 +325,7 @@ describe("terminal Tool - Integration Tests", () => {
         command: "printf '\\t\\t'",
       });
 
-      expect(result).toBe("\t\t");
+      expect(stdoutOf(result)).toBe("\t\t");
     });
 
     test("handles command with mixed stdout/stderr", async () => {

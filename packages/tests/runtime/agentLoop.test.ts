@@ -526,9 +526,18 @@ describe("agentLoop - Cancellation", () => {
   });
 
   test("cancellation during tool execution", async () => {
-    const slowTool = new MockTool("slow_tool", "Result");
-    slowTool.setDelay(50);
-    mockToolRegistry.register(slowTool);
+    let receivedSignal: AbortSignal | undefined;
+    const slowTool = {
+      name: "slow_tool",
+      description: "Waits until cancelled",
+      parameters: [],
+      async execute(_args: Record<string, unknown>, signal?: AbortSignal) {
+        receivedSignal = signal;
+        await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }));
+        return "Result";
+      },
+    };
+    mockToolRegistry.register(slowTool as any);
     
     mockClient.setEvents([
       createToolCallEvent("slow_tool", {}),
@@ -538,8 +547,7 @@ describe("agentLoop - Cancellation", () => {
     // Abort during tool execution
     setTimeout(() => abortController.abort(), 10);
 
-    // Note: current implementation doesn't cancel tool execution itself
-    // It only checks after stream completes
+    const start = Date.now();
     const result = await agentLoop(
       mockClient,
       messages,
@@ -549,6 +557,8 @@ describe("agentLoop - Cancellation", () => {
     );
 
     expect(result).toBe("");
+    expect(receivedSignal).toBe(abortController.signal);
+    expect(Date.now() - start).toBeLessThan(40);
     expect(callbackSpy.getCallsByName("onCancel")).toHaveLength(1);
   });
 });

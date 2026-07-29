@@ -10,13 +10,95 @@ import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
 import { PassThrough } from "stream";
 
+export interface RunAgentOptions {
+  /** Non-empty value switches the agent to a single headless turn. */
+  prompt?: string;
+  /** Headless only: approve tool edits/commands automatically (default true). */
+  autoApprove?: boolean;
+}
+
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
-  .option("-p, --prompt <prompt>", "prompt", "")
+  .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
+  .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
   .action(runAgent);
 
-/** Runs the interactive agent from either `woopcode` or `woopcode agent`. */
-export async function runAgent() {
+/**
+ * Entry point for both `woopcode` and `woopcode agent`. With `--prompt` the
+ * agent runs one non-interactive turn and exits; otherwise it launches the TUI.
+ */
+export async function runAgent(options: RunAgentOptions = {}, command?: Command) {
+  // The root program and `agent` both declare `-p`. Commander records the
+  // parsed value on the root in that case, so the subcommand only sees its
+  // own (empty) default — merge the ancestors' values back in.
+  const globals = command?.optsWithGlobals?.() as RunAgentOptions | undefined;
+  const prompt = (options.prompt || globals?.prompt || "").trim();
+  const autoApprove =
+    options.autoApprove !== false && globals?.autoApprove !== false;
+
+  if (prompt) {
+    return runHeadless(prompt, autoApprove);
+  }
+
+  return runInteractive();
+}
+
+/** Runs a single turn without the TUI, streaming the answer to stdout. */
+async function runHeadless(prompt: string, autoApprove: boolean) {
+  registerCommands();
+  await ensureProviderConfigured();
+
+  const config = await getConfig();
+  const provider = config.defaultProvider;
+  const apiKey = config.providers[provider].apiKey;
+  const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
+  store.setSelectedModel(selectedModel);
+  store.setNonInteractive({ autoApprove });
+
+  let failed = false;
+
+  const callbacks: AgentCallbacks = {
+    onToolStart(tool) {
+      process.stderr.write(`• ${tool.name}\n`);
+    },
+    onToolError(tool) {
+      process.stderr.write(`✖ ${tool.name} failed: ${tool.error}\n`);
+    },
+    onText(text) {
+      process.stdout.write(text);
+    },
+    onError(error) {
+      failed = true;
+      process.stderr.write(`✖ ${error.message}\n`);
+    },
+  };
+
+  const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
+  await controller.initialize();
+
+  const onSigint = () => {
+    controller.cancel();
+  };
+  process.once("SIGINT", onSigint);
+
+  try {
+    await controller.run(prompt);
+  } catch (error) {
+    failed = true;
+    process.stderr.write(
+      `✖ ${error instanceof Error ? error.message : String(error)}\n`
+    );
+  } finally {
+    process.off("SIGINT", onSigint);
+    await controller.dispose();
+  }
+
+  process.stdout.write("\n");
+  process.exit(failed ? 1 : 0);
+}
+
+/** Runs the interactive TUI agent. */
+async function runInteractive() {
   // Register slash commands
   registerCommands();
 

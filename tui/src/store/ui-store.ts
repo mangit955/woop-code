@@ -25,6 +25,23 @@ export class UIStore {
   > = new Map();
   private commandResolvers: Map<string, { resolve: (approved: boolean) => void }> = new Map();
   private questionResolvers: Map<string, { resolve: (answers: string[] | null) => void }> = new Map();
+  private nonInteractive = false;
+  private nonInteractiveApproval = false;
+
+  /**
+   * Headless runs (`woopcode -p "..."`) have no TUI to render approval
+   * prompts, so every pending edit/command would otherwise hang forever.
+   * In this mode approvals resolve immediately with a fixed answer and
+   * questions to the user are declined.
+   */
+  setNonInteractive(options: { autoApprove: boolean }) {
+    this.nonInteractive = true;
+    this.nonInteractiveApproval = options.autoApprove;
+  }
+
+  isNonInteractive() {
+    return this.nonInteractive;
+  }
 
   getState() {
     return this.state;
@@ -224,6 +241,10 @@ export class UIStore {
 
   // Pending Edit Management
   setPendingEdit(edit: PendingEdit): Promise<boolean> {
+    if (this.nonInteractive) {
+      return Promise.resolve(this.nonInteractiveApproval);
+    }
+
     this.maxPendingEditScrollOffset = 0;
     this.state = {
       ...this.state,
@@ -292,6 +313,10 @@ export class UIStore {
   }
 
   setPendingCommand(command: PendingCommand): Promise<boolean> {
+    if (this.nonInteractive) {
+      return Promise.resolve(this.nonInteractiveApproval);
+    }
+
     this.state = { ...this.state, pendingCommand: command };
     this.emit();
 
@@ -323,6 +348,12 @@ export class UIStore {
   }
 
   setPendingQuestion(question: PendingQuestion): Promise<string[] | null> {
+    // Nobody is at the keyboard in headless mode; the tool reports the
+    // declined answer back to the model instead of blocking.
+    if (this.nonInteractive) {
+      return Promise.resolve(null);
+    }
+
     this.state = { ...this.state, pendingQuestion: question };
     this.emit();
 

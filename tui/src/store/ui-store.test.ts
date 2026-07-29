@@ -105,3 +105,39 @@ describe("UIStore questions", () => {
     await expect(pending).resolves.toBeNull();
   });
 });
+
+describe("UIStore headless mode", () => {
+  const edit = {
+    id: "edit-1",
+    filePath: "src/example.ts",
+    oldContent: "old",
+    newContent: "new",
+    diff: "@@ -1 +1 @@\n-old\n+new",
+    toolCallId: "tool-1",
+  };
+  const command = { id: "cmd-1", command: "bun test", toolName: "run_tests" } as const;
+
+  test("resolves approvals immediately instead of waiting for a TUI", async () => {
+    const store = new UIStore();
+    store.setNonInteractive({ autoApprove: true });
+
+    await expect(store.setPendingEdit(edit)).resolves.toBe(true);
+    await expect(store.setPendingCommand(command)).resolves.toBe(true);
+    await expect(
+      store.setPendingQuestion({ id: "q-1", questions: ["Which database?"] })
+    ).resolves.toBeNull();
+
+    // Nothing is rendered, so no approval state is left behind.
+    expect(store.getState().pendingEdit).toBeNull();
+    expect(store.getState().pendingCommand).toBeNull();
+    expect(store.getState().pendingQuestion).toBeNull();
+  });
+
+  test("rejects approvals when auto-approve is disabled", async () => {
+    const store = new UIStore();
+    store.setNonInteractive({ autoApprove: false });
+
+    await expect(store.setPendingEdit(edit)).resolves.toBe(false);
+    await expect(store.setPendingCommand(command)).resolves.toBe(false);
+  });
+});

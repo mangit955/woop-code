@@ -4,7 +4,7 @@ import type { ActiveTurn, TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
 import { TurnFooter } from "./components/TurnFooter";
-import { colors } from "./styles/theme";
+import { usePalette } from "./styles/palette";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -13,6 +13,8 @@ interface TimelineProps {
 }
 
 export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
+  const colors = usePalette();
+
   return (
     <Box flexDirection="column" flexShrink={0}>
       {items.map((item) => (
@@ -36,6 +38,8 @@ export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
 }
 
 const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }) {
+  const colors = usePalette();
+
   switch (item.type) {
     case "user":
       return (

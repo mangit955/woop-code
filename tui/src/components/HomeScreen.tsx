@@ -4,7 +4,7 @@ import { AsciiLogo } from "./AsciiLogo";
 import { CapabilityRow } from "./CapabilityRow";
 import { HomeFooter } from "./HomeFooter";
 import { PromptCard } from "./PromptCard";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 import { planLayout } from "../layout";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 
@@ -41,6 +41,8 @@ export function HomeScreen({
   renderPrompt,
   paletteOpen = false,
 }: HomeScreenProps) {
+  const colors = usePalette();
+
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
   const showWordmark = layout.wordmark !== "hidden" && !paletteOpen;

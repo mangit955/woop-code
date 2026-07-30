@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { useLogoAnimation } from "../hooks/useLogoAnimation";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 const REVEAL_DURATION_MS = 500;
 const WORD_SPACING = "    ";
@@ -21,6 +21,8 @@ export function AsciiLogo({
   revealDuration = REVEAL_DURATION_MS,
   variant = "full",
 }: AsciiLogoProps) {
+  const colors = usePalette();
+
   const logoLines = createLogoLines(word, variant);
   const fullLogo = logoLines.map(({ woop, code }) => `${woop}${code}`).join("\n");
   const { progress } = useLogoAnimation({

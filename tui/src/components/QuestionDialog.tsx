@@ -28,7 +28,15 @@ export function QuestionDialog({ question }: { question: PendingQuestion }) {
 
   return (
     <Box flexGrow={1} alignItems="center" justifyContent="center">
-      <Box flexDirection="column" width="80%" borderStyle="single" borderColor={colors.primary} paddingX={1}>
+      {/* Opaque, so the transcript behind the dialog does not show through. */}
+      <Box
+        flexDirection="column"
+        width="80%"
+        borderStyle="single"
+        borderColor={colors.primary}
+        backgroundColor="#101010"
+        paddingX={1}
+      >
         <Text bold color={colors.primary}>Question {index + 1} of {question.questions.length}</Text>
         <Box marginTop={1}><Text color={colors.textBase}>{currentQuestion}</Text></Box>
         <Box marginTop={1}>

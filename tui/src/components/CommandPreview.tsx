@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 import { windowAround } from "../layout";
 import type { SlashCommand } from "../../../commands/slash/types";
 
@@ -104,6 +104,8 @@ export function CommandPreview({
   maxRows,
   showHeader = true,
 }: CommandPreviewProps) {
+  const colors = usePalette();
+
   if (matches.length === 0) return null;
 
   const activeIndex = Math.min(selectedIndex, matches.length - 1);

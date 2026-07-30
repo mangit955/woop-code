@@ -6,7 +6,7 @@ import { handleSlashCommand } from "../../commands/slash";
 import { registry } from "../../commands/slash/registry";
 import { matchCommands } from "../../commands/slash/match";
 import { store } from "./store/ui-store";
-import { colors } from "./styles/theme";
+import { usePalette } from "./styles/palette";
 import { CommandPreview } from "./components/CommandPreview";
 import { planLayout } from "./layout";
 import { useTerminalSize } from "./hooks/useTerminalSize";
@@ -22,6 +22,11 @@ interface PromptProps {
   variant?: "default" | "inline" | "block";
   /** Dropped first when the composer runs out of columns. */
   showProvider?: boolean;
+  /**
+   * False while a dialog is open. The composer stays visible underneath one, so
+   * it has to stop consuming keystrokes that belong to the dialog.
+   */
+  inputActive?: boolean;
 }
 
 export function Prompt({
@@ -34,7 +39,10 @@ export function Prompt({
   modelName,
   variant = "default",
   showProvider = true,
+  inputActive = true,
 }: PromptProps) {
+  const colors = usePalette();
+
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
   const { width, height } = useTerminalSize();
@@ -113,7 +121,7 @@ export function Prompt({
       // App, which stays mounted when a modal replaces this composer — ink would
       // otherwise run both handlers for a single press.
     },
-    { isActive: true }
+    { isActive: inputActive }
   );
 
   async function handleSubmit(input: string) {
@@ -197,6 +205,7 @@ export function Prompt({
             value={value}
             placeholder={placeholder}
             showCursor={showCursor}
+            focus={inputActive}
             onChange={handleValueChange}
             onSubmit={handleSubmit}
           />
@@ -248,6 +257,7 @@ export function Prompt({
               value={value}
               placeholder={placeholder}
               showCursor={showCursor}
+              focus={inputActive}
               onChange={handleValueChange}
               onSubmit={handleSubmit}
             />

@@ -1,11 +1,13 @@
 import { Box, Text } from "ink";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 export interface CapabilityRowProps {
   capabilities: readonly string[];
 }
 
 export function CapabilityRow({ capabilities }: CapabilityRowProps) {
+  const colors = usePalette();
+
   return (
     <Box flexWrap="wrap" justifyContent="center">
       {capabilities.map((capability, index) => (

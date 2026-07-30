@@ -1,12 +1,14 @@
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 interface ToolStatusProps {
   status: "running" | "completed" | "failed";
 }
 
 export function ToolStatus({ status }: ToolStatusProps) {
+  const colors = usePalette();
+
   if (status === "running") {
     return (
       <Text color={colors.primary}>

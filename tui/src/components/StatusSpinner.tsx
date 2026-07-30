@@ -1,5 +1,7 @@
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
+import { useDimmed } from "../styles/palette";
+import { dimHex } from "../styles/theme";
 
 const TRACK_LENGTH = 8;
 const HOLD_AT_START = 30;
@@ -84,6 +86,9 @@ function inactiveColor(
 
 export function StatusSpinner() {
   const [frame, setFrame] = useState(0);
+  // The spinner carries its own ramp, so it fades itself.
+  const dimmed = useDimmed();
+  const shade = (color: string) => (dimmed ? dimHex(color) : color);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -109,7 +114,7 @@ export function StatusSpinner() {
 
           if (colorIndex === 0) {
             return (
-              <Text key={index} color={spinnerColors.head}>
+              <Text key={index} color={shade(spinnerColors.head)}>
                 ▪
               </Text>
             );
@@ -117,7 +122,7 @@ export function StatusSpinner() {
 
           if (colorIndex === 1) {
             return (
-              <Text key={index} color={spinnerColors.bloom}>
+              <Text key={index} color={shade(spinnerColors.bloom)}>
                 ▪
               </Text>
             );
@@ -128,7 +133,7 @@ export function StatusSpinner() {
             spinnerColors.trailMid,
             spinnerColors.trailFar,
             spinnerColors.trailLast,
-          ];
+          ].map(shade);
           if (colorIndex >= 2 && colorIndex < trailColors.length + 2) {
             return (
               <Text key={index} color={trailColors[colorIndex - 2]}>
@@ -140,11 +145,11 @@ export function StatusSpinner() {
           return (
             <Text
               key={index}
-              color={inactiveColor(
+              color={shade(inactiveColor(
                 scanner.movementProgress,
                 scanner.holdProgress,
                 scanner.holdTotal,
-              )}
+              ))}
             >
               ·
             </Text>

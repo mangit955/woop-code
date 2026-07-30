@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { colors } from "./styles/theme";
+import { usePalette } from "./styles/palette";
 import { planLayout } from "./layout";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 
@@ -9,6 +9,8 @@ interface HeaderProps {
 }
 
 export function Header({ branch, provider }: HeaderProps) {
+  const colors = usePalette();
+
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
 

@@ -4,7 +4,7 @@ import type { PendingEdit } from "../types";
 import { DiffViewer } from "./DiffViewer";
 import { store } from "../store/ui-store";
 import { useUIStore } from "../store/useUIStore";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 
 interface DiffPreviewProps {
@@ -12,6 +12,8 @@ interface DiffPreviewProps {
 }
 
 export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
+  const colors = usePalette();
+
   const { pendingEditScrollOffset } = useUIStore();
   const { width, height } = useTerminalSize();
   const viewportRef = useRef<DOMElement>(null);

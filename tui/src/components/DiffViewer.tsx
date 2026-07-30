@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 interface DiffViewerProps {
   diff: string;
@@ -47,6 +47,8 @@ export function DiffViewer({ diff }: DiffViewerProps) {
 }
 
 function DiffLine({ row, numberWidth }: { row: DiffRow; numberWidth: number }) {
+  const colors = usePalette();
+
   if (row.type === "hunk") {
     return (
       <Box paddingLeft={1} backgroundColor={colors.bgLayer02}>

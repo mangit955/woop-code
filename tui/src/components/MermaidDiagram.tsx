@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 interface MermaidDiagramProps {
   code: string;
@@ -13,6 +13,8 @@ interface DiagramLine {
 
 /** Render the common Mermaid diagram forms in a terminal-friendly format. */
 export function MermaidDiagram({ code }: MermaidDiagramProps) {
+  const colors = usePalette();
+
   const diagram = formatMermaid(code);
 
   return (

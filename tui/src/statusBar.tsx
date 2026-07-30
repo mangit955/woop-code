@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { useUIStore } from "./store/useUIStore";
-import { colors } from "./styles/theme";
+import { usePalette } from "./styles/palette";
 import { StatusSpinner } from "./components/StatusSpinner";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { planLayout, truncateStart } from "./layout";
@@ -26,6 +26,8 @@ export function StatusBar({
   showKeyHints = true,
   labelWidth,
 }: StatusBarProps) {
+  const colors = usePalette();
+
   return (
     <Box justifyContent="space-between" width="100%">
       <Box gap={1} flexShrink={1} minWidth={0}>
@@ -43,6 +45,8 @@ export function StatusBar({
 }
 
 function StatusIcon({ status }: { status: StatusState }) {
+  const colors = usePalette();
+
   if (status === "thinking" || status === "tool") {
     return <StatusSpinner />;
   }
@@ -61,6 +65,8 @@ function StatusLabel({
   message?: string;
   labelWidth?: number;
 }) {
+  const colors = usePalette();
+
   if (status === "ready") {
     // The last segment is the useful part of a path, so trim from the front.
     return (

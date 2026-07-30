@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { highlight, supportsLanguage } from "cli-highlight";
 import chalk from "chalk";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 interface CodeBlockProps {
   code: string;
@@ -13,6 +13,8 @@ function stripAnsi(str: string): string {
 }
 
 export function CodeBlock({ code, language }: CodeBlockProps) {
+  const colors = usePalette();
+
   let highlighted: string;
   try {
     const validLang = language && supportsLanguage(language) ? language : undefined;

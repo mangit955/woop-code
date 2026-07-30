@@ -15,8 +15,8 @@ import type { ActiveTurn, TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { useCancelKey } from "./hooks/useCancelKey";
-import { colors } from "./styles/theme";
 import { planLayout } from "./layout";
+import { PaletteProvider } from "./styles/palette";
 import { getModelDisplayName } from "../../config/client";
 import { matchCommands } from "../../commands/slash/match";
 
@@ -38,6 +38,9 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
   const hasPendingQuestion = state.pendingQuestion !== null;
+  // These float over the app rather than replacing it, so the work behind them
+  // stays readable. The diff preview is not one of them: it splits the screen.
+  const dialogOpen = state.modelPickerOpen || hasPendingCommand || hasPendingQuestion;
 
   // Registered here because App is the only component that is always mounted.
   // Every modal below replaces the composer, which is where this used to live.
@@ -51,6 +54,9 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
     providerName: homeScreen.providerName,
     modelName: getModelDisplayName(state.selectedModel ?? undefined),
     showProvider: layout.showComposerProvider,
+    // The composer stays on screen under a dialog, so it has to stop taking
+    // keystrokes — otherwise typing in a dialog would also type into it.
+    inputActive: !dialogOpen,
   };
 
   return (
@@ -60,19 +66,13 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       height={height}
       backgroundColor="#000000"
     >
-      {/* Header — pinned at top */}
-      <Box flexShrink={0} paddingX={1}>
-        <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
-      </Box>
-
-      {state.modelPickerOpen ? (
-        <ModelPicker controller={controller} selectedModel={state.selectedModel} />
-      ) : hasPendingCommand ? (
-        <CommandApproval command={state.pendingCommand!} />
-      ) : hasPendingQuestion ? (
-        <QuestionDialog question={state.pendingQuestion!} />
-      ) : (
-        <>
+      {/* Everything behind a dialog renders in the faded palette, so the panel
+          above reads as the foreground instead of the app going black. */}
+      <PaletteProvider dimmed={dialogOpen}>
+        {/* Header — pinned at top */}
+        <Box flexShrink={0} paddingX={1}>
+          <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
+        </Box>
 
       {/* Main content */}
       <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} backgroundColor="#000000">
@@ -124,7 +124,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       {/* Footer — pinned at bottom. Its rows are fixed, so in a short terminal
           the decorations come off before the input does: the status bar first,
           then the surrounding gap, then the border itself. */}
-      {!showHome && !hasPendingEdit && !hasPendingCommand && !hasPendingQuestion && (
+      {!showHome && !hasPendingEdit && (
         <Box
           flexDirection="column"
           flexShrink={0}
@@ -136,7 +136,30 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           {layout.showStatusBar && <ConnectedStatusBar />}
         </Box>
       )}
-        </>
+      </PaletteProvider>
+
+      {/* Dialog layer — last child and absolutely positioned, so it paints over
+          the content above while leaving it visible around the panel. */}
+      {dialogOpen && (
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          width={width}
+          height={height}
+          alignItems="center"
+          justifyContent="center"
+        >
+          <PaletteProvider dimmed={false}>
+            {state.modelPickerOpen ? (
+              <ModelPicker controller={controller} selectedModel={state.selectedModel} />
+            ) : hasPendingCommand ? (
+              <CommandApproval command={state.pendingCommand!} />
+            ) : (
+              <QuestionDialog question={state.pendingQuestion!} />
+            )}
+          </PaletteProvider>
+        </Box>
       )}
     </Box>
   );

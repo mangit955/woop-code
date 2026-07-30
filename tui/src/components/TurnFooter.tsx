@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
+import type { Palette } from "../styles/theme";
 import { getModelDisplayName } from "../../../config/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
 import { planLayout } from "../layout";
@@ -16,11 +17,12 @@ const PULSE_INTERVAL_MS = 240;
 /** Breathes the marker while the turn is in flight. */
 const pulseColors = ["#1e40af", "#2563eb", "#3b82f6", "#60a5fa", "#3b82f6", "#2563eb"] as const;
 
-const outcomeColors: Record<TurnOutcome, string> = {
-  completed: colors.primary,
-  cancelled: colors.textMuted,
-  error: colors.dangerBase,
-};
+/** Takes the palette as an argument so it fades with the layer it renders in. */
+function outcomeColor(outcome: TurnOutcome, colors: Palette) {
+  if (outcome === "cancelled") return colors.textMuted;
+  if (outcome === "error") return colors.dangerBase;
+  return colors.primary;
+}
 
 /**
  * Under a minute the tenths matter — most turns live there and the digit is the
@@ -50,6 +52,8 @@ export function TurnFooter({
   endedAt,
   outcome,
 }: TurnFooterProps) {
+  const colors = usePalette();
+
   const running = endedAt === null;
   const [now, setNow] = useState(() => Date.now());
   const [pulse, setPulse] = useState(0);
@@ -74,7 +78,7 @@ export function TurnFooter({
   const elapsed = (endedAt ?? now) - startedAt;
   const markerColor = running
     ? pulseColors[pulse]
-    : outcomeColors[outcome ?? "completed"];
+    : outcomeColor(outcome ?? "completed", colors);
 
   // One row, always. Wrapping this split "Build · Gemini 2.5 Flash Lite · 3.5s"
   // across three lines in a narrow terminal; the model name gives up columns and

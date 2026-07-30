@@ -1,8 +1,10 @@
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 export function ThinkingIndicator() {
+  const colors = usePalette();
+
   return (
     <Box gap={1} paddingLeft={2}>
       <Text color={colors.textMuted}>

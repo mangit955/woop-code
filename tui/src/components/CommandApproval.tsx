@@ -20,7 +20,16 @@ export function CommandApproval({ command }: { command: PendingCommand }) {
   const label = command.toolName === "run_tests" ? "Test command" : "Terminal command";
   return (
     <Box flexGrow={1} alignItems="center" justifyContent="center">
-      <Box flexDirection="column" width="80%" borderStyle="single" borderColor={colors.warningBase} paddingX={1}>
+      {/* An opaque background: the transcript stays rendered behind a dialog
+          now, so a panel without one would show text through it. */}
+      <Box
+        flexDirection="column"
+        width="80%"
+        borderStyle="single"
+        borderColor={colors.warningBase}
+        backgroundColor="#101010"
+        paddingX={1}
+      >
         <Text bold color={colors.warningBase}>Approve {label}</Text>
         <Text color={colors.textMuted}>This command may read, modify, or access network resources.</Text>
         <Box marginTop={1} paddingX={1} backgroundColor="#1a1a1a">

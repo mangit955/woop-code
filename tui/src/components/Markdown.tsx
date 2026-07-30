@@ -4,22 +4,9 @@ import { CodeBlock } from "./CodeBlock";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { InlineCode } from "./InlineCode";
 import type { ReactNode } from "react";
-import { colors } from "../styles/theme";
+import { usePalette, useMarkdownPalette } from "../styles/palette";
+import type { MarkdownPalette } from "../styles/theme";
 
-// OpenCode dark theme markdown colors
-const md = {
-  text: "#eeeeee",
-  heading: "#9d7cd8",
-  strong: "#f5a742",
-  emph: "#e5c07b",
-  code: "#7fd88f",
-  link: "#fab283",
-  linkText: "#56b6c2",
-  blockQuote: "#e5c07b",
-  listItem: "#fab283",
-  listEnum: "#56b6c2",
-  hr: "#808080",
-} as const;
 
 interface MarkdownProps {
   tokens: Token[];
@@ -40,6 +27,9 @@ export function Markdown({ tokens }: MarkdownProps) {
 // ---------------------------------------------------------------------------
 
 function MarkdownBlock({ token }: { token: Token }): ReactNode {
+  const colors = usePalette();
+  const md = useMarkdownPalette();
+
   switch (token.type) {
     case "heading": {
       const t = token as Tokens.Heading;
@@ -50,7 +40,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
         <Box marginTop={t.depth === 1 ? 2 : 1} marginBottom={1}>
           <Text bold color={color}>
             {prefix}
-            {renderInline(t.tokens)}
+            {renderInline(t.tokens, md)}
           </Text>
         </Box>
       );
@@ -60,7 +50,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
       const t = token as Tokens.Paragraph;
       return (
         <Box marginBottom={1}>
-          <Text color={md.text}>{renderInline(t.tokens)}</Text>
+          <Text color={md.text}>{renderInline(t.tokens, md)}</Text>
         </Box>
       );
     }
@@ -170,7 +160,7 @@ function MarkdownBlock({ token }: { token: Token }): ReactNode {
                   {t.header.map((h, ci) => (
                     <Box key={ci}>
                       <Text color={colors.textMuted}>{`  ${pad(cellPlain(h.tokens), labelWidth)}  `}</Text>
-                      <Text color={md.text}>{renderInline(row[ci]?.tokens ?? [])}</Text>
+                      <Text color={md.text}>{renderInline(row[ci]?.tokens ?? [], md)}</Text>
                     </Box>
                   ))}
                 </Box>
@@ -216,6 +206,8 @@ function ListItem({
   item: Tokens.ListItem;
   prefix: string;
 }) {
+  const md = useMarkdownPalette();
+
   return (
     <Box>
       <Text color={md.listItem}>{prefix}</Text>
@@ -224,13 +216,13 @@ function ListItem({
           // In tight lists, unwrap paragraphs to avoid extra spacing
           if (inner.type === "paragraph") {
             const p = inner as Tokens.Paragraph;
-            return <Text key={j} color={md.text}>{renderInline(p.tokens)}</Text>;
+            return <Text key={j} color={md.text}>{renderInline(p.tokens, md)}</Text>;
           }
           // Tight list items use a bare "text" token instead of paragraph
           if (inner.type === "text") {
             const txt = inner as Tokens.Text;
             if (txt.tokens && txt.tokens.length > 0) {
-              return <Text key={j} color={md.text}>{renderInline(txt.tokens)}</Text>;
+              return <Text key={j} color={md.text}>{renderInline(txt.tokens, md)}</Text>;
             }
             return <Text key={j} color={md.text}>{txt.text}</Text>;
           }
@@ -246,13 +238,14 @@ function ListItem({
 // Inline rendering
 // ---------------------------------------------------------------------------
 
-function renderInline(tokens: Token[]): ReactNode[] {
+// Not a component, so it takes the palette rather than reading context.
+function renderInline(tokens: Token[], md: MarkdownPalette): ReactNode[] {
   return tokens.map((token, i) => {
     switch (token.type) {
       case "text": {
         const t = token as Tokens.Text;
         if (t.tokens && t.tokens.length > 0) {
-          return <Text key={i}>{renderInline(t.tokens)}</Text>;
+          return <Text key={i}>{renderInline(t.tokens, md)}</Text>;
         }
         return t.text;
       }
@@ -261,7 +254,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
         const t = token as Tokens.Strong;
         return (
           <Text key={i} bold color={md.strong}>
-            {renderInline(t.tokens)}
+            {renderInline(t.tokens, md)}
           </Text>
         );
       }
@@ -270,7 +263,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
         const t = token as Tokens.Em;
         return (
           <Text key={i} italic color={md.emph}>
-            {renderInline(t.tokens)}
+            {renderInline(t.tokens, md)}
           </Text>
         );
       }
@@ -285,7 +278,7 @@ function renderInline(tokens: Token[]): ReactNode[] {
         // Render link text with accent color
         return (
           <Text key={i} color={md.linkText}>
-            {renderInline(t.tokens)}
+            {renderInline(t.tokens, md)}
           </Text>
         );
       }

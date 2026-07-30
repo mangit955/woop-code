@@ -130,7 +130,7 @@ describe("dialogs float over the app", () => {
     await settle();
 
     expect(app.stdout.text()).toContain(TRANSCRIPT);
-    expect(app.stdout.text()).toContain("Approve Test command");
+    expect(app.stdout.text()).toContain("Run tests");
 
     store.rejectPendingCommand();
     await expect(approval).resolves.toBe(false);

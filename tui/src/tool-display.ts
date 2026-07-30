@@ -33,6 +33,11 @@ const LABELS: Record<string, string> = {
   ask_user: "Ask",
 };
 
+/** Tools shown as a shell block — the command and its output — not a one-liner. */
+export function isCommandTool(name: string) {
+  return RUN_TOOLS.includes(name);
+}
+
 export function toolGlyph(name: string) {
   if (SEARCH_TOOLS.includes(name)) return "*";
   if (READ_TOOLS.includes(name)) return "→";

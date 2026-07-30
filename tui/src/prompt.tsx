@@ -137,6 +137,12 @@ export function Prompt({
       return;
     }
 
+    if (prompt === "/approval" || prompt === "/approve") {
+      store.openApprovalPicker();
+      onValueChange("");
+      return;
+    }
+
     // Auto-complete the selected slash command
     if (prompt.startsWith("/") && slashMatches.length > 0) {
       const activeIndex = Math.min(selectedIndex, slashMatches.length - 1);

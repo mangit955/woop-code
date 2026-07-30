@@ -8,6 +8,7 @@ import { store } from "./store/ui-store";
 import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
 import { ModelPicker } from "./components/ModelPicker";
+import { ApprovalPicker } from "./components/ApprovalPicker";
 import { CommandApproval } from "./components/CommandApproval";
 import { QuestionDialog } from "./components/QuestionDialog";
 import type { AgentController } from "../../commands/agentController";
@@ -40,7 +41,11 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const hasPendingQuestion = state.pendingQuestion !== null;
   // These float over the app rather than replacing it, so the work behind them
   // stays readable. The diff preview is not one of them: it splits the screen.
-  const dialogOpen = state.modelPickerOpen || hasPendingCommand || hasPendingQuestion;
+  const dialogOpen =
+    state.modelPickerOpen ||
+    state.approvalPickerOpen ||
+    hasPendingCommand ||
+    hasPendingQuestion;
 
   // Registered here because App is the only component that is always mounted.
   // Every modal below replaces the composer, which is where this used to live.
@@ -153,6 +158,8 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           <PaletteProvider dimmed={false}>
             {state.modelPickerOpen ? (
               <ModelPicker controller={controller} selectedModel={state.selectedModel} />
+            ) : state.approvalPickerOpen ? (
+              <ApprovalPicker mode={state.approvalMode} />
             ) : hasPendingCommand ? (
               <CommandApproval command={state.pendingCommand!} />
             ) : (

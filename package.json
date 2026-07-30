@@ -38,6 +38,7 @@
     "cli.ts",
     "commands/",
     "config/",
+    "runtime/",
     "tools/",
     "tui/",
     "onboarding/",

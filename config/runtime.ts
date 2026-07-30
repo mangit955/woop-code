@@ -236,8 +236,11 @@ export async function agentLoop(
         toolCallsExecuted >= TOOLS_BEFORE_EFFICIENCY_WARNING
       ) {
         efficiencyWarningSent = true;
+        // The ⚠️ prefix is load-bearing: it is how the UI tells an informational
+        // notice from a terminal status, so it shows in the transcript and the
+        // activity indicator keeps saying the turn is still running.
         callbacks.onStatus?.(
-          `${toolCallsExecuted} tools used - start implementing now to conserve quota`,
+          `⚠️  ${toolCallsExecuted} tools used - start implementing now to conserve quota`,
         );
       }
     }

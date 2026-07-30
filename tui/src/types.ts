@@ -21,6 +21,8 @@ export type TimeLineItem =
       name: string;
       arguments: Record<string, unknown>;
       status: "running" | "completed" | "failed";
+      /** Short report of what came back, e.g. "8 matches". */
+      summary?: string;
     }
   | ({
       id: string;

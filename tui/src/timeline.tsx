@@ -5,6 +5,7 @@ import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
 import { TurnFooter } from "./components/TurnFooter";
 import { usePalette } from "./styles/palette";
+import { formatToolArgument, toolGlyph, toolLabel } from "./tool-display";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -93,51 +94,28 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
       );
 
     case "tool": {
-      const label = toolLabel(item.name);
-      const target = formatToolArgument(item.arguments);
+      const argument = formatToolArgument(item.arguments);
 
+      // One quiet line: glyph, tool, the argument worth reading, and what came
+      // back. The whole row stays muted — it is a record of work, not the work.
       return (
-        <Box flexDirection="column" marginBottom={0} paddingLeft={2} flexShrink={0}>
-          <Box gap={1}>
-            <ToolStatus status={item.status} />
-            <Text bold color={colors.textMuted}>
-              {label}
-            </Text>
-            {target && <Text color={colors.textFaint}>{target}</Text>}
-          </Box>
+        <Box marginBottom={0} paddingLeft={2} flexShrink={0} gap={1}>
+          <ToolStatus status={item.status} glyph={toolGlyph(item.name)} />
+          <Text color={colors.textMuted}>{toolLabel(item.name)}</Text>
+          {argument && (
+            <Box flexShrink={1} minWidth={0}>
+              <Text color={colors.textFaint} wrap="truncate-end">
+                {argument.quoted ? `"${argument.text}"` : argument.text}
+              </Text>
+            </Box>
+          )}
+          {item.summary && (
+            <Box flexShrink={0}>
+              <Text color={colors.textFaint}>{`(${item.summary})`}</Text>
+            </Box>
+          )}
         </Box>
       );
     }
   }
 });
-
-function formatToolArgument(arguments_: Record<string, unknown>) {
-  const value =
-    arguments_.path ??
-    arguments_.query ??
-    arguments_.pattern ??
-    Object.values(arguments_)[0];
-
-  if (value === undefined) {
-    return null;
-  }
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-function toolLabel(name: string): string {
-  const map: Record<string, string> = {
-    read_file: "Read",
-    write_file: "Write",
-    edit_file: "Edit",
-    create_file: "Create",
-    delete_file: "Delete",
-    run_command: "Run",
-    execute_command: "Run",
-    search: "Search",
-    grep: "Search",
-    list_directory: "List",
-    list_files: "List",
-  };
-  return map[name] ?? name.replace(/_/g, " ");
-}

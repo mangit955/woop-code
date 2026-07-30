@@ -8,6 +8,7 @@ import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from ".
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
+import { summarizeToolOutput } from "../tui/src/tool-display";
 import { PassThrough } from "stream";
 
 /** How long a terminal notice stays on the status bar before reverting to Ready. */
@@ -136,7 +137,7 @@ async function runInteractive() {
     },
 
     onToolFinish(tool) {
-      store.finishTool(tool.id);
+      store.finishTool(tool.id, summarizeToolOutput(tool.name, tool.output));
       // A tool result is sent back to the model for the next step. The turn is
       // still active until onDone, so never show Ready here.
       store.setStatus("Thinking...");

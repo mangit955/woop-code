@@ -4,9 +4,11 @@ import { usePalette } from "../styles/palette";
 
 interface ToolStatusProps {
   status: "running" | "completed" | "failed";
+  /** The glyph for this kind of tool, shown once the call has settled. */
+  glyph: string;
 }
 
-export function ToolStatus({ status }: ToolStatusProps) {
+export function ToolStatus({ status, glyph }: ToolStatusProps) {
   const colors = usePalette();
 
   if (status === "running") {
@@ -17,8 +19,10 @@ export function ToolStatus({ status }: ToolStatusProps) {
     );
   }
 
+  // A completed call is a record, not an outcome to celebrate: the glyph says
+  // what kind of work it was and stays out of the way. Only failure stands out.
   if (status === "completed") {
-    return <Text color={colors.successBase}>✓</Text>;
+    return <Text color={colors.textFaint}>{glyph}</Text>;
   }
 
   if (status === "failed") {

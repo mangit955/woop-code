@@ -170,7 +170,7 @@ export class UIStore {
     this.emit();
   }
 
-  finishTool(id: string) {
+  finishTool(id: string, summary?: string) {
     const tool = this.state.timeline.find(
       (item): item is Extract<TimeLineItem, { type: "tool" }> =>
         item.type === "tool" && item.id === id,
@@ -185,6 +185,7 @@ export class UIStore {
           ? {
               ...item,
               status: "completed",
+              summary,
             }
           : item,
       ),

@@ -81,24 +81,31 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
     .filter((line) => line.startsWith("-") && !line.startsWith("---"))
     .length;
 
+  // An edit to a file that did not exist is a creation; say which one it is.
+  const action = pendingEdit.oldContent === "" ? "Create" : "Edit";
+
   return (
     <Box
       flexDirection="column"
       flexGrow={1}
       flexShrink={1}
       minHeight={0}
+      paddingX={1}
     >
+      {/* A filled panel rather than a bordered one: the diff reads as a card
+          lifted off the transcript, which is how the rows' tints stay legible. */}
       <Box
         flexDirection="column"
         flexGrow={1}
         flexShrink={1}
         minHeight={0}
-        borderStyle="single"
-        borderColor={colors.borderBase}
+        backgroundColor={colors.bgLayer01}
+        paddingY={1}
       >
-        <Box justifyContent="space-between" paddingX={1} flexShrink={0}>
+        <Box justifyContent="space-between" paddingX={2} flexShrink={0} marginBottom={1}>
           <Box gap={1} flexShrink={1}>
-            <Text color={colors.warningBase}>M</Text>
+            <Text color={colors.textFaint}>←</Text>
+            <Text color={colors.textMuted}>{action}</Text>
             <Text bold color={colors.textBase} wrap="truncate-end">
               {pendingEdit.filePath}
             </Text>
@@ -122,21 +129,11 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
             flexShrink={0}
             marginTop={-pendingEditScrollOffset}
           >
-            <DiffViewer diff={pendingEdit.diff} />
+            <DiffViewer diff={pendingEdit.diff} filePath={pendingEdit.filePath} />
           </Box>
         </Box>
 
-        <Box
-          justifyContent="space-between"
-          paddingX={1}
-          flexShrink={0}
-          borderStyle="single"
-          borderTop
-          borderRight={false}
-          borderBottom={false}
-          borderLeft={false}
-          borderColor={colors.borderBase}
-        >
+        <Box justifyContent="space-between" paddingX={2} flexShrink={0} marginTop={1}>
           <Text color={colors.textMuted}>
             <Text color={colors.dangerBase}>Esc</Text> reject · <Text color={colors.textFaint}>↑↓</Text> scroll
           </Text>

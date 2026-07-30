@@ -2,6 +2,7 @@ import { Box, Text } from "ink";
 import { highlight, supportsLanguage } from "cli-highlight";
 import chalk from "chalk";
 import { usePalette } from "../styles/palette";
+import { syntaxTheme } from "../styles/syntax";
 
 interface CodeBlockProps {
   code: string;
@@ -21,6 +22,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
     highlighted = highlight(code.trimEnd(), {
       language: validLang,
       ignoreIllegals: true,
+      theme: syntaxTheme,
     });
   } catch {
     highlighted = code.trimEnd();

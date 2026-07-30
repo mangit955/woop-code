@@ -42,14 +42,16 @@ export const colors = {
   agentReview: "#f87171", // Red 400
 
   // Diff colors
-  // OpenCode's default ANSI diff palette: normal colors for counts and
-  // bright variants for the actual change markers.
-  diffAdd: "#008000",
-  diffRemove: "#800000",
+  // Tints, not text colours: a changed line is a full-width band behind
+  // syntax-highlighted code, so the background has to stay dark enough for the
+  // highlighter's colours to read on top of it. Markers and counts are the
+  // saturated pair.
+  diffAdd: "#7dd3fc", // Sky 300 — the "+" marker
+  diffRemove: "#f0a6bb", // Soft rose — the "−" marker
   diffAddHighlight: "#00ff00",
   diffRemoveHighlight: "#ff0000",
-  diffAddBg: "#082408",
-  diffRemoveBg: "#240808",
+  diffAddBg: "#16293d",
+  diffRemoveBg: "#3a1e2b",
   diffModified: "#fbbf24",
 };
 

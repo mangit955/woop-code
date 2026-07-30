@@ -52,7 +52,17 @@ export const createFileTool: Tool = {
       toolCallId: crypto.randomUUID(),
     };
 
-    const approved = await store.setPendingEdit(pendingEdit);
+    // Cancelling the turn rejects this promise. Reachable now that Ctrl+C works
+    // while the approval is on screen; editFile and writeFile already did this.
+    let approved: boolean;
+    try {
+      approved = await store.setPendingEdit(pendingEdit);
+    } catch {
+      const outcome = `Create cancelled for ${path}. No file was created.`;
+      store.addSystemMessage(outcome);
+      return outcome;
+    }
+
     if (!approved) {
       const outcome = `Create rejected for ${path}. No file was created.`;
       store.addSystemMessage(outcome);

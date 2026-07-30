@@ -211,3 +211,67 @@ describe("UIStore turn footer", () => {
     expect(store.getState().timeline).toEqual([]);
   });
 });
+
+describe("UIStore modal dismissal", () => {
+  const edit = {
+    id: "edit-1",
+    filePath: "cli.ts",
+    oldContent: "a",
+    newContent: "b",
+    diff: "",
+    toolCallId: "tool-1",
+  };
+
+  test("reports whether a modal owns the screen", () => {
+    const store = new UIStore();
+    expect(store.hasOpenModal()).toBe(false);
+
+    store.openModelPicker();
+    expect(store.hasOpenModal()).toBe(true);
+
+    store.closeModelPicker();
+    expect(store.hasOpenModal()).toBe(false);
+  });
+
+  test("closes the topmost modal in the order the app renders them", async () => {
+    const store = new UIStore();
+    const command = store.setPendingCommand({
+      id: "cmd-1",
+      command: "bun test",
+      toolName: "run_tests",
+    });
+    store.openModelPicker();
+
+    // The picker renders over the approval, so it is what Ctrl+C closes first.
+    expect(store.dismissTopModal()).toBe(true);
+    expect(store.getState().modelPickerOpen).toBe(false);
+    expect(store.getState().pendingCommand).not.toBeNull();
+
+    expect(store.dismissTopModal()).toBe(true);
+    expect(store.getState().pendingCommand).toBeNull();
+    // Dismissing answers the waiting tool rather than leaving it hanging.
+    await expect(command).resolves.toBe(false);
+  });
+
+  test("resolves a dismissed approval as declined, not as an error", async () => {
+    const store = new UIStore();
+    const approval = store.setPendingEdit(edit);
+
+    expect(store.dismissTopModal()).toBe(true);
+    await expect(approval).resolves.toBe(false);
+    expect(store.getState().pendingEdit).toBeNull();
+  });
+
+  test("answers a dismissed question with no answer", async () => {
+    const store = new UIStore();
+    const answer = store.setPendingQuestion({ id: "q-1", questions: ["Which database?"] });
+
+    expect(store.dismissTopModal()).toBe(true);
+    await expect(answer).resolves.toBeNull();
+  });
+
+  test("reports nothing to dismiss when no modal is open", () => {
+    const store = new UIStore();
+    expect(store.dismissTopModal()).toBe(false);
+  });
+});

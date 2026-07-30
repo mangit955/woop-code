@@ -32,7 +32,6 @@ export function Prompt({
   variant = "default",
   showProvider = true,
 }: PromptProps) {
-  const isExiting = useRef(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
   const lastActivityTime = useRef(Date.now());
@@ -116,19 +115,9 @@ export function Prompt({
         }
       }
 
-      if (!(key.ctrl && input.toLowerCase() === "c")) {
-        return;
-      }
-
-      if (controller.isBusy()) {
-        controller.cancel();
-        return;
-      }
-
-      if (!isExiting.current) {
-        isExiting.current = true;
-        void onExit();
-      }
+      // Ctrl+C is deliberately not handled here. It belongs to useCancelKey on
+      // App, which stays mounted when a modal replaces this composer — ink would
+      // otherwise run both handlers for a single press.
     },
     { isActive: true }
   );

@@ -5,9 +5,14 @@ import { colors } from "../styles/theme";
 
 export function CommandApproval({ command }: { command: PendingCommand }) {
   useInput((input, key) => {
-    if (key.return || input.toLowerCase() === "a") {
+    // Ink reports a chord's letter as plain input with a modifier flag, so
+    // Ctrl+A would otherwise approve the command and Ctrl+R reject it. Only an
+    // unmodified letter is an answer here; chords belong to global handlers.
+    const letter = key.ctrl || key.meta ? "" : input.toLowerCase();
+
+    if (key.return || letter === "a") {
       store.approvePendingCommand();
-    } else if (key.escape || input.toLowerCase() === "r") {
+    } else if (key.escape || letter === "r") {
       store.rejectPendingCommand();
     }
   });

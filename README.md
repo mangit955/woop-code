@@ -128,7 +128,7 @@ Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` fo
 | `↑` / `↓`               | Scroll the conversation.                              |
 | `Page Up` / `Page Down` | Move through the conversation by a page.              |
 | `Home` / `End`          | Jump to the oldest message or back to the latest one. |
-| `Ctrl+C`                | Cancel an active request, or exit when idle.          |
+| `Ctrl+C`                | Cancel an active request — including one waiting on an approval or question. Closes an open dialog when idle, and exits when there is nothing to stop. |
 | `Enter` / `Esc`         | Apply or reject a pending file-change preview.        |
 
 ## Command line

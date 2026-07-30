@@ -8,13 +8,20 @@ const WORD_SPACING = "    ";
 export interface AsciiLogoProps {
   word: string;
   revealDuration?: number;
+  /**
+   * "compact" swaps the six-row figlet for a one-line wordmark. The figlet is
+   * 73 columns wide and clips into unreadable fragments below that, so a
+   * narrow terminal gets the small mark rather than half of the big one.
+   */
+  variant?: "full" | "compact";
 }
 
 export function AsciiLogo({
   word,
   revealDuration = REVEAL_DURATION_MS,
+  variant = "full",
 }: AsciiLogoProps) {
-  const logoLines = createLogoLines(word);
+  const logoLines = createLogoLines(word, variant);
   const fullLogo = logoLines.map(({ woop, code }) => `${woop}${code}`).join("\n");
   const { progress } = useLogoAnimation({
     text: fullLogo,
@@ -43,9 +50,16 @@ export function AsciiLogo({
   );
 }
 
-function createLogoLines(word: string): Array<{ woop: string; code: string }> {
+function createLogoLines(
+  word: string,
+  variant: "full" | "compact",
+): Array<{ woop: string; code: string }> {
   if (word.toUpperCase() !== "WOOPCODE") {
     throw new Error("AsciiLogo currently supports the WOOPCODE wordmark only.");
+  }
+
+  if (variant === "compact") {
+    return [{ woop: "WOOP", code: "CODE" }];
   }
 
   return ANSI_SHADOW_WOOP.map((woop, index) => ({
@@ -77,3 +91,10 @@ const ANSI_SHADOW_CODE = [
   "╚██████╗╚██████╔╝██████╔╝███████╗",
   " ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝",
 ] as const;
+
+/**
+ * Columns the full wordmark needs. Exported so the layout thresholds can be
+ * checked against the real figlet width instead of a copied constant.
+ */
+export const FULL_WORDMARK_COLUMNS =
+  ANSI_SHADOW_WOOP[0].length + WORD_SPACING.length + ANSI_SHADOW_CODE[0].length;

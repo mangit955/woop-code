@@ -1,5 +1,7 @@
 import { Box, Text } from "ink";
 import { colors } from "./styles/theme";
+import { planLayout } from "./layout";
+import { useTerminalSize } from "./hooks/useTerminalSize";
 
 interface HeaderProps {
   branch: string;
@@ -7,20 +9,36 @@ interface HeaderProps {
 }
 
 export function Header({ branch, provider }: HeaderProps) {
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
+
+  // Both halves used to be free to wrap, so in a narrow terminal they ran into
+  // each other and the header became two garbled rows. It stays one row now:
+  // the tagline goes first, then the branch and provider.
   return (
-    <Box justifyContent="space-between" width="100%">
-      <Box>
-        <Text bold color={colors.primary}>
+    <Box justifyContent="space-between" width="100%" flexWrap="nowrap">
+      <Box flexShrink={1} minWidth={0}>
+        <Text bold color={colors.primary} wrap="truncate-end">
           Woopcode
         </Text>
-        <Text color={colors.textMuted}> / coding agent</Text>
+        {layout.showHeaderTagline && (
+          <Text color={colors.textMuted} wrap="truncate-end">
+            {" / coding agent"}
+          </Text>
+        )}
       </Box>
 
-      <Box>
-        <Text color={colors.textMuted}>{branch}</Text>
-        <Text color={colors.textFaint}> · </Text>
-        <Text color={colors.secondary}>{provider}</Text>
-      </Box>
+      {layout.showHeaderMeta && (
+        <Box flexShrink={0}>
+          <Text color={colors.textMuted} wrap="truncate-end">
+            {branch}
+          </Text>
+          <Text color={colors.textFaint}> · </Text>
+          <Text color={colors.secondary} wrap="truncate-end">
+            {provider}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }

@@ -1,10 +1,12 @@
-import { Box, Text, useStdout } from "ink";
+import { Box, Text } from "ink";
 import type { ReactNode } from "react";
 import { AsciiLogo } from "./AsciiLogo";
 import { CapabilityRow } from "./CapabilityRow";
 import { HomeFooter } from "./HomeFooter";
 import { PromptCard } from "./PromptCard";
 import { colors } from "../styles/theme";
+import { planLayout } from "../layout";
+import { useTerminalSize } from "../hooks/useTerminalSize";
 
 export interface HomeScreenData {
   logoWord: string;
@@ -21,12 +23,6 @@ export interface HomeScreenProps extends HomeScreenData {
   renderPrompt: (placeholder: string) => ReactNode;
 }
 
-const LAYOUT = {
-  contentSidePadding: 4,
-  preferredPromptWidth: 68,
-  minimumPromptWidth: 28,
-} as const;
-
 /** The focused, pre-conversation experience for an agent workspace. */
 export function HomeScreen({
   logoWord,
@@ -38,37 +34,43 @@ export function HomeScreen({
   provider,
   renderPrompt,
 }: HomeScreenProps) {
-  const { stdout } = useStdout();
-  const terminalWidth = stdout.columns ?? LAYOUT.preferredPromptWidth;
-  const promptWidth = Math.min(
-    LAYOUT.preferredPromptWidth,
-    Math.max(LAYOUT.minimumPromptWidth, terminalWidth - LAYOUT.contentSidePadding),
-  );
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
 
   return (
     <Box flexDirection="column" flexGrow={1} justifyContent="space-between">
       <Box flexGrow={1} flexDirection="column" justifyContent="center">
-        <Box flexDirection="column" alignItems="center">
-          <AsciiLogo word={logoWord} />
-          <Box marginTop={1} marginBottom={3}>
-            <Text color={colors.textMuted}>{subtitle}</Text>
+        {layout.wordmark !== "hidden" && (
+          <Box flexDirection="column" alignItems="center">
+            <AsciiLogo word={logoWord} variant={layout.wordmark} />
+            {layout.showSubtitle && (
+              <Box marginTop={1} marginBottom={layout.rhythm}>
+                <Text color={colors.textMuted} wrap="truncate-end">
+                  {subtitle}
+                </Text>
+              </Box>
+            )}
           </Box>
-        </Box>
+        )}
 
-        <Box justifyContent="center" width="100%" marginTop={3}>
-          <PromptCard width={promptWidth} examples={promptExamples}>
+        <Box justifyContent="center" width="100%" marginTop={layout.rhythm}>
+          <PromptCard width={layout.contentWidth} examples={promptExamples}>
             {renderPrompt}
           </PromptCard>
         </Box>
 
-        <Box justifyContent="center" width="100%" marginTop={1}>
-          <CapabilityRow capabilities={capabilities} />
-        </Box>
+        {layout.showCapabilities && (
+          <Box justifyContent="center" width="100%" marginTop={1}>
+            <CapabilityRow capabilities={capabilities} />
+          </Box>
+        )}
       </Box>
 
-      <Box width="100%" marginBottom={1}>
-        <HomeFooter />
-      </Box>
+      {layout.showHomeFooter && (
+        <Box width="100%" marginBottom={1}>
+          <HomeFooter />
+        </Box>
+      )}
     </Box>
   );
 }

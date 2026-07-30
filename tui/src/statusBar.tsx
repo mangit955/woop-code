@@ -2,6 +2,8 @@ import { Box, Text } from "ink";
 import { useUIStore } from "./store/useUIStore";
 import { colors } from "./styles/theme";
 import { StatusSpinner } from "./components/StatusSpinner";
+import { useTerminalSize } from "./hooks/useTerminalSize";
+import { planLayout, truncateStart } from "./layout";
 
 const workspacePath = process.cwd().replace(process.env.HOME ?? "", "~");
 
@@ -12,19 +14,30 @@ type StatusState = "ready" | "thinking" | "tool" | "error" | "cancelled";
 interface StatusBarProps {
   status: StatusState;
   message?: string;
+  /** Hidden in narrow terminals, where they used to collide with the label. */
+  showKeyHints?: boolean;
+  /** Columns the label may use before it has to give way to the hints. */
+  labelWidth?: number;
 }
 
-export function StatusBar({ status, message }: StatusBarProps) {
+export function StatusBar({
+  status,
+  message,
+  showKeyHints = true,
+  labelWidth,
+}: StatusBarProps) {
   return (
     <Box justifyContent="space-between" width="100%">
-      <Box gap={1}>
+      <Box gap={1} flexShrink={1} minWidth={0}>
         <StatusIcon status={status} />
-        <StatusLabel status={status} message={message} />
+        <StatusLabel status={status} message={message} labelWidth={labelWidth} />
       </Box>
-      <Box gap={2} flexShrink={0}>
-        <Text color={colors.textFaint}>↑↓ scroll</Text>
-        <Text color={colors.textFaint}>ctrl+c</Text>
-      </Box>
+      {showKeyHints && (
+        <Box gap={2} flexShrink={0}>
+          <Text color={colors.textFaint}>↑↓ scroll</Text>
+          <Text color={colors.textFaint}>ctrl+c</Text>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -42,27 +55,62 @@ function StatusIcon({ status }: { status: StatusState }) {
 function StatusLabel({
   status,
   message,
+  labelWidth,
 }: {
   status: StatusState;
   message?: string;
+  labelWidth?: number;
 }) {
   if (status === "ready") {
-    return <Text color={colors.textMuted}>{workspacePath}</Text>;
+    // The last segment is the useful part of a path, so trim from the front.
+    return (
+      <Text color={colors.textMuted} wrap="truncate-end">
+        {labelWidth ? truncateStart(workspacePath, labelWidth) : workspacePath}
+      </Text>
+    );
   }
   if (status === "error")
-    return <Text color={colors.dangerBase}>{message ?? "Error"}</Text>;
+    return (
+      <Text color={colors.dangerBase} wrap="truncate-end">
+        {message ?? "Error"}
+      </Text>
+    );
   if (status === "cancelled")
-    return <Text color={colors.textMuted}>{message ?? "Cancelled"}</Text>;
+    return (
+      <Text color={colors.textMuted} wrap="truncate-end">
+        {message ?? "Cancelled"}
+      </Text>
+    );
   // thinking or tool — animated, show message
-  return <Text color={colors.textMuted}>{message}</Text>;
+  return (
+    <Text color={colors.textMuted} wrap="truncate-end">
+      {message}
+    </Text>
+  );
 }
 
 // ─── Connected wrapper (reads from store) ────────────────────────────────────
 
+/** Columns the spinner, gaps, and "↑↓ scroll  ctrl+c" hints occupy. */
+const HINTS_AND_ICON_COLUMNS = 28;
+
 export function ConnectedStatusBar() {
   const { status } = useUIStore();
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
   const { state, message } = parseStatus(status);
-  return <StatusBar status={state} message={message} />;
+
+  return (
+    <StatusBar
+      status={state}
+      message={message}
+      showKeyHints={layout.showKeyHints}
+      labelWidth={Math.max(
+        1,
+        width - (layout.showKeyHints ? HINTS_AND_ICON_COLUMNS : 12),
+      )}
+    />
+  );
 }
 
 function parseStatus(raw: string): { state: StatusState; message?: string } {

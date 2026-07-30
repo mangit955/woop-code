@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { colors } from "../styles/theme";
 import { getModelDisplayName } from "../../../config/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
+import { planLayout } from "../layout";
+import { useTerminalSize } from "../hooks/useTerminalSize";
 
 /**
  * Fast enough that the tenths digit reads as a running clock, slow enough that
@@ -51,6 +53,8 @@ export function TurnFooter({
   const running = endedAt === null;
   const [now, setNow] = useState(() => Date.now());
   const [pulse, setPulse] = useState(0);
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
 
   useEffect(() => {
     if (!running) return;
@@ -72,14 +76,25 @@ export function TurnFooter({
     ? pulseColors[pulse]
     : outcomeColors[outcome ?? "completed"];
 
+  // One row, always. Wrapping this split "Build · Gemini 2.5 Flash Lite · 3.5s"
+  // across three lines in a narrow terminal; the model name gives up columns and
+  // then disappears, while the agent and the clock stay.
   return (
-    <Box flexDirection="row" gap={1} marginBottom={1} flexShrink={0}>
+    <Box flexDirection="row" gap={1} marginBottom={1} flexShrink={0} flexWrap="nowrap">
       <Text color={markerColor}>▪</Text>
       <Text bold color={colors.textBase}>
         {agent}
       </Text>
-      <Text color={colors.textFaint}>·</Text>
-      <Text color={colors.textMuted}>{getModelDisplayName(model)}</Text>
+      {layout.showTurnModel && (
+        <>
+          <Text color={colors.textFaint}>·</Text>
+          <Box flexShrink={1} minWidth={0}>
+            <Text color={colors.textMuted} wrap="truncate-end">
+              {getModelDisplayName(model)}
+            </Text>
+          </Box>
+        </>
+      )}
       <Text color={colors.textFaint}>·</Text>
       <Text color={colors.textMuted}>{formatDuration(elapsed)}</Text>
       {outcome === "cancelled" && (

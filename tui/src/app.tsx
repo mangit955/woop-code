@@ -15,6 +15,7 @@ import type { ActiveTurn, TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { colors } from "./styles/theme";
+import { planLayout } from "./layout";
 import { getModelDisplayName } from "../../config/client";
 
 interface AppProps {
@@ -27,6 +28,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const state = useUIStore();
   const [promptValue, setPromptValue] = useState("");
   const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
   const showHome = state.timeline.length === 0;
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
@@ -39,6 +41,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
     onValueChange: setPromptValue,
     providerName: homeScreen.providerName,
     modelName: getModelDisplayName(state.selectedModel ?? undefined),
+    showProvider: layout.showComposerProvider,
   };
 
   return (
@@ -68,7 +71,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           <HomeScreen
             {...homeScreen}
             renderPrompt={(placeholder) => (
-              <Prompt {...promptProps} placeholder={placeholder} variant="block" />
+              <Prompt {...promptProps} placeholder={placeholder} variant={layout.composer} />
             )}
           />
         ) : hasPendingEdit ? (
@@ -108,11 +111,19 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         )}
       </Box>
 
-      {/* Footer — pinned at bottom */}
+      {/* Footer — pinned at bottom. Its rows are fixed, so in a short terminal
+          the decorations come off before the input does: the status bar first,
+          then the surrounding gap, then the border itself. */}
       {!showHome && !hasPendingEdit && !hasPendingCommand && !hasPendingQuestion && (
-        <Box flexDirection="column" flexShrink={0} paddingX={1} gap={1} marginBottom={1}>
-          <Prompt {...promptProps} variant="block" />
-          <ConnectedStatusBar />
+        <Box
+          flexDirection="column"
+          flexShrink={0}
+          paddingX={1}
+          gap={layout.showStatusBar ? 1 : 0}
+          marginBottom={layout.showStatusBar ? 1 : 0}
+        >
+          <Prompt {...promptProps} variant={layout.composer} />
+          {layout.showStatusBar && <ConnectedStatusBar />}
         </Box>
       )}
         </>

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Box, Text } from "ink";
-import { lexer, type Token } from "marked";
+import type { Token } from "marked";
+import { lexMarkdown } from "../markdown-lexer";
 import { Markdown } from "./Markdown";
 
 interface MessageRendererProps {
@@ -57,7 +58,7 @@ export function MessageRenderer({ content }: MessageRendererProps) {
 
     try {
       const healed = healMarkdown(content);
-      return lexer(healed);
+      return lexMarkdown(healed);
     } catch {
       // If marked fails for any reason, fall back to plain text
       return [

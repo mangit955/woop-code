@@ -141,3 +141,73 @@ describe("UIStore headless mode", () => {
     await expect(store.setPendingCommand(command)).resolves.toBe(false);
   });
 });
+
+describe("UIStore turn footer", () => {
+  const turn = { agent: "Build", model: "gemini-2.0-flash", startedAt: 1_000 };
+
+  test("keeps the running turn out of the timeline so it renders last", () => {
+    const store = new UIStore();
+    store.addUserMessage("explain this repo");
+    store.startTurn(turn);
+
+    // Held aside rather than appended: anything the turn adds next has to land
+    // above the footer, not below it.
+    expect(store.getState().activeTurn).toMatchObject(turn);
+    expect(store.getState().timeline.map((item) => item.type)).toEqual(["user"]);
+  });
+
+  test("freezes the elapsed time into the timeline when the turn ends", () => {
+    const store = new UIStore();
+    store.addUserMessage("explain this repo");
+    store.startTurn(turn);
+    store.startTool({ id: "tool-1", name: "read_file", arguments: { path: "cli.ts" } });
+    store.finishTurn("completed", 4_500);
+
+    expect(store.getState().activeTurn).toBeNull();
+    expect(store.getState().timeline.map((item) => item.type)).toEqual([
+      "user",
+      "tool",
+      "turn",
+    ]);
+
+    const footer = store.getState().timeline.at(-1);
+    expect(footer).toMatchObject({
+      type: "turn",
+      agent: "Build",
+      model: "gemini-2.0-flash",
+      startedAt: 1_000,
+      endedAt: 4_500,
+      outcome: "completed",
+    });
+  });
+
+  test("records how the turn ended", () => {
+    const store = new UIStore();
+
+    store.startTurn(turn);
+    store.finishTurn("cancelled", 2_000);
+    store.startTurn({ ...turn, startedAt: 3_000 });
+    store.finishTurn("error", 3_200);
+
+    expect(
+      store.getState().timeline.map((item) => item.type === "turn" && item.outcome),
+    ).toEqual(["cancelled", "error"]);
+  });
+
+  test("ignores a finish without a turn in flight", () => {
+    const store = new UIStore();
+    store.finishTurn("completed");
+
+    expect(store.getState().timeline).toEqual([]);
+    expect(store.getState().activeTurn).toBeNull();
+  });
+
+  test("drops the running turn when the conversation is cleared", () => {
+    const store = new UIStore();
+    store.startTurn(turn);
+    store.clearTimeline();
+
+    expect(store.getState().activeTurn).toBeNull();
+    expect(store.getState().timeline).toEqual([]);
+  });
+});

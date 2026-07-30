@@ -1,0 +1,99 @@
+import { Box, Text } from "ink";
+import { useEffect, useState } from "react";
+import { colors } from "../styles/theme";
+import { getModelDisplayName } from "../../../config/client";
+import type { TurnIdentity, TurnOutcome } from "../types";
+
+/**
+ * Fast enough that the tenths digit reads as a running clock, slow enough that
+ * it costs a fraction of what streaming tokens already cost per second.
+ */
+const TICK_INTERVAL_MS = 100;
+const PULSE_INTERVAL_MS = 240;
+
+/** Breathes the marker while the turn is in flight. */
+const pulseColors = ["#1e40af", "#2563eb", "#3b82f6", "#60a5fa", "#3b82f6", "#2563eb"] as const;
+
+const outcomeColors: Record<TurnOutcome, string> = {
+  completed: colors.primary,
+  cancelled: colors.textMuted,
+  error: colors.dangerBase,
+};
+
+/**
+ * Under a minute the tenths matter — most turns live there and the digit is the
+ * only sign the clock is moving. Past that they are noise.
+ */
+export function formatDuration(milliseconds: number) {
+  const seconds = Math.max(0, milliseconds) / 1000;
+
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${Math.floor(seconds % 60)}s`;
+}
+
+interface TurnFooterProps extends TurnIdentity {
+  /** Null while the turn is running, which is what starts the clock. */
+  endedAt: number | null;
+  outcome: TurnOutcome | null;
+}
+
+export function TurnFooter({
+  agent,
+  model,
+  startedAt,
+  endedAt,
+  outcome,
+}: TurnFooterProps) {
+  const running = endedAt === null;
+  const [now, setNow] = useState(() => Date.now());
+  const [pulse, setPulse] = useState(0);
+
+  useEffect(() => {
+    if (!running) return;
+
+    const clock = setInterval(() => setNow(Date.now()), TICK_INTERVAL_MS);
+    const breathing = setInterval(
+      () => setPulse((frame) => (frame + 1) % pulseColors.length),
+      PULSE_INTERVAL_MS,
+    );
+
+    return () => {
+      clearInterval(clock);
+      clearInterval(breathing);
+    };
+  }, [running]);
+
+  const elapsed = (endedAt ?? now) - startedAt;
+  const markerColor = running
+    ? pulseColors[pulse]
+    : outcomeColors[outcome ?? "completed"];
+
+  return (
+    <Box flexDirection="row" gap={1} marginBottom={1} flexShrink={0}>
+      <Text color={markerColor}>▪</Text>
+      <Text bold color={colors.textBase}>
+        {agent}
+      </Text>
+      <Text color={colors.textFaint}>·</Text>
+      <Text color={colors.textMuted}>{getModelDisplayName(model)}</Text>
+      <Text color={colors.textFaint}>·</Text>
+      <Text color={colors.textMuted}>{formatDuration(elapsed)}</Text>
+      {outcome === "cancelled" && (
+        <>
+          <Text color={colors.textFaint}>·</Text>
+          <Text color={colors.textMuted}>cancelled</Text>
+        </>
+      )}
+      {outcome === "error" && (
+        <>
+          <Text color={colors.textFaint}>·</Text>
+          <Text color={colors.dangerBase}>failed</Text>
+        </>
+      )}
+    </Box>
+  );
+}

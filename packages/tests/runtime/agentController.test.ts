@@ -53,6 +53,8 @@ mock.module("../../../config/client", () => ({
 // Mock the UI store
 const mockStore = {
   addUserMessage: mock(() => {}),
+  startTurn: mock(() => {}),
+  finishTurn: mock(() => {}),
   setStatus: mock(() => {}),
   startAssistantMessage: mock(() => {}),
   appendAssistantText: mock(() => {}),

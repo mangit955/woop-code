@@ -1,9 +1,10 @@
-import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, UIState } from "../types";
+import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
 export class UIStore {
   private state: UIState = {
     timeline: [],
+    activeTurn: null,
     status: "Ready",
     isThinking: false,
     modelPickerOpen: false,
@@ -80,6 +81,49 @@ export class UIStore {
           id: crypto.randomUUID(),
           type: "user",
           content,
+        },
+      ],
+    };
+
+    this.emit();
+  }
+
+  /**
+   * Opens the footer that reports agent, model, and elapsed time for the turn
+   * about to run. It lives outside the timeline while in flight so it stays
+   * below whatever the turn appends next.
+   */
+  startTurn(turn: TurnIdentity) {
+    this.state = {
+      ...this.state,
+      activeTurn: { id: crypto.randomUUID(), ...turn },
+    };
+
+    this.emit();
+  }
+
+  /**
+   * Freezes the footer into the timeline at the position it reached, so the
+   * final elapsed time stays readable in scrollback while the next turn starts
+   * its own footer below it.
+   */
+  finishTurn(outcome: TurnOutcome, endedAt = Date.now()) {
+    const active = this.state.activeTurn;
+    if (!active) return;
+
+    const { id, ...identity } = active;
+
+    this.state = {
+      ...this.state,
+      activeTurn: null,
+      timeline: [
+        ...this.state.timeline,
+        {
+          id,
+          type: "turn",
+          ...identity,
+          endedAt,
+          outcome,
         },
       ],
     };
@@ -389,6 +433,7 @@ export class UIStore {
     this.state = {
       ...this.state,
       timeline: [],
+      activeTurn: null,
       status: "Ready",
       isThinking: false,
       pendingEditScrollOffset: 0,

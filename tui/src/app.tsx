@@ -11,7 +11,7 @@ import { ModelPicker } from "./components/ModelPicker";
 import { CommandApproval } from "./components/CommandApproval";
 import { QuestionDialog } from "./components/QuestionDialog";
 import type { AgentController } from "../../commands/agentController";
-import type { TimeLineItem } from "./types";
+import type { ActiveTurn, TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { colors } from "./styles/theme";
@@ -77,6 +77,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
             <ConversationViewport
               items={state.timeline}
               isThinking={state.isThinking}
+              activeTurn={state.activeTurn}
               scrollOffset={state.scrollOffset}
               updateKey={state}
               layoutKey={`${width}:${height}`}
@@ -98,6 +99,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           <ConversationViewport
             items={state.timeline}
             isThinking={state.isThinking}
+            activeTurn={state.activeTurn}
             scrollOffset={state.scrollOffset}
             updateKey={state}
             layoutKey={`${width}:${height}`}
@@ -122,6 +124,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
 interface ConversationViewportProps {
   items: TimeLineItem[];
   isThinking: boolean;
+  activeTurn: ActiveTurn | null;
   scrollOffset: number;
   updateKey: object;
   layoutKey: string;
@@ -136,6 +139,7 @@ interface ConversationViewportProps {
 function ConversationViewport({
   items,
   isThinking,
+  activeTurn,
   scrollOffset,
   updateKey,
   layoutKey,
@@ -185,7 +189,7 @@ function ConversationViewport({
         flexShrink={0}
         marginBottom={-scrollOffset}
       >
-        <Timeline items={items} isThinking={isThinking} />
+        <Timeline items={items} isThinking={isThinking} activeTurn={activeTurn} />
       </Box>
     </Box>
   );

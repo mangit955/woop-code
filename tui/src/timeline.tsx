@@ -1,21 +1,36 @@
 import { Box, Text } from "ink";
 import { memo } from "react";
-import type { TimeLineItem } from "./types";
+import type { ActiveTurn, TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
+import { TurnFooter } from "./components/TurnFooter";
 import { colors } from "./styles/theme";
 
 interface TimelineProps {
   items: TimeLineItem[];
   isThinking: boolean;
+  activeTurn: ActiveTurn | null;
 }
 
-export function Timeline({ items, isThinking }: TimelineProps) {
+export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
   return (
     <Box flexDirection="column" flexShrink={0}>
       {items.map((item) => (
         <TimelineItem key={item.id} item={item} />
       ))}
+      {/* Rendered after the items rather than as one of them: the running turn's
+          footer has to stay below whatever the turn appends next, which is what
+          walks it down the transcript toward the composer. */}
+      {activeTurn && (
+        <TurnFooter
+          key={activeTurn.id}
+          agent={activeTurn.agent}
+          model={activeTurn.model}
+          startedAt={activeTurn.startedAt}
+          endedAt={null}
+          outcome={null}
+        />
+      )}
     </Box>
   );
 }
@@ -60,6 +75,17 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
             <Text color={colors.textMuted}>{item.content}</Text>
           </Box>
         </Box>
+      );
+
+    case "turn":
+      return (
+        <TurnFooter
+          agent={item.agent}
+          model={item.model}
+          startedAt={item.startedAt}
+          endedAt={item.endedAt}
+          outcome={item.outcome}
+        />
       );
 
     case "tool": {

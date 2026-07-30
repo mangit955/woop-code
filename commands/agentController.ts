@@ -106,10 +106,19 @@ export class AgentController {
 
     // Update UI before starting the agent
     store.addUserMessage(prompt);
+    // Opened here rather than after the first token so the footer appears
+    // directly under the prompt the moment the turn starts, then travels down
+    // as the turn appends tool rows and assistant text beneath it.
+    store.startTurn({
+      agent: "Build",
+      model: this.model,
+      startedAt: Date.now(),
+    });
     store.setStatus("Thinking...");
 
     let response = "";
     let agentLoopStarted = false;
+    let failed = false;
 
     try {
       const client = createProviderClient(this.provider, this.apiKey, this.model);
@@ -150,11 +159,15 @@ export class AgentController {
           error instanceof Error ? error : new Error(String(error)),
         );
       }
+      failed = true;
       await this.persist();
       throw error;
     } finally {
       this.abortController = null;
       this.isRunning = false;
+      store.finishTurn(
+        this.wasCancelled ? "cancelled" : failed ? "error" : "completed",
+      );
     }
     this.pendingAssistantText = null;
     if (this.wasCancelled) {

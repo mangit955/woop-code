@@ -10,11 +10,17 @@ Woopcode runs where you work: in the terminal and inside the current repository.
 
 > **Status:** an early-stage project with a production-ready Google Gemini workflow. Other provider entries may appear in configuration, but Google Gemini is the only runtime provider currently implemented.
 
+## Demo
+
+<video src="https://raw.githubusercontent.com/mangit955/woop-code/main/public/intro.mp4" controls muted loop width="800"></video>
+
+If the player does not load, [watch the intro clip](public/intro.mp4).
+
 ## Why Woopcode
 
 | | |
 |---|---|
-| **Repository-aware** | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. |
+| **Repository-aware** | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. Repository context is budgeted per request rather than dumped, since the agent can read any file on demand. |
 | **Terminal-first** | A focused React Ink interface with a pinned header, scrollable conversation, keyboard navigation, and no browser tab required. |
 | **Visible execution** | Streams assistant output and tool activity so you can follow the work instead of waiting behind an opaque progress screen. |
 | **Review before overwrite** | Existing-file edits and overwrites pause on a unified diff for approval. |
@@ -76,6 +82,12 @@ The conversation, provider configuration, and local state are stored in:
 - macOS and Linux: `~/.config/woopcode/`
 - Windows: `%LOCALAPPDATA%\\woopcode\\`
 
+### Session history
+
+Conversation history is written after every turn using an atomic write, so an interrupted session does not leave a half-written transcript behind. Restarting Woopcode in the same repository resumes from that history; `/new` clears it.
+
+Only user and assistant messages are persisted, capped at the most recent messages. Tool calls and their results are dropped: they are the bulk of a long transcript, they only mean something to the turn that produced them, and persisting half of a call/result pair would make the restored history invalid for the provider.
+
 ## Built-in tools
 
 Woopcode currently ships with 13 tools.
@@ -84,7 +96,7 @@ Woopcode currently ships with 13 tools.
 |---|---|---|
 | Explore | `find_files`, `glob`, `list_files`, `grep` | Locate files, patterns, directories, and text. |
 | Read | `read_file`, `web_fetch`, `web_search` | Read local files or retrieve relevant external documentation. |
-| Change | `edit_file`, `write_file`, `create_file` | Make targeted replacements, overwrite an existing file, or create a new one. |
+| Change | `edit_file`, `write_file`, `create_file` | Make targeted replacements, overwrite an existing file, or create a new one (an empty file is valid). |
 | Verify | `run_tests`, `run_terminal` | Run focused test, build, lint, or inspection commands. |
 | Collaborate | `ask_user` | Ask for clarification when a decision requires your input. |
 
@@ -105,10 +117,13 @@ Type `/` in the prompt to browse and autocomplete commands.
 | `/provider [name]` | View or switch the configured provider. |
 | `/login <provider> <api-key>` | Authenticate from inside the app. |
 | `/logout [provider]` | Remove a saved provider key. |
-| `/model` | Show the active model and available model entries. |
+| `/models` | Show the active model and the models available for the current provider. |
 | `/workspace` | Show repository, path, branch, and file count. |
 | `/status` | Show workspace, provider, session, and version details. |
+| `/version` | Show the Woopcode version. |
 | `/exit` | Quit Woopcode. |
+
+Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` for `/new`, `/p` for provider, `/m` or `/model` for models, `/v` for version, `/q` or `/quit` for exit.
 
 | Key | Action |
 |---|---|

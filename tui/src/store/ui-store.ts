@@ -1,11 +1,14 @@
 import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
 
+/** The idle status, and what a transient status reverts to. */
+export const READY_STATUS = "Ready";
+
 export class UIStore {
   private state: UIState = {
     timeline: [],
     activeTurn: null,
-    status: "Ready",
+    status: READY_STATUS,
     isThinking: false,
     modelPickerOpen: false,
     selectedModel: null,
@@ -28,6 +31,7 @@ export class UIStore {
   private questionResolvers: Map<string, { resolve: (answers: string[] | null) => void }> = new Map();
   private nonInteractive = false;
   private nonInteractiveApproval = false;
+  private statusResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Headless runs (`woopcode -p "..."`) have no TUI to render approval
@@ -262,7 +266,52 @@ export class UIStore {
     this.emit();
   }
 
+  /**
+   * Writes the status and cancels any scheduled reset.
+   *
+   * The cancellation is the point. Error and cancellation statuses revert to
+   * Ready on a timer, and that timer used to live in a closure the controller
+   * could not reach — so a turn starting within the window kept running while
+   * the old timer relabelled it Ready. The composer then looked idle and
+   * silently refused input, because the controller was still busy. Making every
+   * write supersede a pending reset fixes it for all callers, present and
+   * future, rather than for the one that happened to be reported.
+   */
   setStatus(status: string) {
+    this.clearStatusReset();
+    this.applyStatus(status);
+  }
+
+  /**
+   * A status that reverts to Ready after `resetAfterMs` unless something else
+   * happens first — used for terminal notices the user should have a moment to
+   * read. Replaces any reset already pending.
+   */
+  setTransientStatus(status: string, resetAfterMs: number) {
+    this.setStatus(status);
+
+    this.statusResetTimer = setTimeout(() => {
+      this.statusResetTimer = null;
+      // Only revert what this timer actually set. Belt and braces next to the
+      // clearing above, and it keeps a late timer from touching a status that
+      // has since moved on.
+      if (this.state.status !== status) return;
+      this.applyStatus(READY_STATUS);
+    }, resetAfterMs);
+
+    // A pending reset must never hold the process open on its own.
+    this.statusResetTimer.unref?.();
+  }
+
+  /** Drops a pending reset, leaving the current status in place. */
+  clearStatusReset() {
+    if (!this.statusResetTimer) return;
+
+    clearTimeout(this.statusResetTimer);
+    this.statusResetTimer = null;
+  }
+
+  private applyStatus(status: string) {
     const isThinking = status.toLowerCase().includes("thinking");
     this.state = { ...this.state, status, isThinking };
     this.emit();
@@ -460,13 +509,16 @@ export class UIStore {
     this.clearPendingEdit();
     this.clearPendingCommand();
     this.cancelPendingQuestion();
+    // This sets the status directly, so a pending reset would be redundant at
+    // best and would fire over a later status at worst.
+    this.clearStatusReset();
     this.maxScrollOffset = 0;
     this.maxPendingEditScrollOffset = 0;
     this.state = {
       ...this.state,
       timeline: [],
       activeTurn: null,
-      status: "Ready",
+      status: READY_STATUS,
       isThinking: false,
       pendingEditScrollOffset: 0,
       pendingCommand: null,

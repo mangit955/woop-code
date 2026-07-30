@@ -17,7 +17,9 @@ import { CallbackSpy } from "../shared/mocks";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
-mock.module("../../../tools", () => ({ getTool }));
+// Keep the real registry exports; only tool lookup is faked.
+const actualTools = await import("../../../tools");
+mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
 /**
  * PROPERTY-BASED TESTS FOR RUNTIME

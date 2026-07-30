@@ -71,6 +71,10 @@ export class AgentController {
     return this.provider;
   }
 
+  getModel() {
+    return this.model;
+  }
+
   async run(prompt: string) {
     if (this.isRunning) {
       return;
@@ -146,6 +150,7 @@ export class AgentController {
           error instanceof Error ? error : new Error(String(error)),
         );
       }
+      await this.persist();
       throw error;
     } finally {
       this.abortController = null;
@@ -157,6 +162,11 @@ export class AgentController {
     } else {
       this.pendingUserMessage = null;
     }
+
+    // Persist per turn rather than only on disposal: a crash, a killed
+    // terminal or a machine losing power would otherwise discard the whole
+    // session, and there is nothing else that would have written it.
+    await this.persist();
 
     return response;
   }
@@ -178,7 +188,24 @@ export class AgentController {
       this.pendingAssistantText = null;
     }
 
-    await saveConversation(this.conversation);
+    await this.persist();
+  }
+
+  /**
+   * Writes the conversation to disk. Failures are reported but never thrown:
+   * losing history is bad, but it must not take down a turn that otherwise
+   * succeeded.
+   */
+  private async persist() {
+    try {
+      await saveConversation(this.conversation);
+    } catch (error) {
+      this.callbacks.onError?.(
+        new Error(
+          `Could not save conversation history: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+    }
   }
 
   cancel() {

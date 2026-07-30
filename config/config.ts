@@ -117,13 +117,40 @@ export async function getConversation(): Promise<Message[]> {
   );
 }
 
+/**
+ * How many messages are kept on disk. History exists to give a new session
+ * context, not to be a complete archive, and the provider is only sent a few
+ * recent turns anyway (see recentMessages).
+ */
+export const MAX_PERSISTED_MESSAGES = 100;
+
+/**
+ * Trims a conversation to what is worth keeping between sessions.
+ *
+ * Tool calls and their results are dropped: they are the bulk of a long
+ * transcript, they are only meaningful to the turn that produced them, and
+ * persisting one half of a call/result pair would make the restored history
+ * invalid for the provider.
+ */
+export function prepareConversationForDisk(messages: Message[]): Message[] {
+  const conversational = messages.filter(
+    (message) => message.role === "user" || message.role === "assistant",
+  );
+
+  return conversational.slice(-MAX_PERSISTED_MESSAGES);
+}
+
 export async function saveConversation(messages: Message[]) {
   await initializeConfig();
   const conversationPath = getConversationPath();
-  await Bun.write(
-    conversationPath,
-    JSON.stringify(messages, null, 2),
-  );
+  const payload = JSON.stringify(prepareConversationForDisk(messages), null, 2);
+
+  // Saving now happens after every turn, so a crash mid-write would be much
+  // easier to hit. Write to a sibling file and rename, which is atomic on the
+  // same filesystem: readers see either the old file or the new one.
+  const temporaryPath = `${conversationPath}.tmp`;
+  await Bun.write(temporaryPath, payload);
+  renameSync(temporaryPath, conversationPath);
 }
 
 export async function appendMessage(message: any) {
@@ -134,25 +161,107 @@ export async function appendMessage(message: any) {
   await saveConversation(conversation);
 }
 
-// for context building
-export async function readPackageJson() {
-  const file = Bun.file(`${process.cwd()}/package.json`);
+// ==================== REPOSITORY CONTEXT ====================
+//
+// This context is prepended to every model request, so it is budgeted rather
+// than dumped. The agent can always read the full files on demand with
+// read_file, so anything cut here costs at most one tool call.
+
+/** Never read a context file larger than this into memory. */
+export const MAX_CONTEXT_FILE_BYTES = 512 * 1024;
+export const MAX_PACKAGE_JSON_CHARS = 2_000;
+export const MAX_README_CHARS = 4_000;
+/** Ceiling for the assembled context, applied after the per-file limits. */
+export const MAX_REPO_CONTEXT_CHARS = 8_000;
+
+/** Number of dependency names kept per section before summarising the rest. */
+const MAX_DEPENDENCIES_LISTED = 40;
+
+/**
+ * Cuts text to `limit`, preferring the last line break so the result does not
+ * end mid-line, and says what was dropped.
+ */
+export function truncate(text: string, limit: number, hint: string): string {
+  if (text.length <= limit) return text;
+
+  const slice = text.slice(0, limit);
+  const lastBreak = slice.lastIndexOf("\n");
+  const kept = lastBreak > limit * 0.5 ? slice.slice(0, lastBreak) : slice;
+  const dropped = text.length - kept.length;
+
+  return `${kept}\n… (${dropped} more characters omitted — ${hint})`;
+}
+
+/** Reads a context file, skipping anything too large to belong in a prompt. */
+async function readContextFile(path: string): Promise<string> {
+  const file = Bun.file(path);
 
   if (!(await file.exists())) {
     return "";
   }
 
-  return await file.text();
+  // Bun.file exposes the size without reading the contents, so an accidental
+  // multi-megabyte README never reaches memory.
+  if (file.size > MAX_CONTEXT_FILE_BYTES) {
+    return "";
+  }
+
+  try {
+    return await file.text();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Summarises package.json instead of inlining it. The useful signal is the
+ * project identity, its scripts and which libraries it uses — not the exact
+ * version ranges, which dominate the file and change nothing for the agent.
+ */
+export async function readPackageJson() {
+  const text = await readContextFile(`${process.cwd()}/package.json`);
+
+  if (!text) return "";
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // Malformed package.json still carries information; keep a bounded slice.
+    return truncate(text, MAX_PACKAGE_JSON_CHARS, "read package.json for the rest");
+  }
+
+  const lines: string[] = [];
+  const identity = [parsed?.name, parsed?.version].filter(Boolean).join("@");
+  if (identity) lines.push(`name: ${identity}`);
+  if (typeof parsed?.description === "string") lines.push(`description: ${parsed.description}`);
+  if (typeof parsed?.type === "string") lines.push(`type: ${parsed.type}`);
+
+  const scripts = Object.keys(parsed?.scripts ?? {});
+  if (scripts.length > 0) lines.push(`scripts: ${scripts.join(", ")}`);
+
+  for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
+    const names = Object.keys(parsed?.[field] ?? {});
+    if (names.length === 0) continue;
+
+    const listed = names.slice(0, MAX_DEPENDENCIES_LISTED);
+    const rest = names.length - listed.length;
+    lines.push(
+      `${field}: ${listed.join(", ")}${rest > 0 ? ` (+${rest} more)` : ""}`,
+    );
+  }
+
+  return truncate(
+    lines.join("\n"),
+    MAX_PACKAGE_JSON_CHARS,
+    "read package.json for the rest",
+  );
 }
 
 export async function readReadme() {
-  const file = Bun.file(`${process.cwd()}/README.md`);
+  const text = await readContextFile(`${process.cwd()}/README.md`);
 
-  if (!(await file.exists())) {
-    return "";
-  }
-
-  return await file.text();
+  return truncate(text, MAX_README_CHARS, "read README.md for the rest");
 }
 
 export async function listRepositoryFiles() {
@@ -204,24 +313,30 @@ export async function buildRepositoryContext() {
   const packageJson = await readPackageJson();
   const readme = await readReadme();
   const structure = await getProjectStructure();
-  
+
   // Don't include full file list - it can be massive and waste tokens
   // The agent has list_files and find_files tools to discover files on demand
   let contextParts = ["Repository Context"];
-  
+
   if (packageJson) {
-    contextParts.push(`\nPackage.json:\n${packageJson}`);
+    contextParts.push(`\nPackage.json (summary):\n${packageJson}`);
   }
-  
+
   if (readme) {
-    contextParts.push(`\nREADME:\n${readme}`);
+    contextParts.push(`\nREADME (may be truncated):\n${readme}`);
   }
-  
+
   if (structure) {
     contextParts.push(`\nTop-level structure:\n${structure}\n\nUse find_files or list_files to explore deeper.`);
   }
-  
-  return contextParts.join("");
+
+  // Each part is already bounded; this is the backstop that keeps the total
+  // predictable however the parts grow.
+  return truncate(
+    contextParts.join(""),
+    MAX_REPO_CONTEXT_CHARS,
+    "use read_file, find_files or list_files for anything else",
+  );
 }
 
 export function recentMessages(

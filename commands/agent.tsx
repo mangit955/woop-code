@@ -55,6 +55,10 @@ async function runHeadless(prompt: string, autoApprove: boolean) {
   let failed = false;
 
   const callbacks: AgentCallbacks = {
+    onStatus(status) {
+      // Efficiency notices are the only statuses worth surfacing headlessly.
+      if (status.startsWith("⚠️")) process.stderr.write(`${status}\n`);
+    },
     onToolStart(tool) {
       process.stderr.write(`• ${tool.name}\n`);
     },
@@ -115,8 +119,15 @@ async function runInteractive() {
       }
       // Runtime notices (such as iteration-budget warnings) are informational,
       // not terminal states. Keep the activity indicator truthful while a turn
-      // is still in progress.
-      store.setStatus(status.startsWith("⚠️") ? "Thinking..." : status);
+      // is still in progress, and show the notice itself in the transcript so
+      // it is not swallowed.
+      if (status.startsWith("⚠️")) {
+        store.addSystemMessage(status);
+        store.setStatus("Thinking...");
+        return;
+      }
+
+      store.setStatus(status);
     },
 
     onToolStart(tool) {

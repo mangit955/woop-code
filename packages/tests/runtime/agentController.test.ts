@@ -18,9 +18,9 @@ import { wait } from "../shared/helpers";
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
 
-mock.module("../../../tools", () => ({
-  getTool,
-}));
+// Keep the real registry exports; only tool lookup is faked.
+const actualTools = await import("../../../tools");
+mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
 // Mock config functions
 let mockConversation: Message[] = [];
@@ -759,5 +759,60 @@ describe("AgentController - Provider switching", () => {
 
     expect(createProviderClient).not.toHaveBeenCalled();
     expect(errors[0]?.message).toContain("No provider is logged in");
+  });
+});
+
+describe("AgentController - Persistence", () => {
+  beforeEach(() => {
+    mockConversation = [];
+    mockRepoContext = "test repo";
+    globalMockClient = new MockProviderClient();
+    mockToolRegistry.clear();
+    saveConversation.mockClear();
+  });
+
+  test("saves after every turn, not only on disposal", async () => {
+    const controller = new AgentController("google", "key", {});
+    await controller.initialize();
+
+    globalMockClient.setEvents([createTextEvent("first"), createDoneEvent()]);
+    await controller.run("One");
+    expect(saveConversation).toHaveBeenCalledTimes(1);
+
+    globalMockClient.setEvents([createTextEvent("second"), createDoneEvent()]);
+    await controller.run("Two");
+    expect(saveConversation).toHaveBeenCalledTimes(2);
+
+    // A process killed here keeps both turns.
+    const saved = saveConversation.mock.calls.at(-1)?.[0] as Message[];
+    expect(saved.filter((message) => message.role === "user")).toHaveLength(2);
+  });
+
+  test("keeps the turn on disk when the provider fails", async () => {
+    const controller = new AgentController("google", "key", {});
+    await controller.initialize();
+    globalMockClient.setThrowError(new Error("provider exploded"));
+
+    await expect(controller.run("Prompt")).rejects.toThrow("provider exploded");
+
+    expect(saveConversation).toHaveBeenCalled();
+    const saved = saveConversation.mock.calls.at(-1)?.[0] as Message[];
+    expect(saved.at(-1)).toMatchObject({ role: "user", content: "Prompt" });
+  });
+
+  test("a failed save is reported but does not fail the turn", async () => {
+    const errors: Error[] = [];
+    const controller = new AgentController("google", "key", {
+      onError: (error) => errors.push(error),
+    });
+    await controller.initialize();
+
+    saveConversation.mockImplementationOnce(async () => {
+      throw new Error("disk full");
+    });
+    globalMockClient.setEvents([createTextEvent("answer"), createDoneEvent()]);
+
+    await expect(controller.run("Prompt")).resolves.toBe("answer");
+    expect(errors[0]?.message).toContain("Could not save conversation history");
   });
 });

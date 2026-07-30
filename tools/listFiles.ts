@@ -1,9 +1,13 @@
 import type { Tool } from "../config/types";
 import { resolveWorkspacePath } from "./workspace";
+import { limitOutput, walkWorkspace } from "./scan";
+
+const MAX_RESULTS = 500;
+const MAX_TOOL_OUTPUT = 8 * 1024; // 8 KB
 
 export const listFilesTool: Tool = {
   name: "list_files",
-  description: "List all files in a directory. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.",
+  description: `List files in a directory, skipping dependency and build directories. Returns up to ${MAX_RESULTS} files. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.`,
   parameters: [
     {
       name: "path",
@@ -17,36 +21,29 @@ export const listFilesTool: Tool = {
       mustExist: true,
     });
 
-    const files: string[] = [];
+    const { files, hitResultLimit, hitEntryLimit } = await walkWorkspace(path, {
+      maxResults: MAX_RESULTS,
+    });
 
-    for await (const file of new Bun.Glob("**/*").scan(path)) {
-      const ignoredDirs = [
-        "node_modules",
-        ".git",
-        "dist",
-        "build",
-        ".next",
-        "coverage",
-      ];
-
-      if (
-        ignoredDirs.some((dir) => file === dir || file.startsWith(`${dir}/`))
-      ) {
-        continue;
-      }
-
-      files.push(file);
-    }
-    const MAX_TOOL_OUTPUT = 8 * 1024; // 8 KB
-    const output = files.join("\n");
-
-    if (output.length <= MAX_TOOL_OUTPUT) {
-      return output;
+    if (files.length === 0) {
+      return "No files found.";
     }
 
-    return (
-      output.slice(0, MAX_TOOL_OUTPUT) +
-      `\n\n... Output truncated (${output.length - MAX_TOOL_OUTPUT} more characters)`
-    );
+    const notes: string[] = [];
+    if (hitResultLimit) {
+      notes.push(
+        `Stopped after ${MAX_RESULTS} files. Pass a more specific path, or use glob/find_files to target what you need.`,
+      );
+    }
+    if (hitEntryLimit) {
+      notes.push(
+        "Stopped early: this directory tree is very large. Pass a more specific path.",
+      );
+    }
+
+    // Truncate the listing first so the notes always survive the byte cap.
+    const listing = limitOutput(files.join("\n"), MAX_TOOL_OUTPUT);
+
+    return [listing, ...notes].join("\n\n");
   },
 };

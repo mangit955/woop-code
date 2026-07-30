@@ -18,19 +18,25 @@ export async function agentLoop(
   const MAX_ITERATIONS = 20; // Allow complex tasks to complete
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
   const SAME_TOOL_THRESHOLD = 4;
-  
+  /** Tools actually run before the turn is nudged toward implementing. */
+  const TOOLS_BEFORE_EFFICIENCY_WARNING = 6;
+
   const executedTools = new Map<string, number>();
 
   let iterations = 0;
+  // One iteration is one provider response, which can carry several tool calls
+  // or none at all, so tool usage has to be counted where tools are actually
+  // run rather than inferred from the loop counter.
+  let toolCallsExecuted = 0;
+  let efficiencyWarningSent = false;
 
   try {
     while (iterations < MAX_ITERATIONS) {
       iterations++;
-      
-      // Warn the agent about efficiency at key milestones
-      if (iterations === 6) {
-        callbacks.onStatus?.(`⚠️  ${iterations} tools used - start implementing now to conserve quota`);
-      } else if (iterations === MAX_ITERATIONS - 5) {
+
+      // This one is about the loop budget, so the iteration counter is the
+      // right measure.
+      if (iterations === MAX_ITERATIONS - 5) {
         callbacks.onStatus?.(`⚠️  ${MAX_ITERATIONS - iterations} iterations remaining - prioritize completion`);
       }
 
@@ -114,6 +120,7 @@ export async function agentLoop(
         }
 
         executedTools.set(toolKey, callCount + 1);
+        toolCallsExecuted++;
         callbacks.onToolStart?.({
           id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments,
         });
@@ -166,6 +173,16 @@ export async function agentLoop(
         messages.push({
           role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: toolResult,
         } as Message);
+      }
+
+      // Reported once, after the tools of this iteration have run, so the
+      // count is what was actually used rather than how many times the model
+      // has been asked to respond.
+      if (!efficiencyWarningSent && toolCallsExecuted >= TOOLS_BEFORE_EFFICIENCY_WARNING) {
+        efficiencyWarningSent = true;
+        callbacks.onStatus?.(
+          `⚠️  ${toolCallsExecuted} tools used - start implementing now to conserve quota`,
+        );
       }
     }
 

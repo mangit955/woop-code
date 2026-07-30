@@ -14,6 +14,7 @@ import type { AgentController } from "../../commands/agentController";
 import type { ActiveTurn, TimeLineItem } from "./types";
 import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
+import { useCancelKey } from "./hooks/useCancelKey";
 import { colors } from "./styles/theme";
 import { planLayout } from "./layout";
 import { getModelDisplayName } from "../../config/client";
@@ -33,6 +34,10 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
   const hasPendingQuestion = state.pendingQuestion !== null;
+
+  // Registered here because App is the only component that is always mounted.
+  // Every modal below replaces the composer, which is where this used to live.
+  useCancelKey({ controller, onExit });
 
   const promptProps = {
     controller,

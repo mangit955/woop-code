@@ -424,6 +424,38 @@ export class UIStore {
     this.emit();
   }
 
+  /** True when a modal owns the screen, so global keys can tell. */
+  hasOpenModal() {
+    const { modelPickerOpen, pendingCommand, pendingQuestion, pendingEdit } = this.state;
+    return modelPickerOpen || pendingCommand !== null || pendingQuestion !== null || pendingEdit !== null;
+  }
+
+  /**
+   * Closes whichever modal is on top, in the order the app renders them, and
+   * reports whether there was anything to close. Approvals resolve as declined
+   * rather than rejecting: the user dismissed the window, which is an answer,
+   * not a failure the tool should hear about as an error.
+   */
+  dismissTopModal() {
+    if (this.state.modelPickerOpen) {
+      this.closeModelPicker();
+      return true;
+    }
+    if (this.state.pendingCommand) {
+      this.rejectPendingCommand();
+      return true;
+    }
+    if (this.state.pendingQuestion) {
+      this.cancelPendingQuestion();
+      return true;
+    }
+    if (this.state.pendingEdit) {
+      this.rejectPendingEdit();
+      return true;
+    }
+    return false;
+  }
+
   clearTimeline() {
     this.clearPendingEdit();
     this.clearPendingCommand();

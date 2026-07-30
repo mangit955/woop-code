@@ -16,7 +16,9 @@ interface PromptProps {
   onValueChange: (value: string) => void;
   providerName?: string;
   modelName?: string;
-  variant?: "default" | "block";
+  variant?: "default" | "inline" | "block";
+  /** Dropped first when the composer runs out of columns. */
+  showProvider?: boolean;
 }
 
 export function Prompt({
@@ -28,6 +30,7 @@ export function Prompt({
   providerName,
   modelName,
   variant = "default",
+  showProvider = true,
 }: PromptProps) {
   const isExiting = useRef(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -191,7 +194,7 @@ export function Prompt({
     }
   }
 
-  if (variant === "default") {
+  if (variant === "default" || variant === "inline") {
     return (
       <Box flexDirection="column" width="100%" position="relative">
         {slashMatches.length > 0 && (
@@ -257,11 +260,24 @@ export function Prompt({
               onSubmit={handleSubmit}
             />
           </Box>
-          <Box marginTop={1}>
-            <Text color={colors.primary}>Build</Text>
-            <Text color={colors.textFaint}>{" · "}</Text>
-            <Text color={colors.textBase}>{modelName ?? "Model"}</Text>
-            <Text color={colors.textFaint}> Google</Text>
+          {/* One row, never two: wrapping this line used to push the model name
+              through the card's bottom border. The agent label stays whole and
+              the model name gives up characters instead. */}
+          <Box marginTop={1} flexDirection="row" flexWrap="nowrap">
+            <Box flexShrink={0}>
+              <Text color={colors.primary}>Build</Text>
+              <Text color={colors.textFaint}>{" · "}</Text>
+            </Box>
+            <Box flexShrink={1} minWidth={0}>
+              <Text color={colors.textBase} wrap="truncate-end">
+                {modelName ?? "Model"}
+              </Text>
+            </Box>
+            {showProvider && (
+              <Box flexShrink={0}>
+                <Text color={colors.textFaint}> Google</Text>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>

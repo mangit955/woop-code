@@ -12,19 +12,17 @@ Woopcode runs where you work: in the terminal and inside the current repository.
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/mangit955/woop-code/main/public/intro.mp4" controls muted loop width="800"></video>
-
-If the player does not load, [watch the intro clip](public/intro.mp4).
+<video src="https://github.com/user-attachments/assets/85d6c423-cf58-4a1c-b3ce-ed4ddbd22055" autoplay loop muted playsinline controls width="800"></video>
 
 ## Why Woopcode
 
-| | |
-|---|---|
-| **Repository-aware** | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. Repository context is budgeted per request rather than dumped, since the agent can read any file on demand. |
-| **Terminal-first** | A focused React Ink interface with a pinned header, scrollable conversation, keyboard navigation, and no browser tab required. |
-| **Visible execution** | Streams assistant output and tool activity so you can follow the work instead of waiting behind an opaque progress screen. |
-| **Review before overwrite** | Existing-file edits and overwrites pause on a unified diff for approval. |
-| **Practical guardrails** | Detects duplicate tool calls, limits tool iterations, supports cancellation, and returns recoverable tool errors to the agent. |
+|                             |                                                                                                                                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Repository-aware**        | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. Repository context is budgeted per request rather than dumped, since the agent can read any file on demand. |
+| **Terminal-first**          | A focused React Ink interface with a pinned header, scrollable conversation, keyboard navigation, and no browser tab required.                                                                                                          |
+| **Visible execution**       | Streams assistant output and tool activity so you can follow the work instead of waiting behind an opaque progress screen.                                                                                                              |
+| **Review before overwrite** | Existing-file edits and overwrites pause on a unified diff for approval.                                                                                                                                                                |
+| **Practical guardrails**    | Detects duplicate tool calls, limits tool iterations, supports cancellation, and returns recoverable tool errors to the agent.                                                                                                          |
 
 ## Quick start
 
@@ -92,13 +90,13 @@ Only user and assistant messages are persisted, capped at the most recent messag
 
 Woopcode currently ships with 13 tools.
 
-| Area | Tools | Purpose |
-|---|---|---|
-| Explore | `find_files`, `glob`, `list_files`, `grep` | Locate files, patterns, directories, and text. |
-| Read | `read_file`, `web_fetch`, `web_search` | Read local files or retrieve relevant external documentation. |
-| Change | `edit_file`, `write_file`, `create_file` | Make targeted replacements, overwrite an existing file, or create a new one (an empty file is valid). |
-| Verify | `run_tests`, `run_terminal` | Run focused test, build, lint, or inspection commands. |
-| Collaborate | `ask_user` | Ask for clarification when a decision requires your input. |
+| Area        | Tools                                      | Purpose                                                                                               |
+| ----------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Explore     | `find_files`, `glob`, `list_files`, `grep` | Locate files, patterns, directories, and text.                                                        |
+| Read        | `read_file`, `web_fetch`, `web_search`     | Read local files or retrieve relevant external documentation.                                         |
+| Change      | `edit_file`, `write_file`, `create_file`   | Make targeted replacements, overwrite an existing file, or create a new one (an empty file is valid). |
+| Verify      | `run_tests`, `run_terminal`                | Run focused test, build, lint, or inspection commands.                                                |
+| Collaborate | `ask_user`                                 | Ask for clarification when a decision requires your input.                                            |
 
 ### Change safety
 
@@ -110,28 +108,28 @@ Woopcode currently ships with 13 tools.
 
 Type `/` in the prompt to browse and autocomplete commands.
 
-| Command | Description |
-|---|---|
-| `/help` | Show all available commands. |
-| `/new` | Start a new conversation. |
-| `/provider [name]` | View or switch the configured provider. |
-| `/login <provider> <api-key>` | Authenticate from inside the app. |
-| `/logout [provider]` | Remove a saved provider key. |
-| `/models` | Show the active model and the models available for the current provider. |
-| `/workspace` | Show repository, path, branch, and file count. |
-| `/status` | Show workspace, provider, session, and version details. |
-| `/version` | Show the Woopcode version. |
-| `/exit` | Quit Woopcode. |
+| Command                       | Description                                                              |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| `/help`                       | Show all available commands.                                             |
+| `/new`                        | Start a new conversation.                                                |
+| `/provider [name]`            | View or switch the configured provider.                                  |
+| `/login <provider> <api-key>` | Authenticate from inside the app.                                        |
+| `/logout [provider]`          | Remove a saved provider key.                                             |
+| `/models`                     | Show the active model and the models available for the current provider. |
+| `/workspace`                  | Show repository, path, branch, and file count.                           |
+| `/status`                     | Show workspace, provider, session, and version details.                  |
+| `/version`                    | Show the Woopcode version.                                               |
+| `/exit`                       | Quit Woopcode.                                                           |
 
 Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` for `/new`, `/p` for provider, `/m` or `/model` for models, `/v` for version, `/q` or `/quit` for exit.
 
-| Key | Action |
-|---|---|
-| `↑` / `↓` | Scroll the conversation. |
-| `Page Up` / `Page Down` | Move through the conversation by a page. |
-| `Home` / `End` | Jump to the oldest message or back to the latest one. |
-| `Ctrl+C` | Cancel an active request, or exit when idle. |
-| `Enter` / `Esc` | Apply or reject a pending file-change preview. |
+| Key                     | Action                                                |
+| ----------------------- | ----------------------------------------------------- |
+| `↑` / `↓`               | Scroll the conversation.                              |
+| `Page Up` / `Page Down` | Move through the conversation by a page.              |
+| `Home` / `End`          | Jump to the oldest message or back to the latest one. |
+| `Ctrl+C`                | Cancel an active request, or exit when idle.          |
+| `Enter` / `Esc`         | Apply or reject a pending file-change preview.        |
 
 ## Command line
 
@@ -168,14 +166,14 @@ The project is TypeScript throughout and uses:
 
 Useful implementation entry points:
 
-| Path | Responsibility |
-|---|---|
-| [`cli.ts`](cli.ts) | Command-line entry point. |
-| [`commands/agent.tsx`](commands/agent.tsx) | Interactive agent lifecycle and terminal input. |
-| [`config/runtime.ts`](config/runtime.ts) | Streaming agent loop, tool execution, recovery, and limits. |
-| [`tools/index.ts`](tools/index.ts) | Built-in tool registry and provider-name compatibility. |
-| [`tui/src/`](tui/src) | The React Ink interface, timeline, prompt, scrolling, and diff preview. |
-| [`commands/slash/README.md`](commands/slash/README.md) | Slash-command implementation notes. |
+| Path                                                   | Responsibility                                                          |
+| ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [`cli.ts`](cli.ts)                                     | Command-line entry point.                                               |
+| [`commands/agent.tsx`](commands/agent.tsx)             | Interactive agent lifecycle and terminal input.                         |
+| [`config/runtime.ts`](config/runtime.ts)               | Streaming agent loop, tool execution, recovery, and limits.             |
+| [`tools/index.ts`](tools/index.ts)                     | Built-in tool registry and provider-name compatibility.                 |
+| [`tui/src/`](tui/src)                                  | The React Ink interface, timeline, prompt, scrolling, and diff preview. |
+| [`commands/slash/README.md`](commands/slash/README.md) | Slash-command implementation notes.                                     |
 
 ## Contributing
 

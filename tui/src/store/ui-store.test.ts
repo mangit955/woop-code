@@ -275,3 +275,74 @@ describe("UIStore modal dismissal", () => {
     expect(store.dismissTopModal()).toBe(false);
   });
 });
+
+describe("UIStore status resets", () => {
+  const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  test("a transient notice reverts to Ready on its own", async () => {
+    const store = new UIStore();
+    store.setTransientStatus("Cancelled", 20);
+
+    expect(store.getState().status).toBe("Cancelled");
+
+    await tick(60);
+    expect(store.getState().status).toBe("Ready");
+    expect(store.getState().isThinking).toBe(false);
+  });
+
+  test("a new request supersedes a pending reset", async () => {
+    // The reported bug: a cancel scheduled Ready, the next turn set Thinking
+    // directly without clearing that timer, and a second later the timer
+    // relabelled the running turn Ready. The composer then looked idle while
+    // the controller was still busy and refusing input.
+    const store = new UIStore();
+    store.setTransientStatus("Cancelled", 20);
+    store.setStatus("Thinking...");
+
+    await tick(60);
+    expect(store.getState().status).toBe("Thinking...");
+    expect(store.getState().isThinking).toBe(true);
+  });
+
+  test("an error notice cannot outlive the turn that follows it", async () => {
+    const store = new UIStore();
+    store.setTransientStatus("Error: rate limited", 30);
+    store.setStatus("Thinking...");
+    store.setStatus("Working...");
+
+    await tick(70);
+    expect(store.getState().status).toBe("Working...");
+  });
+
+  test("overlapping notices leave only the newest reset pending", async () => {
+    const store = new UIStore();
+    store.setTransientStatus("Error: first", 20);
+    store.setTransientStatus("Cancelled", 90);
+
+    // The first timer must not revert the notice that replaced it.
+    await tick(50);
+    expect(store.getState().status).toBe("Cancelled");
+
+    await tick(70);
+    expect(store.getState().status).toBe("Ready");
+  });
+
+  test("clearing a reset leaves the notice on screen", async () => {
+    const store = new UIStore();
+    store.setTransientStatus("Error: boom", 20);
+    store.clearStatusReset();
+
+    await tick(60);
+    expect(store.getState().status).toBe("Error: boom");
+  });
+
+  test("starting a new conversation drops a pending reset", async () => {
+    const store = new UIStore();
+    store.setTransientStatus("Error: boom", 20);
+    store.clearTimeline();
+    store.setStatus("Thinking...");
+
+    await tick(60);
+    expect(store.getState().status).toBe("Thinking...");
+  });
+});

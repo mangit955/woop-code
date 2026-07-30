@@ -10,6 +10,10 @@ import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
 import { PassThrough } from "stream";
 
+/** How long a terminal notice stays on the status bar before reverting to Ready. */
+const ERROR_STATUS_MS = 3000;
+const CANCEL_STATUS_MS = 1000;
+
 export interface RunAgentOptions {
   /** Non-empty value switches the agent to a single headless turn. */
   prompt?: string;
@@ -106,17 +110,12 @@ async function runInteractive() {
   // Ensure provider is configured (launches onboarding if needed)
   const { provider, apiKey } = await ensureProviderConfigured();
 
-  let cancelStatusTimeout: ReturnType<typeof setTimeout> | undefined;
   const config = await getConfig();
   const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
   store.setSelectedModel(selectedModel);
 
   const callbacks: AgentCallbacks = {
     onStatus(status) {
-      if (cancelStatusTimeout) {
-        clearTimeout(cancelStatusTimeout);
-        cancelStatusTimeout = undefined;
-      }
       // Runtime notices (such as iteration-budget warnings) are informational,
       // not terminal states. Keep the activity indicator truthful while a turn
       // is still in progress, and show the notice itself in the transcript so
@@ -161,24 +160,14 @@ async function runInteractive() {
 
     onError(error) {
       store.finishAssistantMessage();
-      store.setStatus(`Error: ${error.message}`);
-      
-      // Clear error status after a few seconds so user can continue
-      if (cancelStatusTimeout) {
-        clearTimeout(cancelStatusTimeout);
-      }
-      cancelStatusTimeout = setTimeout(() => {
-        store.setStatus("Ready");
-      }, 3000); // Show error for 3 seconds then reset
+      // Long enough to read, and superseded the moment anything else happens —
+      // including the next turn starting.
+      store.setTransientStatus(`Error: ${error.message}`, ERROR_STATUS_MS);
     },
 
     onCancel() {
       store.finishAssistantMessage();
-      store.setStatus("Cancelled");
-
-      cancelStatusTimeout = setTimeout(() => {
-        store.setStatus("Ready");
-      }, 1000);
+      store.setTransientStatus("Cancelled", CANCEL_STATUS_MS);
     },
   };
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks);

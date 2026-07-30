@@ -8,6 +8,7 @@ import { store } from "../store/ui-store";
 import { colors } from "../styles/theme";
 import { planLayout, windowAround } from "../layout";
 import { useTerminalSize } from "../hooks/useTerminalSize";
+import { applyModelSelection } from "../model-selection";
 
 interface ModelPickerProps {
   controller: AgentController;
@@ -17,6 +18,8 @@ interface ModelPickerProps {
 export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
   const [query, setQuery] = useState("");
   const [showCursor, setShowCursor] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(() =>
     Math.max(0, GOOGLE_MODELS.findIndex((model) => model.id === selectedModel)),
   );
@@ -26,9 +29,16 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
   );
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
+  // A message needs a row. Where the hints are on screen it takes their slot;
+  // otherwise it costs the list a row, so the dialog still fits its budget
+  // instead of pushing its own title off the top of a short terminal.
+  const listRows = Math.max(
+    1,
+    layout.dialogListRows - (error && !layout.showDialogHints ? 1 : 0),
+  );
   // The list is longer than a short terminal can show, so scroll a window of it
   // around the selection instead of rendering rows that get clipped away.
-  const visible = windowAround(selectedIndex, matches.length, layout.dialogListRows);
+  const visible = windowAround(selectedIndex, matches.length, listRows);
   const hiddenAbove = visible.start;
   const hiddenBelow = matches.length - visible.end;
 
@@ -40,17 +50,39 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
   const close = () => store.closeModelPicker();
   const choose = async () => {
     const model = matches[selectedIndex];
-    if (!model || !controller.setModel(model.id)) return;
+    // A second Enter while the first save is in flight would write twice and
+    // race over the outcome.
+    if (!model || saving) return;
 
-    const config = await getConfig();
-    config.selectedModel = model.id;
-    await saveConfig(config);
-    store.setSelectedModel(model.id);
+    setSaving(true);
+    setError(null);
+
+    const outcome = await applyModelSelection({
+      modelId: model.id,
+      isBusy: () => controller.isBusy(),
+      setModel: (id) => controller.setModel(id),
+      loadConfig: getConfig,
+      saveConfig,
+      // Closes the picker, so it runs only once everything else has succeeded.
+      commit: (id) => store.setSelectedModel(id),
+    });
+
+    setSaving(false);
+    // Anything other than success keeps the dialog open with a reason on it,
+    // rather than dismissing silently or leaving it open with no explanation.
+    if (outcome.status !== "applied") {
+      setError(outcome.message);
+      // The dialog has one narrow row for this, so keep the untruncated text
+      // where it can still be read after the picker closes. Refusals are
+      // self-explanatory and transient, so they stay in the dialog only.
+      if (outcome.status === "failed") store.addSystemMessage(outcome.message);
+    }
   };
 
   useInput((_, key) => {
     if (key.escape) {
-      close();
+      // Closing mid-write would hide the outcome of a save already in flight.
+      if (!saving) close();
       return;
     }
     if (key.upArrow) {
@@ -75,7 +107,8 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>Select model</Text>
-          <Text color={colors.textFaint}>esc</Text>
+          {/* Reuses the hint's slot so progress costs no rows. */}
+          <Text color={colors.textFaint}>{saving ? "saving…" : "esc"}</Text>
         </Box>
         <Box marginBottom={layout.dialogRhythm}>
           <TextInput
@@ -124,11 +157,19 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
             </>
           )}
         </Box>
-        {layout.showDialogHints && (
-          <Box marginTop={2} gap={3}>
-            <Text color={colors.textBase}>Enter select</Text>
-            <Text color={colors.textFaint}>↑↓ navigate</Text>
+        {error ? (
+          <Box marginTop={layout.showDialogHints ? 1 : 0}>
+            <Text color={colors.dangerBase} wrap="truncate-end">
+              {error}
+            </Text>
           </Box>
+        ) : (
+          layout.showDialogHints && (
+            <Box marginTop={2} gap={3}>
+              <Text color={colors.textBase}>Enter select</Text>
+              <Text color={colors.textFaint}>↑↓ navigate</Text>
+            </Box>
+          )
         )}
       </Box>
     </Box>

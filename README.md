@@ -12,7 +12,7 @@ Woopcode runs where you work: in the terminal and inside the current repository.
 
 ## Demo
 
-<video src="https://github.com/user-attachments/assets/85d6c423-cf58-4a1c-b3ce-ed4ddbd22055" autoplay loop muted playsinline controls width="800"></video>
+![Woopcode demo](public/demo.gif)
 
 ## Why Woopcode
 

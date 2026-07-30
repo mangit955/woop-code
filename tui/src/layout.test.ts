@@ -47,6 +47,21 @@ describe("layout planning", () => {
     }
   });
 
+  test("leaves the command popup room without displacing the chrome", () => {
+    // The popup renders in flow above the composer, so its budget plus the
+    // chrome it must not cover has to fit the window.
+    for (let height = 6; height <= 40; height++) {
+      const layout = planLayout(80, height);
+      const chrome =
+        1 + // header
+        (layout.composer === "block" ? 6 : 1) +
+        (layout.showStatusBar ? 1 : 0);
+
+      expect(chrome + layout.commandPopupRows).toBeLessThanOrEqual(height);
+      expect(layout.commandPopupRows).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   test("sheds detail as columns run out, in priority order", () => {
     // The provider tag goes before the model name, the tagline before the branch.
     expect(planLayout(100, 24).showComposerProvider).toBe(true);

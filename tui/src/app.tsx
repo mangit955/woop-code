@@ -18,6 +18,7 @@ import { useCancelKey } from "./hooks/useCancelKey";
 import { colors } from "./styles/theme";
 import { planLayout } from "./layout";
 import { getModelDisplayName } from "../../config/client";
+import { matchCommands } from "../../commands/slash/match";
 
 interface AppProps {
   controller: AgentController;
@@ -31,6 +32,9 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
   const showHome = state.timeline.length === 0;
+  // The command list takes rows from whatever is behind it, so the home screen
+  // has to know it is open.
+  const paletteOpen = matchCommands(promptValue).length > 0;
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
   const hasPendingQuestion = state.pendingQuestion !== null;
@@ -75,6 +79,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         {showHome ? (
           <HomeScreen
             {...homeScreen}
+            paletteOpen={paletteOpen}
             renderPrompt={(placeholder) => (
               <Prompt {...promptProps} placeholder={placeholder} variant={layout.composer} />
             )}

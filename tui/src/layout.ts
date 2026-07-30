@@ -42,6 +42,9 @@ const PREFERRED_CONTENT_WIDTH = 68;
 const MIN_CONTENT_WIDTH = 20;
 
 const MIN_DIALOG_LIST_ROWS = 1;
+/** Rows the slash-command popup keeps free for whatever sits behind it. */
+const MIN_POPUP_CONTEXT_ROWS = 1;
+const COMMAND_POPUP_HEADER_MIN_ROWS = 14;
 /** The "↑ n more" / "↓ n more" rows a windowed list can add. */
 const DIALOG_SCROLL_INDICATOR_ROWS = 2;
 const DIALOG_LABEL_MIN_ROWS = 12;
@@ -68,6 +71,12 @@ export interface LayoutPlan {
   composer: ComposerVariant;
   /** Vertical breathing room between home sections; the first thing to go. */
   rhythm: number;
+  /**
+   * Total rows the slash-command popup may occupy. It renders in flow, so this
+   * is what stops it from pushing the composer or the header off screen.
+   */
+  commandPopupRows: number;
+  showCommandPopupHeader: boolean;
   contentWidth: number;
   dialogWidth: number;
   /** Rows a dialog list may render before it has to scroll. */
@@ -135,6 +144,21 @@ export function planLayout(width: number, height: number): LayoutPlan {
   const showDialogScrollIndicators =
     height - dialogFixedRows - DIALOG_SCROLL_INDICATOR_ROWS >= MIN_DIALOG_LIST_ROWS;
 
+  // The popup opens above the composer and used to be absolutely positioned, so
+  // it painted over the header, the wordmark, and the transcript instead of
+  // giving way to them. In flow it needs a budget: everything the app must keep
+  // showing while the list is open, subtracted from the window.
+  const composerRows =
+    composer === "block" ? BLOCK_COMPOSER_ROWS : INLINE_COMPOSER_ROWS;
+  const commandPopupRows = Math.max(
+    1,
+    height -
+      HEADER_ROWS -
+      composerRows -
+      (showStatusBar ? STATUS_BAR_ROWS : 0) -
+      MIN_POPUP_CONTEXT_ROWS,
+  );
+
   return {
     wordmark,
     showSubtitle: height >= SUBTITLE_MIN_ROWS,
@@ -148,6 +172,8 @@ export function planLayout(width: number, height: number): LayoutPlan {
     showTurnModel: width >= TURN_MODEL_MIN_COLUMNS,
     composer,
     rhythm: height >= CAPABILITIES_MIN_ROWS ? 3 : height >= SUBTITLE_MIN_ROWS ? 1 : 0,
+    commandPopupRows,
+    showCommandPopupHeader: height >= COMMAND_POPUP_HEADER_MIN_ROWS,
     contentWidth: fitWidth(width),
     dialogWidth: fitWidth(width),
     dialogListRows: Math.max(

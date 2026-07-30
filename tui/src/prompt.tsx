@@ -4,9 +4,12 @@ import { useRef, useMemo, useState, useEffect } from "react";
 import type { AgentController } from "../../commands/agentController";
 import { handleSlashCommand } from "../../commands/slash";
 import { registry } from "../../commands/slash/registry";
+import { matchCommands } from "../../commands/slash/match";
 import { store } from "./store/ui-store";
 import { colors } from "./styles/theme";
 import { CommandPreview } from "./components/CommandPreview";
+import { planLayout } from "./layout";
+import { useTerminalSize } from "./hooks/useTerminalSize";
 
 interface PromptProps {
   controller: AgentController;
@@ -34,6 +37,8 @@ export function Prompt({
 }: PromptProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
   const lastActivityTime = useRef(Date.now());
 
   useEffect(() => {
@@ -55,18 +60,7 @@ export function Prompt({
     setSelectedIndex(0);
   }, [value]);
 
-  const slashMatches = useMemo(() => {
-    if (!value.startsWith("/")) return [];
-    
-    const search = value.slice(1).toLowerCase().trim();
-    
-    // If just "/", show all commands
-    if (!search) return registry.getAll();
-    
-    return registry.getAll().filter(
-      cmd => cmd.name.startsWith(search) || cmd.aliases?.some(a => a.startsWith(search))
-    );
-  }, [value]);
+  const slashMatches = useMemo(() => matchCommands(value), [value]);
 
   const handleValueChange = (newValue: string) => {
     lastActivityTime.current = Date.now();
@@ -185,11 +179,17 @@ export function Prompt({
 
   if (variant === "default" || variant === "inline") {
     return (
-      <Box flexDirection="column" width="100%" position="relative">
+      <Box flexDirection="column" width="100%">
+        {/* In flow, above the input: the popup gives way to the header and the
+            transcript instead of painting over them. */}
         {slashMatches.length > 0 && (
-          <Box position="absolute" bottom={1} left={0} width="100%">
-            <CommandPreview matches={slashMatches} query={value.slice(1)} selectedIndex={selectedIndex} />
-          </Box>
+          <CommandPreview
+            matches={slashMatches}
+            query={value.slice(1)}
+            selectedIndex={selectedIndex}
+            maxRows={layout.commandPopupRows}
+            showHeader={layout.showCommandPopupHeader}
+          />
         )}
         <Box>
           <Text color={colors.primary}>❯ </Text>
@@ -209,7 +209,6 @@ export function Prompt({
     <Box
       flexDirection="column"
       width="100%"
-      position="relative"
       borderStyle="single"
       borderTop={false}
       borderRight={false}
@@ -218,9 +217,13 @@ export function Prompt({
       borderColor="#000000"
     >
       {slashMatches.length > 0 && (
-        <Box position="absolute" bottom={4} left={0} width="100%">
-          <CommandPreview matches={slashMatches} query={value.slice(1)} selectedIndex={selectedIndex} />
-        </Box>
+        <CommandPreview
+          matches={slashMatches}
+          query={value.slice(1)}
+          selectedIndex={selectedIndex}
+          maxRows={layout.commandPopupRows}
+          showHeader={layout.showCommandPopupHeader}
+        />
       )}
       <Box 
         backgroundColor="#1a1a1a" 

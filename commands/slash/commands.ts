@@ -1,5 +1,6 @@
 import type { SlashCommand, SlashCommandContext } from "./types";
 import { registry } from "./registry";
+import { APPROVAL_MODES, describeApprovalMode, parseApprovalMode } from "../../runtime/approval";
 import {
   getConfig,
   saveConfig,
@@ -339,6 +340,28 @@ const logoutCommand: SlashCommand = {
 
 // ==================== WORKSPACE COMMANDS ====================
 
+const approvalCommand: SlashCommand = {
+  name: "approval",
+  aliases: ["approve"],
+  description: "Choose how much runs without asking",
+  category: "configuration",
+
+  async execute(context, args) {
+    // The TUI intercepts this and opens the picker; reaching here means there is
+    // no picker to open, so report the setting instead.
+    const config = await getConfig();
+    const info = describeApprovalMode(parseApprovalMode(config.approvalMode));
+
+    const modes = APPROVAL_MODES.map((entry) => {
+      const marker = entry.mode === info.mode ? "✓" : " ";
+      const warning = entry.unsafe ? " (unsafe)" : "";
+      return `  ${marker} ${entry.mode}${warning} — ${entry.description}`;
+    }).join("\n");
+
+    return `Approval mode: ${info.label}\n\n${modes}`;
+  },
+};
+
 const workspaceCommand: SlashCommand = {
   name: "workspace",
   aliases: ["ws"],
@@ -438,6 +461,7 @@ export function registerCommands() {
   registry.register(loginCommand);
   registry.register(logoutCommand);
   registry.register(modelCommand);
+  registry.register(approvalCommand);
   registry.register(workspaceCommand);
   registry.register(statusCommand);
   registry.register(versionCommand);

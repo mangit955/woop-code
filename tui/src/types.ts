@@ -1,3 +1,5 @@
+import type { ApprovalMode, CommandRisk } from "../../runtime/approval";
+
 export type TimeLineItem =
   | {
       id: string;
@@ -23,6 +25,8 @@ export type TimeLineItem =
       status: "running" | "completed" | "failed";
       /** Short report of what came back, e.g. "8 matches". */
       summary?: string;
+      /** Command output, kept for tools rendered as a shell block. */
+      output?: string;
     }
   | ({
       id: string;
@@ -65,6 +69,8 @@ export interface PendingCommand {
   id: string;
   command: string;
   toolName: "run_terminal" | "run_tests";
+  /** Why it needs approval, from the classifier. */
+  risk?: CommandRisk;
 }
 
 export interface PendingQuestion {
@@ -75,6 +81,8 @@ export interface PendingQuestion {
 export interface UIState {
   timeline: TimeLineItem[];
   activeTurn: ActiveTurn | null;
+  approvalMode: ApprovalMode;
+  approvalPickerOpen: boolean;
   status: string;
   isThinking: boolean;
   modelPickerOpen: boolean;

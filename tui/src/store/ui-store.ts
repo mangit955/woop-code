@@ -1,5 +1,6 @@
 import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
 import type { ToolCall } from "../../../config/types";
+import { DEFAULT_APPROVAL_MODE, type ApprovalMode } from "../../../runtime/approval";
 
 /** The idle status, and what a transient status reverts to. */
 export const READY_STATUS = "Ready";
@@ -11,6 +12,8 @@ export class UIStore {
     status: READY_STATUS,
     isThinking: false,
     modelPickerOpen: false,
+    approvalMode: DEFAULT_APPROVAL_MODE,
+    approvalPickerOpen: false,
     selectedModel: null,
     pendingEdit: null,
     pendingCommand: null,
@@ -170,7 +173,7 @@ export class UIStore {
     this.emit();
   }
 
-  finishTool(id: string, summary?: string) {
+  finishTool(id: string, result?: { summary?: string; output?: string }) {
     const tool = this.state.timeline.find(
       (item): item is Extract<TimeLineItem, { type: "tool" }> =>
         item.type === "tool" && item.id === id,
@@ -185,7 +188,8 @@ export class UIStore {
           ? {
               ...item,
               status: "completed",
-              summary,
+              summary: result?.summary,
+              output: result?.output,
             }
           : item,
       ),
@@ -194,15 +198,30 @@ export class UIStore {
     this.emit();
   }
 
-  failTool(id: string) {
+  failTool(id: string, output?: string) {
     this.state = {
       ...this.state,
       timeline: this.state.timeline.map((item) =>
         item.type === "tool" && item.id === id
-          ? { ...item, status: "failed" }
+          ? { ...item, status: "failed", output }
           : item,
       ),
     };
+    this.emit();
+  }
+
+  openApprovalPicker() {
+    this.state = { ...this.state, approvalPickerOpen: true };
+    this.emit();
+  }
+
+  closeApprovalPicker() {
+    this.state = { ...this.state, approvalPickerOpen: false };
+    this.emit();
+  }
+
+  setApprovalMode(mode: ApprovalMode) {
+    this.state = { ...this.state, approvalMode: mode, approvalPickerOpen: false };
     this.emit();
   }
 
@@ -476,8 +495,15 @@ export class UIStore {
 
   /** True when a modal owns the screen, so global keys can tell. */
   hasOpenModal() {
-    const { modelPickerOpen, pendingCommand, pendingQuestion, pendingEdit } = this.state;
-    return modelPickerOpen || pendingCommand !== null || pendingQuestion !== null || pendingEdit !== null;
+    const { modelPickerOpen, approvalPickerOpen, pendingCommand, pendingQuestion, pendingEdit } =
+      this.state;
+    return (
+      modelPickerOpen ||
+      approvalPickerOpen ||
+      pendingCommand !== null ||
+      pendingQuestion !== null ||
+      pendingEdit !== null
+    );
   }
 
   /**
@@ -489,6 +515,10 @@ export class UIStore {
   dismissTopModal() {
     if (this.state.modelPickerOpen) {
       this.closeModelPicker();
+      return true;
+    }
+    if (this.state.approvalPickerOpen) {
+      this.closeApprovalPicker();
       return true;
     }
     if (this.state.pendingCommand) {
@@ -519,6 +549,7 @@ export class UIStore {
       ...this.state,
       timeline: [],
       activeTurn: null,
+      approvalPickerOpen: false,
       status: READY_STATUS,
       isThinking: false,
       pendingEditScrollOffset: 0,

@@ -8,7 +8,8 @@ import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from ".
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
-import { summarizeToolOutput } from "../tui/src/tool-display";
+import { isCommandTool, summarizeToolOutput } from "../tui/src/tool-display";
+import { parseApprovalMode } from "../runtime/approval";
 import { PassThrough } from "stream";
 
 /** How long a terminal notice stays on the status bar before reverting to Ready. */
@@ -114,6 +115,7 @@ async function runInteractive() {
   const config = await getConfig();
   const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
   store.setSelectedModel(selectedModel);
+  store.setApprovalMode(parseApprovalMode(config.approvalMode));
 
   const callbacks: AgentCallbacks = {
     onStatus(status) {
@@ -137,14 +139,18 @@ async function runInteractive() {
     },
 
     onToolFinish(tool) {
-      store.finishTool(tool.id, summarizeToolOutput(tool.name, tool.output));
+      store.finishTool(tool.id, {
+        summary: summarizeToolOutput(tool.name, tool.output),
+        // Command tools render as a shell block, so their output is kept.
+        output: isCommandTool(tool.name) ? tool.output : undefined,
+      });
       // A tool result is sent back to the model for the next step. The turn is
       // still active until onDone, so never show Ready here.
       store.setStatus("Thinking...");
     },
 
     onToolError(tool) {
-      store.failTool(tool.id);
+      store.failTool(tool.id, isCommandTool(tool.name) ? tool.error : undefined);
       store.addSystemMessage(`${tool.name} failed: ${tool.error}`);
       store.setStatus("Thinking...");
     },

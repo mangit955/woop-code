@@ -5,7 +5,8 @@ import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
 import { TurnFooter } from "./components/TurnFooter";
 import { usePalette } from "./styles/palette";
-import { formatToolArgument, toolGlyph, toolLabel } from "./tool-display";
+import { formatToolArgument, isCommandTool, toolGlyph, toolLabel } from "./tool-display";
+import { CommandBlock } from "./components/CommandBlock";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -94,6 +95,18 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
       );
 
     case "tool": {
+      // Command tools carry output worth reading, so they render as a block
+      // rather than as a one-line record.
+      if (isCommandTool(item.name)) {
+        return (
+          <CommandBlock
+            command={commandOf(item.arguments, item.name)}
+            output={item.output}
+            status={item.status}
+          />
+        );
+      }
+
       const argument = formatToolArgument(item.arguments);
 
       // One quiet line: glyph, tool, the argument worth reading, and what came
@@ -119,3 +132,11 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
     }
   }
 });
+
+/** run_tests defaults to `bun test` when the model does not name a command. */
+function commandOf(arguments_: Record<string, unknown>, name: string) {
+  const command = arguments_.command;
+  if (typeof command === "string" && command.trim() !== "") return command;
+
+  return name === "run_tests" ? "bun test" : name;
+}

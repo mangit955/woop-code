@@ -37,7 +37,9 @@ export async function agentLoop(
       // This one is about the loop budget, so the iteration counter is the
       // right measure.
       if (iterations === MAX_ITERATIONS - 5) {
-        callbacks.onStatus?.(`⚠️  ${MAX_ITERATIONS - iterations} iterations remaining - prioritize completion`);
+        callbacks.onStatus?.(
+          `⚠️  ${MAX_ITERATIONS - iterations} iterations remaining - prioritize completion`,
+        );
       }
 
       let assistantText = "";
@@ -109,34 +111,67 @@ export async function agentLoop(
             `Skipped duplicate ${toolCall.name} call. The result for these exact arguments ` +
             `is already in the conversation; use it and continue with a different action.`;
 
-          callbacks.onToolStart?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments });
-          messages.push({
-            role: "assistant_tool_call", toolName: toolCall.name, toolCallId: toolCall.id,
-            arguments: toolCall.arguments, thoughtSignature: toolCall.thoughtSignature,
+          callbacks.onToolStart?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
           });
-          callbacks.onToolFinish?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, output });
-          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: output });
+          messages.push({
+            role: "assistant_tool_call",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            arguments: toolCall.arguments,
+            thoughtSignature: toolCall.thoughtSignature,
+          });
+          callbacks.onToolFinish?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+            output,
+          });
+          messages.push({
+            role: "tool",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            content: output,
+          });
           continue;
         }
 
         executedTools.set(toolKey, callCount + 1);
         toolCallsExecuted++;
         callbacks.onToolStart?.({
-          id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments,
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
         });
 
         messages.push({
-          role: "assistant_tool_call", toolName: toolCall.name, toolCallId: toolCall.id,
-          arguments: toolCall.arguments, thoughtSignature: toolCall.thoughtSignature,
+          role: "assistant_tool_call",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          arguments: toolCall.arguments,
+          thoughtSignature: toolCall.thoughtSignature,
         });
 
         let result: string;
         try {
           result = await tool.execute(toolCall.arguments, signal);
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          callbacks.onToolError?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, error: message });
-          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: `Tool failed: ${message}` });
+          const message =
+            error instanceof Error ? error.message : String(error);
+          callbacks.onToolError?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+            error: message,
+          });
+          messages.push({
+            role: "tool",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            content: `Tool failed: ${message}`,
+          });
           continue;
         }
 
@@ -153,13 +188,25 @@ export async function agentLoop(
             : result;
 
         const editWasDeclined =
-          toolResult.startsWith("Edit rejected") || toolResult.startsWith("Edit cancelled");
+          toolResult.startsWith("Edit rejected") ||
+          toolResult.startsWith("Edit cancelled");
 
         if (editWasDeclined) {
-          callbacks.onToolError?.({ id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, error: "Rejected by user" });
-          messages.push({ role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: toolResult });
+          callbacks.onToolError?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+            error: "Rejected by user",
+          });
+          messages.push({
+            role: "tool",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            content: toolResult,
+          });
 
-          const outcome = "The proposed file change was not applied because it was rejected.";
+          const outcome =
+            "The proposed file change was not applied because it was rejected.";
           messages.push({ role: "assistant", content: outcome });
           callbacks.onText?.(outcome);
           callbacks.onDone?.();
@@ -167,31 +214,40 @@ export async function agentLoop(
         }
 
         callbacks.onToolFinish?.({
-          id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments, output: toolResult,
+          id: toolCall.id,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+          output: toolResult,
         });
 
         messages.push({
-          role: "tool", toolName: toolCall.name, toolCallId: toolCall.id, content: toolResult,
+          role: "tool",
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          content: toolResult,
         } as Message);
       }
 
       // Reported once, after the tools of this iteration have run, so the
       // count is what was actually used rather than how many times the model
       // has been asked to respond.
-      if (!efficiencyWarningSent && toolCallsExecuted >= TOOLS_BEFORE_EFFICIENCY_WARNING) {
+      if (
+        !efficiencyWarningSent &&
+        toolCallsExecuted >= TOOLS_BEFORE_EFFICIENCY_WARNING
+      ) {
         efficiencyWarningSent = true;
         callbacks.onStatus?.(
-          `⚠️  ${toolCallsExecuted} tools used - start implementing now to conserve quota`,
+          `${toolCallsExecuted} tools used - start implementing now to conserve quota`,
         );
       }
     }
 
     throw new Error(
       `Agent exceeded the maximum number of iterations (${MAX_ITERATIONS}).\n\n` +
-      `This usually means:\n` +
-      `  • The task is too complex - try breaking it into smaller steps\n` +
-      `  • The agent is stuck in analysis - it may need clearer instructions\n` +
-      `  • More iterations are needed - consider increasing MAX_ITERATIONS`
+        `This usually means:\n` +
+        `  • The task is too complex - try breaking it into smaller steps\n` +
+        `  • The agent is stuck in analysis - it may need clearer instructions\n` +
+        `  • More iterations are needed - consider increasing MAX_ITERATIONS`,
     );
   } catch (error) {
     if (signal?.aborted) {

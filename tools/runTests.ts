@@ -1,6 +1,7 @@
 import type { Tool } from "../config/types";
 import { store } from "../tui/src/store/ui-store";
 import { formatCommandResult, runCommand } from "./command";
+import { requestCommandApproval } from "./approval";
 
 export const runTestsTool: Tool = {
   name: "run_tests",
@@ -17,11 +18,9 @@ export const runTestsTool: Tool = {
     
     const timeoutSeconds = (args.timeout as number) || 60;
 
-    const approved = await store.setPendingCommand({
-      id: crypto.randomUUID(),
-      command,
-      toolName: "run_tests",
-    });
+    // Classification and policy decide whether this needs a human; the tool
+    // itself knows nothing about which commands are safe.
+    const { approved } = await requestCommandApproval(command, "run_tests");
     if (!approved) {
       return "Command rejected by user. It was not run.";
     }

@@ -1,6 +1,7 @@
 import { renameSync } from "fs";
 import type { Message } from "./types";
 import { getProvidersConfigPath, getConversationPath, initializeConfig } from "./paths";
+import { type ApprovalMode, parseApprovalMode } from "../runtime/approval";
 
 export interface ProviderEntry {
   type?: string;
@@ -10,6 +11,8 @@ export interface ProviderEntry {
 export interface ProvidersConfig {
   defaultProvider: string;
   selectedModel?: string;
+  /** How much the agent may run without asking; see runtime/approval. */
+  approvalMode?: ApprovalMode;
   providers: Record<string, ProviderEntry>;
 }
 
@@ -72,8 +75,30 @@ export function normalizeConfig(raw: unknown): ProvidersConfig {
     ...(typeof source.selectedModel === "string"
       ? { selectedModel: source.selectedModel }
       : {}),
+    // Always normalised, so an absent or misspelt setting cannot leave the
+    // approval mode undefined at the point a command is about to run.
+    approvalMode: parseApprovalMode(source.approvalMode),
     providers,
   };
+}
+
+/**
+ * The approval mode for the next command. Read per command rather than cached,
+ * so changing it with /approval takes effect immediately.
+ */
+export async function getApprovalMode(): Promise<ApprovalMode> {
+  try {
+    return parseApprovalMode((await getConfig()).approvalMode);
+  } catch {
+    // An unreadable config must not widen permissions.
+    return parseApprovalMode(undefined);
+  }
+}
+
+export async function saveApprovalMode(mode: ApprovalMode) {
+  const config = await getConfig();
+  config.approvalMode = mode;
+  await saveConfig(config);
 }
 
 export async function getConfig(): Promise<ProvidersConfig> {

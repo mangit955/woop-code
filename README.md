@@ -101,8 +101,36 @@ Woopcode currently ships with 13 tools.
 ### Change safety
 
 - `edit_file`, `write_file`, and `create_file` show a diff and wait for approval before changing the workspace.
-- `run_terminal` and `run_tests` show the exact command and wait for approval before execution. They are intended for short, non-interactive commands and do not start servers or watch processes.
+- `run_terminal` and `run_tests` are gated by the approval mode below. Whatever the mode, they are intended for short, non-interactive commands and do not start servers or watch processes.
 - Tool failures and repeated calls are returned to the agent so it can adjust rather than silently retrying the same action.
+
+## Approval modes
+
+Shell commands are classified by risk before they run, so inspecting the
+repository does not interrupt you while destructive work still asks.
+
+| Mode | Runs without asking | Always asks |
+|---|---|---|
+| `always-ask` | nothing | everything |
+| `auto-read-only` *(default)* | reads and test suites — `git status`, `rg`, `cat`, `bun test` | anything that writes |
+| `auto-workspace` | the above, plus writes inside the workspace — `mkdir`, `touch`, `git add`, `git commit` | deletes, history rewrites, system and network changes |
+| `full-auto` | everything — **no protection** | nothing |
+
+Deleting files, `git reset`, `git clean`, `sudo`, `chmod`, and network access
+always require approval in every mode except `full-auto`. A command the
+classifier does not recognise is treated as destructive, so it asks rather than
+running unattended.
+
+A command line is judged by its riskiest part: `git status && rm -rf build` asks,
+and so does anything hidden inside `$(...)`.
+
+Change the mode with `/approval`, or set it in config:
+
+```json
+{
+  "approvalMode": "auto-read-only"
+}
+```
 
 ## In-app commands and controls
 
@@ -116,6 +144,7 @@ Type `/` in the prompt to browse and autocomplete commands.
 | `/login <provider> <api-key>` | Authenticate from inside the app.                                        |
 | `/logout [provider]`          | Remove a saved provider key.                                             |
 | `/models`                     | Show the active model and the models available for the current provider. |
+| `/approval`                   | Choose how much runs without asking.                                     |
 | `/workspace`                  | Show repository, path, branch, and file count.                           |
 | `/status`                     | Show workspace, provider, session, and version details.                  |
 | `/version`                    | Show the Woopcode version.                                               |

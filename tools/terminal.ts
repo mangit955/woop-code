@@ -1,6 +1,7 @@
 import type { Tool } from "../config/types";
 import { store } from "../tui/src/store/ui-store";
 import { formatCommandResult, runCommand } from "./command";
+import { requestCommandApproval } from "./approval";
 
 function startsBackgroundProcess(command: string) {
   let quote: "'" | '"' | "`" | null = null;
@@ -49,11 +50,9 @@ export const terminalTool: Tool = {
       throw Error("command is required");
     }
 
-    const approved = await store.setPendingCommand({
-      id: crypto.randomUUID(),
-      command,
-      toolName: "run_terminal",
-    });
+    // Classification and policy decide whether this needs a human; the tool
+    // itself knows nothing about which commands are safe.
+    const { approved } = await requestCommandApproval(command, "run_terminal");
     if (!approved) {
       return "Command rejected by user. It was not run.";
     }

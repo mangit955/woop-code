@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { UIStore } from "./ui-store";
+import { ApprovalMode, DEFAULT_APPROVAL_MODE } from "../../../runtime/approval";
 
 describe("UIStore conversation scrolling", () => {
   test("scrolls only within the measured transcript bounds", () => {
@@ -344,5 +345,60 @@ describe("UIStore status resets", () => {
 
     await tick(60);
     expect(store.getState().status).toBe("Thinking...");
+  });
+});
+
+describe("UIStore approval mode", () => {
+  test("starts on the default mode", () => {
+    const store = new UIStore();
+
+    expect(store.getState().approvalMode).toBe(DEFAULT_APPROVAL_MODE);
+    expect(store.getState().approvalPickerOpen).toBe(false);
+  });
+
+  test("choosing a mode records it and closes the picker", () => {
+    const store = new UIStore();
+    store.openApprovalPicker();
+    expect(store.hasOpenModal()).toBe(true);
+
+    store.setApprovalMode(ApprovalMode.FULL_AUTO);
+
+    expect(store.getState().approvalMode).toBe(ApprovalMode.FULL_AUTO);
+    expect(store.getState().approvalPickerOpen).toBe(false);
+    expect(store.hasOpenModal()).toBe(false);
+  });
+
+  test("the picker is dismissable like any other modal", () => {
+    const store = new UIStore();
+    store.openApprovalPicker();
+
+    expect(store.dismissTopModal()).toBe(true);
+    expect(store.getState().approvalPickerOpen).toBe(false);
+  });
+});
+
+describe("UIStore command output", () => {
+  test("keeps a command tool's output for its block", () => {
+    const store = new UIStore();
+    store.startTool({ id: "t1", name: "run_terminal", arguments: { command: "git status" } });
+    store.finishTool("t1", { output: "On branch main" });
+
+    expect(store.getState().timeline.at(-1)).toMatchObject({
+      type: "tool",
+      status: "completed",
+      output: "On branch main",
+    });
+  });
+
+  test("keeps a failed command's output too", () => {
+    const store = new UIStore();
+    store.startTool({ id: "t1", name: "run_tests", arguments: {} });
+    store.failTool("t1", "1 fail");
+
+    expect(store.getState().timeline.at(-1)).toMatchObject({
+      type: "tool",
+      status: "failed",
+      output: "1 fail",
+    });
   });
 });

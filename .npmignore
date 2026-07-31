@@ -30,6 +30,9 @@ onboarding/FLOW.md
 onboarding/QUICK_START.md
 onboarding/test-reset.ts
 
+# Landing page
+site/
+
 # Build artifacts
 dist/
 *.log

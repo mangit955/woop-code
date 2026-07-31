@@ -9,13 +9,16 @@ const HOLD_AT_END = 9;
 const TOTAL_FRAMES =
   TRACK_LENGTH + HOLD_AT_END + (TRACK_LENGTH - 1) + HOLD_AT_START;
 
+// A periwinkle ramp stepped around the theme's primary (#ACA3EC): the head sits
+// on the accent itself, the bloom one step lighter, and the trail darkens
+// through it.
 const spinnerColors = {
-  head: "#60a5fa",
-  bloom: "#93c5fd",
-  trailNear: "#3b82f6",
-  trailMid: "#2563eb",
-  trailFar: "#1d4ed8",
-  trailLast: "#1e40af",
+  head: "#ACA3EC",
+  bloom: "#C6C0F4",
+  trailNear: "#8F83E0",
+  trailMid: "#7263CE",
+  trailFar: "#5A4CAB",
+  trailLast: "#453B82",
 } as const;
 
 function getScannerFrame(frameIndex: number) {
@@ -71,11 +74,11 @@ function inactiveColor(
       ? 1 - holdProgress / holdTotal
       : movementProgress / (TRACK_LENGTH - 1);
   const amount = Math.max(0, Math.min(1, progress));
-  // Blend from the terminal background into the inactive blue. True-color
+  // Blend from the terminal background into the inactive periwinkle. True-color
   // interpolation avoids the hard brightness jumps that make a TUI spinner
   // look jittery at its turnaround points.
   const start: [number, number, number] = [10, 10, 10];
-  const end: [number, number, number] = [30, 58, 95];
+  const end: [number, number, number] = [44, 39, 82];
   const channel = (index: 0 | 1 | 2) =>
     Math.round(start[index] + (end[index] - start[index]) * amount)
       .toString(16)

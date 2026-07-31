@@ -43,7 +43,7 @@ export function AsciiLogo({
 
         return (
           <Box key={index}>
-            <Text bold color={colors.primary}>{visibleWoop}</Text>
+            <Text bold color={colors.logo}>{visibleWoop}</Text>
             <Text bold color={colors.textFaint}>{visibleCode}</Text>
           </Box>
         );

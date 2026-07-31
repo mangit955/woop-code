@@ -1,6 +1,6 @@
 /**
  * Theme configuration inspired by OpenCode's dark design system.
- * Uses a near-black base with a deep-blue primary, purple secondary, and
+ * Uses a near-black base with a soft-periwinkle primary, indigo secondary, and
  * muted grays.
  */
 
@@ -10,7 +10,7 @@ export const colors = {
   textMuted: "#a3a3a3", // Neutral 400
   textFaint: "#737373", // Neutral 500
   textStrong: "#ffffff",
-  textAccent: "#3b82f6",
+  textAccent: "#ACA3EC",
   textCode: "#2dd4bf", // Teal 400
 
   // Background colors
@@ -22,10 +22,13 @@ export const colors = {
   borderBase: "#404040", // Neutral 700
   borderMuted: "#262626", // Neutral 800
   borderStrong: "#525252", // Neutral 600
-  borderActive: "#3b82f6", // Blue 600
+  borderActive: "#ACA3EC", // Periwinkle
 
   // Primary and accent
-  primary: "#3b82f6", // Blue 600
+  primary: "#ACA3EC", // Periwinkle
+  // The WOOP half of the wordmark. Its own token rather than `primary` so the
+  // logo can be tuned without recolouring every accent in the interface.
+  logo: "#ACA3EC",
   secondary: "#818cf8", // Indigo 400
   accent: "#2dd4bf", // Teal 400
 

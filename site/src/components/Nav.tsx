@@ -45,12 +45,9 @@ export function Nav({ repo }: { repo: string }) {
       </a>
 
       <nav className="nav__links" aria-label="Main">
-        <a
-          className="nav__link"
-          href={`${repo}#readme`}
-          target="_blank"
-          rel="noreferrer"
-        >
+        {/* Same origin, so no target/rel: the docs are part of this site now,
+            not somewhere else the reader is being sent. */}
+        <a className="nav__link" href="/docs">
           Docs
         </a>
 

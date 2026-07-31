@@ -1,0 +1,390 @@
+/* ==========================================================================
+   Woopcode docs — tokens.
+   ==========================================================================
+
+   The light half, authored. It descends from the landing page: the same
+   lavender ground, the same hairline, the same font stack. Anything the
+   landing page already decides is referenced rather than restated, so a change
+   to `styles.css` reaches the docs on its own.
+
+   The dark half lives in `tokens.generated.css`, built from
+   `tui/src/styles/theme.ts` by `site/scripts/generate-tokens.ts`, so the docs
+   and the terminal cannot disagree about what a diff or a warning looks like.
+
+   The two files are loaded as two <link> tags, this one first — not with
+   @import. @import has to precede every other rule, which would put the dark
+   block *above* the light one and let light win inside a dark OS. Load order
+   is the simplest thing that resolves correctly in both directions.
+
+   What this file is NOT: a layout. There is no sidebar, no table of contents,
+   no component styling here. It sets a palette, a type scale, and a reading
+   measure — enough to judge whether the writing works, and deliberately not
+   enough to judge how the site looks. See site/design/system.md §10. */
+
+/* Inter, self-hosted, same subset the landing page uses. Repeated here because
+   the docs preview shell does not load `styles.css` — it must stay independent
+   so docs tokens cannot leak into the landing page. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --doc-bg: #e0dcf9;
+  --doc-surface: #ffffff;
+  --doc-raised: #fbfaff;
+  --doc-sunken: #f4f2fd;
+
+  /* ── Text ─────────────────────────────────────────────────────────────── */
+  --doc-text: #111111;
+  --doc-text-2: #4a4a4a;
+  --doc-faint: #6b6b6b;
+  --doc-strong: #000000;
+
+  /* ── Lines ────────────────────────────────────────────────────────────── */
+  --doc-line: rgba(38, 32, 74, 0.12);
+  --doc-line-2: rgba(38, 32, 74, 0.24);
+
+  /* ── Accent ───────────────────────────────────────────────────────────── */
+  /* Links, the active nav rail, focus rings. Nothing else — see system.md §6. */
+  --doc-accent: #8b7bff;
+  --doc-accent-quiet: #6f5fe0;
+
+  /* ── Callout states ───────────────────────────────────────────────────── */
+  --doc-note: rgba(38, 32, 74, 0.24);
+  --doc-tip: #8b7bff;
+  --doc-warning: #b7791f;
+  --doc-danger: #c53030;
+
+  /* ── Diff ─────────────────────────────────────────────────────────────── */
+  /* Light-mode tints. The dark pair comes straight from theme.ts; these are
+     their light equivalents, since the terminal has no light theme to copy. */
+  --doc-diff-add: #0f6fa8;
+  --doc-diff-remove: #a83f5b;
+  --doc-diff-add-bg: #e8f2fb;
+  --doc-diff-remove-bg: #fceef2;
+
+  /* ── Syntax ───────────────────────────────────────────────────────────── */
+  --doc-code-text: #1f1f1f;
+  --doc-code-heading: #6b3fa0;
+  --doc-code-string: #2a7a4f;
+  --doc-code-keyword: #a35200;
+  --doc-code-comment: #7b7b7b;
+  --doc-code-link: #b5551f;
+
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+  --doc-sans:
+    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  --doc-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --doc-size-body: 17px;
+  --doc-size-small: 14px;
+  --doc-size-code: 14px;
+  --doc-line-height: 1.7;
+
+  /* 68–74 characters. Wider than the landing page's copy column: docs are
+     scanned in vertical sweeps rather than read in one sitting. */
+  --doc-measure: 70ch;
+
+  /* ── Rhythm ───────────────────────────────────────────────────────────── */
+  /* One unit, 4px. The gap above a heading is about three times the gap below
+     it, so a heading binds to the text it introduces instead of floating
+     between two blocks. system.md §4. */
+  --doc-gap-para: 16px;
+  --doc-gap-h2: 44px;
+  --doc-gap-h3: 28px;
+  --doc-gap-heading-body: 12px;
+  --doc-gap-block: 20px;
+  --doc-gap-table: 24px;
+
+  --doc-radius: 10px;
+  --doc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The generated dark block sets `prefers-color-scheme: dark` and
+   `[data-theme="dark"]`. This restates the authored light values so a reader
+   who forces light inside a dark OS gets light back. Both directions win. */
+:root[data-theme="light"] {
+  --doc-bg: #e0dcf9;
+  --doc-surface: #ffffff;
+  --doc-raised: #fbfaff;
+  --doc-sunken: #f4f2fd;
+  --doc-text: #111111;
+  --doc-text-2: #4a4a4a;
+  --doc-faint: #6b6b6b;
+  --doc-strong: #000000;
+  --doc-line: rgba(38, 32, 74, 0.12);
+  --doc-line-2: rgba(38, 32, 74, 0.24);
+  --doc-accent: #8b7bff;
+  --doc-accent-quiet: #6f5fe0;
+  --doc-note: rgba(38, 32, 74, 0.24);
+  --doc-tip: #8b7bff;
+  --doc-warning: #b7791f;
+  --doc-danger: #c53030;
+  --doc-diff-add: #0f6fa8;
+  --doc-diff-remove: #a83f5b;
+  --doc-diff-add-bg: #e8f2fb;
+  --doc-diff-remove-bg: #fceef2;
+  --doc-code-text: #1f1f1f;
+  --doc-code-heading: #6b3fa0;
+  --doc-code-string: #2a7a4f;
+  --doc-code-keyword: #a35200;
+  --doc-code-comment: #7b7b7b;
+  --doc-code-link: #b5551f;
+}
+
+/* ==========================================================================
+   Reading styles.
+   ==========================================================================
+   Type, measure, rhythm, and the elements markdown produces. Layout — the
+   panel, the sidebar, the table of contents — belongs to layout.css. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--doc-bg);
+  color: var(--doc-text);
+  font-family: var(--doc-sans);
+  font-size: var(--doc-size-body);
+  line-height: var(--doc-line-height);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prose holds the reading measure. Code and tables do not: a terminal capture
+   or a parameter table has its own natural width, and squeezing it into a
+   68–74 character column turns it into a horizontal scroll for no reason. The
+   panel is wider than the measure so they have somewhere to go. */
+.page > * {
+  max-width: var(--doc-measure);
+}
+
+.page > pre,
+.page > table,
+.page > .table-scroll,
+.page > .pager,
+.page > .cards {
+  max-width: 100%;
+}
+
+/* ── Headings ─────────────────────────────────────────────────────────── */
+
+h1,
+h2,
+h3 {
+  color: var(--doc-strong);
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--doc-gap-heading-body);
+}
+
+h2 {
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 540;
+  letter-spacing: -0.017em;
+  margin-top: var(--doc-gap-h2);
+  margin-bottom: var(--doc-gap-heading-body);
+}
+
+h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 560;
+  letter-spacing: -0.012em;
+  margin-top: var(--doc-gap-h3);
+  margin-bottom: var(--doc-gap-heading-body);
+}
+
+/* h3 is the deepest heading — anything wanting an h4 is a table, a definition
+   list, or its own page. Flagged loudly rather than styled. */
+h4,
+h5,
+h6 {
+  font-size: var(--doc-size-body);
+  color: var(--doc-danger);
+}
+
+h4::after,
+h5::after,
+h6::after {
+  content: " ← heading too deep, see system.md §3";
+  font-size: var(--doc-size-small);
+  font-weight: 400;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+
+p,
+ul,
+ol {
+  margin: 0 0 var(--doc-gap-para);
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+a {
+  color: var(--doc-accent-quiet);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--doc-accent) 45%, transparent);
+}
+
+a:hover {
+  text-decoration-color: var(--doc-accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+strong {
+  font-weight: 560;
+  color: var(--doc-strong);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--doc-line);
+  margin: var(--doc-gap-h2) 0;
+}
+
+blockquote {
+  margin: var(--doc-gap-block) 0;
+  padding-left: 16px;
+  border-left: 2px solid var(--doc-note);
+  color: var(--doc-text-2);
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────── */
+
+code {
+  font-family: var(--doc-mono);
+  /* 450 rather than 400: at 0.9em the mono face otherwise reads lighter than
+     the sentence around it and drops out mid-line. */
+  font-weight: 450;
+  font-size: 0.9em;
+  letter-spacing: 0;
+}
+
+:not(pre) > code {
+  padding: 0.1em 0.34em;
+  border-radius: 4px;
+  background: var(--doc-sunken);
+  border: 1px solid var(--doc-line);
+  color: var(--doc-code-text);
+}
+
+/* A reference page's title is the signature — `read_file`, `/approval`. It is
+   monospace because it is a literal, not because it is an inline code span, so
+   it takes none of the chip's chrome. */
+h1 code,
+h2 code,
+h3 code {
+  font-weight: inherit;
+  font-size: inherit;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+}
+
+/* Code and terminal output wrap; they never scroll sideways.
+ *
+ * A horizontal scrollbar inside a code block hides the end of the line at rest,
+ * and the end of the line is usually the part that matters — the flag, the
+ * path, the marker. A wrapped line is also what the reader's own terminal does
+ * with output too wide for it, so this is the more faithful rendering as well
+ * as the more usable one.
+ *
+ * Tables are the exception and keep their scroll container: wrapping a table
+ * destroys the column alignment that makes it readable. See system.md §4. */
+pre {
+  margin: var(--doc-gap-block) 0;
+  padding: 14px 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--doc-raised);
+  border: 1px solid var(--doc-line);
+  border-radius: var(--doc-radius);
+  font-size: var(--doc-size-code);
+  line-height: 1.6;
+}
+
+pre code {
+  font-weight: 400;
+  font-size: inherit;
+  color: var(--doc-code-text);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  margin: var(--doc-gap-table) 0;
+  border-collapse: collapse;
+  font-size: var(--doc-size-small);
+  line-height: 1.55;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--doc-line);
+  vertical-align: top;
+}
+
+th {
+  font-weight: 560;
+  color: var(--doc-strong);
+  border-bottom-color: var(--doc-line-2);
+}
+
+td code {
+  white-space: nowrap;
+}
+
+/* A table wider than five columns becomes a definition list — see system.md
+   §3. Until the renderer enforces that, it scrolls rather than breaking the
+   page. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

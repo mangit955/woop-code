@@ -1,0 +1,542 @@
+/* ==========================================================================
+   Woopcode docs — layout.
+   ==========================================================================
+
+   Three panes on a wide screen: navigation, the content panel, the on-page
+   table of contents. The panel is the landing page's idea — a white surface
+   floating on the lavender ground — carried into a document.
+
+   The rule this file is built around is site/design/system.md §5: visual energy
+   decreases with depth. There is no Backdrop here, no AsciiCanvas, no
+   crosshairs, no reveal animation, no icons in the navigation, and colour
+   appears in exactly two places — links and the active rail. Everything else is
+   type, spacing, and hairlines. */
+
+:root {
+  --doc-sidebar: 240px;
+  --doc-toc: 200px;
+  --doc-topbar: 60px;
+  /* Rail to rail, inherited from the landing page's measure. */
+  --doc-frame: min(1400px, 94vw);
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+
+/* The landing page's bar, with the docs' items in it. Frosted at rest rather
+   than on scroll: the sidebar scrolls underneath it at every position, so
+   there is no "at rest" state where the page behind it is empty. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--doc-topbar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 clamp(16px, 3vw, 32px);
+  background: color-mix(in srgb, var(--doc-bg) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(1.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.7);
+  border-bottom: 1px solid var(--doc-line);
+}
+
+.topbar__brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--doc-strong);
+}
+
+/* The wordmark's block-drawing pair, drawn as a bar with a leg at each end —
+   the same shape as the landing page's mark, at nav scale. */
+.topbar__mark {
+  align-self: center;
+  width: 18px;
+  height: 11px;
+  background: currentColor;
+  clip-path: polygon(
+    0 0, 100% 0, 100% 100%, 72% 100%, 72% 46%, 28% 46%, 28% 100%, 0 100%
+  );
+}
+
+.topbar__name {
+  font-size: 16px;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+}
+
+.topbar__section {
+  font-size: 14px;
+  font-weight: 420;
+  color: var(--doc-faint);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.4vw, 16px);
+}
+
+.topbar__version {
+  font-family: var(--doc-mono);
+  font-size: 12px;
+  color: var(--doc-faint);
+}
+
+.topbar__theme,
+.topbar__menu {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--doc-line);
+  background: transparent;
+  color: var(--doc-text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color 0.18s var(--doc-ease),
+    border-color 0.18s var(--doc-ease);
+}
+
+.topbar__theme:hover,
+.topbar__menu:hover {
+  color: var(--doc-text);
+  border-color: var(--doc-line-2);
+}
+
+.topbar__menu {
+  display: none;
+}
+
+.topbar__cta {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: var(--doc-strong);
+  color: var(--doc-bg);
+  font-size: 13.5px;
+  font-weight: 450;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.18s var(--doc-ease);
+}
+
+.topbar__cta:hover {
+  opacity: 0.84;
+}
+
+/* ── The three panes ──────────────────────────────────────────────────── */
+
+.layout {
+  width: var(--doc-frame);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: var(--doc-sidebar) minmax(0, 1fr) var(--doc-toc);
+  gap: 40px;
+  align-items: start;
+  padding: 32px 0 96px;
+}
+
+/* A page with fewer than two headings has no table of contents, so the column
+   is not rendered at all — an empty third column would just push the panel off
+   centre. */
+.layout--no-toc {
+  grid-template-columns: var(--doc-sidebar) minmax(0, 1fr);
+  max-width: calc(var(--doc-sidebar) + 40px + var(--doc-measure) + 260px);
+}
+
+.layout__sidebar,
+.layout__toc {
+  position: sticky;
+  top: calc(var(--doc-topbar) + 24px);
+  max-height: calc(100vh - var(--doc-topbar) - 48px);
+  overflow-y: auto;
+  /* The scrollbar is a piece of chrome that appears the moment the pane is
+     taller than the screen; keep it out of the layout so it cannot shift the
+     type underneath it. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--doc-line-2) transparent;
+}
+
+/* The content surface. Body copy never sits directly on the lavender: it is a
+   saturated colour chosen to make a white panel read clean, not a background to
+   read long prose against. */
+.layout__main {
+  min-width: 0;
+  padding: 48px clamp(28px, 4vw, 64px) 64px;
+  background: var(--doc-surface);
+  border: 1px solid var(--doc-line);
+  border-radius: 16px;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+.sidebar {
+  position: relative;
+  padding-left: 13px;
+}
+
+/* One rail for the whole sidebar, moved to the active item rather than a
+   border drawn on each link — so it can slide between sections instead of
+   blinking from one place to another. Position comes from client.js. */
+.sidebar__rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: var(--rail-h, 0);
+  border-radius: 1px;
+  background: var(--doc-accent);
+  transform: translateY(var(--rail-y, 0));
+  opacity: var(--rail-o, 0);
+  transition:
+    transform 0.26s var(--doc-ease),
+    height 0.26s var(--doc-ease),
+    opacity 0.2s var(--doc-ease);
+}
+
+.nav-group + .nav-group {
+  margin-top: 26px;
+}
+
+.nav-group__label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-faint);
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-list--nested {
+  margin: 2px 0 2px 14px;
+}
+
+.nav-item {
+  margin: 0 0 1px;
+}
+
+.nav-link {
+  display: block;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 420;
+  letter-spacing: -0.012em;
+  color: var(--doc-text-2);
+  text-decoration: none;
+  transition:
+    color 0.16s var(--doc-ease),
+    background 0.16s var(--doc-ease);
+}
+
+a.nav-link:hover {
+  color: var(--doc-text);
+  background: color-mix(in srgb, var(--doc-text) 5%, transparent);
+}
+
+.nav-link[aria-current="page"] {
+  color: var(--doc-strong);
+  font-weight: 500;
+}
+
+/* Not written yet. Shown so the shape of the docs stays honest, but plainly
+   not a link — no pointer, no hover, no underline. */
+.nav-link--planned {
+  color: var(--doc-faint);
+  opacity: 0.62;
+  cursor: default;
+}
+
+/* ── Table of contents ────────────────────────────────────────────────── */
+
+.toc__label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-faint);
+}
+
+.toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--doc-line);
+}
+
+.toc-item a {
+  display: block;
+  padding: 4px 0 4px 12px;
+  margin-left: -1px;
+  border-left: 1px solid transparent;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--doc-faint);
+  text-decoration: none;
+  transition:
+    color 0.16s var(--doc-ease),
+    border-color 0.16s var(--doc-ease);
+}
+
+.toc-item--h3 a {
+  padding-left: 24px;
+}
+
+.toc-item a:hover {
+  color: var(--doc-text-2);
+}
+
+.toc-item a[data-active] {
+  color: var(--doc-strong);
+  border-left-color: var(--doc-accent);
+}
+
+/* ── Page chrome ──────────────────────────────────────────────────────── */
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--doc-faint);
+}
+
+.crumbs a {
+  color: var(--doc-faint);
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  color: var(--doc-text-2);
+}
+
+.crumbs__sep {
+  color: var(--doc-line-2);
+}
+
+.crumbs [aria-current="page"] {
+  color: var(--doc-text-2);
+}
+
+/* The `#` beside a heading. Hidden until the heading is hovered or the link
+   itself is focused — present for anyone who wants a link to a section,
+   invisible to everyone reading past it. */
+.anchor {
+  margin-left: 8px;
+  color: var(--doc-accent);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.14s var(--doc-ease);
+}
+
+h2:hover .anchor,
+h3:hover .anchor,
+.anchor:focus-visible {
+  opacity: 1;
+}
+
+.page-since {
+  margin-top: 40px;
+  font-family: var(--doc-mono);
+  font-size: 12px;
+  color: var(--doc-faint);
+}
+
+/* ── Pager ────────────────────────────────────────────────────────────── */
+
+.pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid var(--doc-line);
+}
+
+.pager__card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 16px;
+  border: 1px solid var(--doc-line);
+  border-radius: 10px;
+  text-decoration: none;
+  transition:
+    border-color 0.18s var(--doc-ease),
+    background 0.18s var(--doc-ease);
+}
+
+.pager__card:hover {
+  border-color: var(--doc-line-2);
+  background: var(--doc-raised);
+}
+
+.pager__card--next {
+  text-align: right;
+}
+
+.pager__direction {
+  font-size: 12px;
+  color: var(--doc-faint);
+}
+
+.pager__title {
+  font-size: 14.5px;
+  font-weight: 480;
+  color: var(--doc-strong);
+}
+
+/* ── Home ─────────────────────────────────────────────────────────────── */
+
+.page--home .lede {
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--doc-text-2);
+}
+
+.cards {
+  display: grid;
+  /* Three across on a full-width panel. Four made each card narrower than its
+     own title needed. */
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 12px;
+  margin-top: 40px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  border: 1px solid var(--doc-line);
+  border-radius: 12px;
+  text-decoration: none;
+  transition:
+    border-color 0.18s var(--doc-ease),
+    background 0.18s var(--doc-ease);
+}
+
+a.card:hover {
+  border-color: var(--doc-line-2);
+  background: var(--doc-raised);
+}
+
+.card__title {
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--doc-strong);
+}
+
+.card__meta {
+  font-size: 13px;
+  color: var(--doc-faint);
+}
+
+.card--planned {
+  opacity: 0.55;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+/* The table of contents is the first thing to go: it is an orientation aid, and
+   below this width the content column needs the room more than the reader needs
+   the aid. */
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: var(--doc-sidebar) minmax(0, 1fr);
+  }
+
+  .layout__toc {
+    display: none;
+  }
+}
+
+/* Below this, the sidebar becomes a sheet over the page rather than a column
+   beside it. */
+@media (max-width: 900px) {
+  :root {
+    --doc-frame: 96vw;
+  }
+
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 20px;
+  }
+
+  .topbar__menu {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .topbar__version {
+    display: none;
+  }
+
+  .layout__sidebar {
+    position: fixed;
+    top: var(--doc-topbar);
+    bottom: 0;
+    left: 0;
+    z-index: 15;
+    width: 280px;
+    max-height: none;
+    padding: 24px 20px 40px;
+    background: var(--doc-surface);
+    border-right: 1px solid var(--doc-line);
+    transform: translateX(-101%);
+    transition: transform 0.24s var(--doc-ease);
+  }
+
+  .layout__sidebar[data-open] {
+    transform: translateX(0);
+  }
+
+  .scrim {
+    position: fixed;
+    inset: var(--doc-topbar) 0 0;
+    z-index: 14;
+    background: rgba(0, 0, 0, 0.34);
+  }
+
+  .layout__main {
+    padding: 32px 22px 48px;
+    border-radius: 12px;
+  }
+
+  .pager {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* On a narrow phone the bar has to choose. Navigation and the theme control
+   are what a reader needs here; the repository link is a click away through the
+   wordmark, and the section label is redundant once the sidebar is the only
+   thing on screen. */
+@media (max-width: 560px) {
+  .topbar__cta,
+  .topbar__section {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__rail,
+  .layout__sidebar {
+    transition: none;
+  }
+}

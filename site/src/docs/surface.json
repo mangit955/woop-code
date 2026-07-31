@@ -1,0 +1,395 @@
+{
+  "version": "0.6.0",
+  "counts": {
+    "tools": 13,
+    "commands": 11,
+    "approvalModes": 4
+  },
+  "tools": [
+    {
+      "name": "list_files",
+      "description": "List files in a directory, skipping dependency and build directories. Returns up to 500 files. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": false,
+          "description": "Directory path"
+        }
+      ]
+    },
+    {
+      "name": "read_file",
+      "description": "Reads the contents of a file.",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Path to the file"
+        }
+      ]
+    },
+    {
+      "name": "run_terminal",
+      "description": "Runs a terminal command in the current project. For quick commands only (tests, builds, installs). Do not use for starting servers or long-running processes.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "string",
+          "required": true,
+          "description": "Command to execute"
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "required": false,
+          "description": "Timeout in seconds (default: 30). Command will be killed if it exceeds this time."
+        }
+      ]
+    },
+    {
+      "name": "create_file",
+      "description": "Creates a new file with the provided content. Pass an empty string to create an empty file.",
+      "effect": "write",
+      "gate": "Pauses on a unified diff. Nothing is written until you approve it.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "File path"
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "required": true,
+          "description": "File content. May be an empty string for an empty file."
+        }
+      ]
+    },
+    {
+      "name": "write_file",
+      "description": "Overwrite an existing file.",
+      "effect": "write",
+      "gate": "Pauses on a unified diff. Nothing is written until you approve it.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "File path"
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "required": true,
+          "description": "New file contents"
+        }
+      ]
+    },
+    {
+      "name": "edit_file",
+      "description": "Replace text inside an existing file.",
+      "effect": "write",
+      "gate": "Pauses on a unified diff. Nothing is written until you approve it.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "File path"
+        },
+        {
+          "name": "oldText",
+          "type": "string",
+          "required": true,
+          "description": "Exact current text to replace, copied verbatim from read_file output."
+        },
+        {
+          "name": "newText",
+          "type": "string",
+          "required": true,
+          "description": "Exact replacement text."
+        }
+      ]
+    },
+    {
+      "name": "grep",
+      "description": "Searches recursively for text in project files.",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "text to search for"
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false,
+          "description": "directory to search, default process.cwd()"
+        }
+      ]
+    },
+    {
+      "name": "run_tests",
+      "description": "Runs the project's test command. For quick test execution only - do not use to start servers.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "string",
+          "required": false,
+          "description": "defaults to bun test"
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "required": false,
+          "description": "timeout in seconds (default: 60)"
+        }
+      ]
+    },
+    {
+      "name": "find_files",
+      "description": "Finds files by name or partial filename, skipping dependency and build directories. Returns up to 200 matches. Use specific queries (e.g., 'websocket', 'config') rather than broad patterns (e.g., '.').",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "filename or partial filename"
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false,
+          "description": "root directory, default process.cwd()"
+        }
+      ]
+    },
+    {
+      "name": "glob",
+      "description": "Search for files matching a glob pattern. Supports wildcards like *, **, ?, [abc], etc.\n  \nExamples:\n- \"*.ts\" - All TypeScript files in current directory\n- \"**/*.test.ts\" - All test files recursively\n- \"src/**/*.{ts,tsx}\" - TypeScript/TSX files in src/\n- \"*.{js,json}\" - JS and JSON files\n\nReturns up to 100 matching file paths.",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "The glob pattern to match files against (e.g., '**/*.ts', 'src/**/*.json')"
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false,
+          "description": "The directory to search in. If not specified, uses current working directory. Must be a valid directory path if provided."
+        }
+      ]
+    },
+    {
+      "name": "web_search",
+      "description": "Search the web for current information, documentation, or answers to questions.\n\nUse this when you need:\n- Current/up-to-date information (news, prices, versions, etc.)\n- Documentation or API references\n- Technical solutions or stack overflow answers\n- Verify information that may have changed recently\n\nReturns a list of relevant web pages with titles, URLs, and snippets.\n\nCurrent year: 2026",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "The search query (e.g., 'latest nodejs version', 'how to use react hooks')"
+        },
+        {
+          "name": "numResults",
+          "type": "number",
+          "required": false,
+          "description": "Number of search results to return (default: 5, max: 10)"
+        }
+      ]
+    },
+    {
+      "name": "web_fetch",
+      "description": "Fetch and extract content from a specific URL.\n\nUse this to:\n- Read documentation pages\n- Fetch article content\n- Get data from specific web pages\n- Read content found via web_search\n\nSupports:\n- HTML pages (converts to readable text)\n- Plain text\n- JSON data\n- Markdown\n\nMax response size: 5MB\nDefault timeout: 30 seconds",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "The URL to fetch content from (must start with http:// or https://)"
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "required": false,
+          "description": "Output format: 'text', 'markdown', or 'html' (default: 'markdown')"
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "required": false,
+          "description": "Timeout in seconds (default: 30, max: 120)"
+        }
+      ]
+    },
+    {
+      "name": "ask_user",
+      "description": "Ask the user questions to gather information needed to complete their request.\n\nUse this when you need:\n- Clarification on ambiguous requests\n- Additional details or preferences\n- User confirmation before proceeding\n- Input that only the user can provide\n\nYou can ask multiple questions at once. Each question will be presented to the user,\nand their answers will be returned to you.\n\nExamples:\n- \"Which API endpoint should I modify?\"\n- \"Do you want to use TypeScript or JavaScript?\"\n- \"Should I update the tests as well?\"",
+      "effect": "ask",
+      "gate": "Stops the turn and waits for your answer.",
+      "parameters": [
+        {
+          "name": "questions",
+          "type": "array",
+          "required": true,
+          "description": "Array of questions to ask the user (e.g., ['What is the API key?', 'Which environment?'])"
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "help",
+      "aliases": [
+        "h",
+        "?"
+      ],
+      "category": "other",
+      "description": "Show available commands",
+      "usage": "/help"
+    },
+    {
+      "name": "new",
+      "aliases": [
+        "clear",
+        "reset"
+      ],
+      "category": "session",
+      "description": "Start a new conversation",
+      "usage": "/new"
+    },
+    {
+      "name": "exit",
+      "aliases": [
+        "quit",
+        "q"
+      ],
+      "category": "session",
+      "description": "Exit Woopcode",
+      "usage": "/exit"
+    },
+    {
+      "name": "provider",
+      "aliases": [
+        "p"
+      ],
+      "category": "configuration",
+      "description": "Show or switch provider",
+      "usage": "/provider [provider-name]"
+    },
+    {
+      "name": "login",
+      "aliases": [],
+      "category": "configuration",
+      "description": "Login to a provider",
+      "usage": "/login <provider> <api-key>"
+    },
+    {
+      "name": "logout",
+      "aliases": [],
+      "category": "configuration",
+      "description": "Logout from a provider",
+      "usage": "/logout [provider]"
+    },
+    {
+      "name": "models",
+      "aliases": [
+        "model",
+        "m"
+      ],
+      "category": "configuration",
+      "description": "Show the active model and those available for this provider",
+      "usage": "/models"
+    },
+    {
+      "name": "approval",
+      "aliases": [
+        "approve"
+      ],
+      "category": "configuration",
+      "description": "Choose how much runs without asking",
+      "usage": "/approval"
+    },
+    {
+      "name": "workspace",
+      "aliases": [
+        "ws"
+      ],
+      "category": "workspace",
+      "description": "Show workspace information",
+      "usage": "/workspace"
+    },
+    {
+      "name": "status",
+      "aliases": [
+        "info"
+      ],
+      "category": "other",
+      "description": "Show comprehensive system status",
+      "usage": "/status"
+    },
+    {
+      "name": "version",
+      "aliases": [
+        "v"
+      ],
+      "category": "other",
+      "description": "Show Woopcode version",
+      "usage": "/version"
+    }
+  ],
+  "approvalModes": [
+    {
+      "mode": "always-ask",
+      "label": "Always ask",
+      "description": "Confirm every shell command",
+      "unsafe": false,
+      "default": false
+    },
+    {
+      "mode": "auto-read-only",
+      "label": "Auto read-only",
+      "description": "Run reads and tests; ask before anything writes",
+      "unsafe": false,
+      "default": true
+    },
+    {
+      "mode": "auto-workspace",
+      "label": "Auto workspace",
+      "description": "Also write inside the workspace; ask to delete or touch the system",
+      "unsafe": false,
+      "default": false
+    },
+    {
+      "mode": "full-auto",
+      "label": "Full auto",
+      "description": "Run everything without asking — no protection",
+      "unsafe": true,
+      "default": false
+    }
+  ]
+}

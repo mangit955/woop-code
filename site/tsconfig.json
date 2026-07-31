@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The CLI targets Bun only; the landing page is the one part that needs DOM.
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun", "react", "react-dom"]
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["dist", "../node_modules"]
+}

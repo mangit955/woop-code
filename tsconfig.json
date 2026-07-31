@@ -26,5 +26,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+
+  // The landing page needs DOM types; it has its own tsconfig.
+  "exclude": ["site", "node_modules"]
 }

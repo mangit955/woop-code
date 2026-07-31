@@ -1,0 +1,15 @@
+<!-- The ▛▜ mark: a 4x2 quadrant grid with six cells filled, each stepped along
+     a periwinkle ramp around the product accent #ACA3EC. Same mark as
+     src/components/Logo.tsx, but stepped around the accent rather than below
+     it — the tile is dark, so here the accent reads on its own. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <rect width="32" height="32" rx="7" fill="#0d0d0d" />
+  <g transform="translate(4 10)">
+    <rect x="0" y="0" width="6" height="6" fill="#d3cef7" />
+    <rect x="6" y="0" width="6" height="6" fill="#bfb8f1" />
+    <rect x="12" y="0" width="6" height="6" fill="#aca3ec" />
+    <rect x="18" y="0" width="6" height="6" fill="#9a8fe4" />
+    <rect x="0" y="6" width="6" height="6" fill="#b8b0ef" />
+    <rect x="18" y="6" width="6" height="6" fill="#7d6ed5" />
+  </g>
+</svg>

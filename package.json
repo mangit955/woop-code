@@ -48,6 +48,8 @@
   ],
   "scripts": {
     "start": "bun ./cli.ts",
+    "site": "bun --hot ./site/server.ts",
+    "site:build": "bun build ./site/index.html --outdir ./site/dist --minify",
     "test": "bun test && bunx --no-install tsc --noEmit",
     "test:watch": "bun test --watch",
     "prepublishOnly": "bun test"
@@ -63,15 +65,19 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "marked": "^18.0.7",
-    "react": "^19.2.7"
+    "react": "^19.2.7",
+    "simplex-noise": "^4.0.3"
   },
   "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/typescript-checker": "^9.6.1",
     "@types/bun": "latest",
     "@types/commander": "^2.12.5",
     "@types/react": "^19.2.17",
-    "fast-check": "^4.9.0"
+    "@types/react-dom": "^19.2.3",
+    "fast-check": "^4.9.0",
+    "react-dom": "19.2.7"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

@@ -1,0 +1,777 @@
+/* ==========================================================================
+   Woopcode — one static screen, split down the middle.
+   ========================================================================== */
+
+/* Inter, self-hosted. Latin subset only, variable weight 100-900 in one 48KB
+   file, copied from the @fontsource-variable/inter dev dependency. Served by
+   our own server, so the page still makes no third-party requests. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../public/fonts/inter-latin.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  /* Neutral greys, no warm cast — it is what makes the reference read clean. */
+  --bg: #0d0d0d;
+  --text: #f4f4f4;
+  --text-2: #a2a2a2;
+  --muted: #8a8a8a;
+  --faint: #5c5c5c;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-2: rgba(255, 255, 255, 0.18);
+  --violet: #8b7bff;
+  /* The page the panel sits on. The product accent (#ACA3EC) taken to a high
+     lightness at the same hue — the panel is white throughout, so this is the
+     only thing separating the two. */
+  --page-bg: #e0dcf9;
+  /* Every hairline: the two vertical rails, the band's rules, the crosshairs. */
+  --rule: rgba(38, 32, 74, 0.12);
+  /* Rail to rail. The nav, the panel and the band all measure against this. */
+  --frame: min(1320px, 94vw);
+  /* How far the panel runs past the first screen. Its bottom edge sits this far
+     below the fold, so reaching the end of the panel is itself a scroll. */
+  --overhang: 140px;
+
+  --sans:
+    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* The panel fills the first screen and the band sits under the fold, so the
+     page scrolls vertically — but never sideways. */
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100%;
+}
+
+img,
+video,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(139, 123, 255, 0.3);
+}
+
+/* Bar on top, panel in the middle, band at the bottom. The panel takes whatever
+   height the other two leave, so the whole thing still fits one screen. */
+.shell {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* The rails carry on below the band, which is both what cal.com does and what
+     gives the band's lower pair of crosshairs somewhere to sit. */
+  padding-bottom: 28px;
+  background: var(--page-bg);
+}
+
+/* The two vertical rails. They belong to the shell rather than to the content
+   column so they run the full height of the page and the band's rules cross
+   them, instead of stopping at whichever element drew them. */
+.shell::before,
+.shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.shell::before {
+  left: calc((100% - var(--frame)) / 2);
+}
+
+.shell::after {
+  right: calc((100% - var(--frame)) / 2);
+}
+
+/* The content column between the rails. The band is deliberately left outside
+   it, so the band's rules run the full width of the page and cross the rails
+   instead of stopping at them. */
+.frame {
+  width: var(--frame);
+  margin-inline: auto;
+  flex: none;
+  /* Nav plus panel run past the first screen by --overhang, so the panel's own
+     bottom edge — and everything after it — only appears once you scroll. dvh
+     so a phone's collapsing address bar cannot pull that edge into view. */
+  min-height: calc(100vh + var(--overhang));
+  min-height: calc(100dvh + var(--overhang));
+  display: flex;
+  flex-direction: column;
+}
+
+/* The split, now a panel floating between the rails rather than the page
+   itself. Clipped so the two halves take the panel's corners. */
+.page {
+  position: relative;
+  /* The panel owns the white and the glyph field; the two halves are
+     transparent and only carry content, so nothing draws a seam between them. */
+  isolation: isolate;
+  background: #fff;
+  flex: 1;
+  min-height: 0;
+  margin: 0 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--rule);
+  /* Every layer at 0,0 so the falloff is even on all four sides, same as the
+     artwork inside it. Tinted violet rather than black so the lavender page it
+     falls on does not grey out. */
+  box-shadow:
+    0 0 2px rgba(38, 32, 74, 0.05),
+    0 0 22px rgba(38, 32, 74, 0.06),
+    0 0 60px rgba(38, 32, 74, 0.07),
+    0 0 120px rgba(38, 32, 74, 0.05);
+}
+
+/* Navbar ----------------------------------------------------------------- */
+
+/* Sits on the page background above the panel, between the rails. */
+.nav {
+  position: sticky;
+  top: 0;
+  /* Above the rails, which the shell draws at z-index 2. */
+  z-index: 5;
+  flex: none;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 clamp(20px, 3vw, 40px);
+  /* Transparent at rest; the frosted state below fades in on scroll. The border
+     is declared here so only its colour animates — adding a border on scroll
+     would shift the bar by a pixel. */
+  border-bottom: 1px solid transparent;
+  transition:
+    background 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+}
+
+.nav[data-scrolled="true"] {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px) saturate(1.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.7);
+  border-bottom-color: var(--rule);
+  box-shadow: 0 8px 24px rgba(38, 32, 74, 0.06);
+}
+
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2vw, 28px);
+}
+
+.nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 380;
+  letter-spacing: -0.012em;
+  color: #292929;
+  transition: color 0.18s var(--ease);
+}
+
+.nav__link:hover {
+  color: #000;
+}
+
+.nav__cta {
+  display: inline-flex;
+  align-items: center;
+  /* Wider than the trailing chevron needed — the mark now leads the label. */
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 380;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+  transition:
+    background 0.18s,
+    transform 0.16s var(--ease);
+}
+
+.nav__cta:hover {
+  background: #2a2a2a;
+}
+
+.nav__cta:active {
+  transform: translateY(1px);
+}
+
+/* Band ------------------------------------------------------------------- */
+
+/* Full width so its two rules cross the rails. The crosshairs sit on those four
+   intersections and are drawn by the band, since it is the only element that
+   knows where both the rules and the rails are. */
+.band {
+  position: relative;
+  flex: none;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.band__inner {
+  width: var(--frame);
+  margin-inline: auto;
+  min-height: 76px;
+  padding: 16px clamp(20px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* One plus per intersection: ::before is the horizontal stroke, ::after the
+   vertical one, and the span is centred on the crossing point. */
+.cross {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.cross::before,
+.cross::after {
+  content: "";
+  position: absolute;
+  background: var(--rule);
+}
+
+.cross::before {
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 1px;
+}
+
+.cross::after {
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+}
+
+.cross--tl,
+.cross--bl {
+  left: calc((100% - var(--frame)) / 2 - 4px);
+}
+
+.cross--tr,
+.cross--br {
+  right: calc((100% - var(--frame)) / 2 - 4px);
+}
+
+.cross--tl,
+.cross--tr {
+  top: -5px;
+}
+
+.cross--bl,
+.cross--br {
+  bottom: -5px;
+}
+
+.band__legal {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6b6b6b;
+}
+
+.band__links {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 32px);
+  flex-wrap: wrap;
+}
+
+.band__link {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: #4a4a4a;
+  transition: color 0.18s var(--ease);
+}
+
+.band__link:hover {
+  color: #000;
+}
+
+/* Left pane -------------------------------------------------------------- */
+
+/* The left half is the light side of the split. It redefines the palette tokens
+   on itself rather than being restyled rule by rule, so everything inside —
+   type, rules, the install field — inverts by inheritance. */
+.pane {
+  --text: #111111;
+  --text-2: #4a4a4a;
+  --muted: #3f3f3f;
+  --faint: #6b6b6b;
+  --line: rgba(0, 0, 0, 0.13);
+  --line-2: rgba(0, 0, 0, 0.24);
+
+  position: relative;
+  /* Above the panel's field, and transparent so it shows through. */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 4.2vh, 52px) clamp(32px, 6.4vw, 104px);
+  min-width: 0;
+}
+
+/* Full opacity at rest: the mark is flat black, and the old 0.95 held it just
+   short of that. The hover now dims rather than brightens. */
+.brand {
+  display: inline-flex;
+  width: fit-content;
+  opacity: 1;
+  transition: opacity 0.2s var(--ease);
+}
+
+.brand:hover {
+  opacity: 1;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mark {
+  display: block;
+}
+
+.logo__name {
+  font-size: 21px;
+  font-weight: 550;
+  letter-spacing: -0.022em;
+  /* Black rather than --text (#111), so the wordmark matches the mark exactly. */
+  color: #000;
+}
+
+/* The mark moved up into the navbar and the legal line down into the band, so
+   the pane holds nothing but this block and it simply centres. */
+.lede {
+  position: relative;
+  z-index: 1;
+  max-width: 30rem;
+  margin: auto 0;
+}
+
+.lede h2 {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 32px);
+  line-height: 1.1;
+  font-weight: 400;
+  letter-spacing: -0.028em;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.lede__sub {
+  margin: 18px 0 0;
+  font-size: clamp(12px, 0.95vw, 14px);
+  line-height: 1.5;
+  letter-spacing: -0.014em;
+  color: var(--faint);
+}
+
+.lede__note {
+  margin: 18px 0 0;
+  font-size: clamp(12.5px, 0.95vw, 13.5px);
+  letter-spacing: -0.012em;
+  color: var(--faint);
+}
+
+/* Install row ------------------------------------------------------------ */
+
+.install {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.install__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Runner switch ---------------------------------------------------------- */
+
+/* A track with a thumb that slides between the options, rather than two buttons
+   that light up — the movement is what says the two are one choice. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.035);
+  /* Same treatment as the field below it: the glyph field runs under both. */
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+.switch__thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--count));
+  border-radius: 999px;
+  background: #111;
+  transform: translateX(calc(var(--index) * 100%));
+  transition: transform 0.3s var(--ease);
+}
+
+.switch__option {
+  position: relative;
+  /* Above the thumb, so the label of the selected option reads on the fill. */
+  z-index: 1;
+  appearance: none;
+  border: 0;
+  background: none;
+  min-width: 56px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  color: var(--faint);
+  cursor: pointer;
+  transition: color 0.22s var(--ease);
+}
+
+.switch__option:hover {
+  color: var(--text);
+}
+
+.switch__option[aria-selected="true"],
+.switch__option[aria-selected="true"]:hover {
+  color: #fff;
+}
+
+.install__field {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  /* A fill barely below the page background — enough to read as a field
+     rather than an outline, without becoming a panel. The blur is what makes it
+     a field rather than a tint: the glyph pattern now runs under this half of
+     the panel, and softening it is what keeps the command legible. */
+  background: rgba(0, 0, 0, 0.035);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s var(--ease),
+    background 0.2s var(--ease);
+}
+
+.install__field:hover {
+  border-color: var(--line-2);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+.install__prompt {
+  color: var(--faint);
+}
+
+/* `pre` so the spaces the morph holds onto are the spaces that get drawn. */
+.install__command {
+  min-width: 0;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.install__hint {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  transition: color 0.18s;
+}
+
+.install__field:hover .install__hint {
+  color: var(--text-2);
+}
+
+.install__hint[data-copied="true"] {
+  color: #15803d;
+}
+
+.install__go {
+  flex: none;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 0;
+  background: #111;
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 560;
+  letter-spacing: -0.014em;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    transform 0.16s var(--ease);
+}
+
+.install__go:hover {
+  background: #2a2a2a;
+}
+
+.install__go:active {
+  transform: translateY(1px);
+}
+
+/* Right pane ------------------------------------------------------------- */
+
+.scene {
+  position: relative;
+  /* Above the panel's field, and transparent so it shows through. */
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+/* Spans the panel, not one half of it. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.backdrop canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.scene__body {
+  position: relative;
+  z-index: 1;
+  width: min(620px, 84%);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3.4vh, 34px);
+}
+
+/* No frame, no fill — the screenshot is the object. Its own corner radius is
+   mirrored here so the shadow follows the image rather than a square box. */
+.demo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  /* Every layer sits at 0,0 so the falloff is even on all four sides — a glow
+     the image rests inside, not a drop shadow cast downward. The blur radii are
+     wider than the offset version needed, because a centred blur spends half of
+     itself under the image. The depth comes from the shadow, not from colour;
+     the tint stays violet rather than black to keep it in the palette. */
+  box-shadow:
+    0 0 4px rgba(38, 32, 74, 0.07),
+    0 0 18px rgba(38, 32, 74, 0.11),
+    0 0 50px rgba(38, 32, 74, 0.2),
+    0 0 110px rgba(38, 32, 74, 0.16);
+}
+
+.demo img {
+  width: 100%;
+  height: auto;
+  border-radius: inherit;
+}
+
+.scene__caption {
+  margin: 0;
+  font-size: clamp(13px, 0.95vw, 14.5px);
+  line-height: 1.62;
+  color: rgba(38, 32, 74, 0.72);
+  /* No text-shadow: it existed to lift white type off the animated dark field,
+     and on the light field it only muddies the glyphs behind. */
+}
+
+/* Entrance --------------------------------------------------------------- */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.72s var(--ease),
+    transform 0.72s var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-reveal="in"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+/* A 50/50 split cannot hold both halves on a phone, so below this width the
+   panel stacks and each half sizes to its own content. */
+@media (max-width: 900px) {
+  .page {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .band__inner {
+    justify-content: flex-start;
+    gap: 12px 24px;
+  }
+
+  .pane {
+    gap: 44px;
+    padding: 30px 24px 36px;
+    min-height: auto;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: none;
+  }
+
+  .scene {
+    min-height: 62vh;
+    padding: 44px 0;
+  }
+
+  .scene__body {
+    width: min(560px, 88%);
+  }
+}
+
+@media (max-width: 560px) {
+  .install__field,
+  .install__go {
+    width: 100%;
+    flex: none;
+  }
+
+  .install__go {
+    order: 2;
+  }
+
+  /* All three items still fit on a phone at this size, so the bar stays a bar
+     rather than collapsing behind a menu button. */
+  .nav {
+    height: 58px;
+    gap: 12px;
+  }
+
+  .nav__links {
+    gap: 12px;
+  }
+
+  .nav__link,
+  .nav__cta {
+    font-size: 13px;
+  }
+
+  .nav__cta {
+    height: 32px;
+    padding: 0 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}

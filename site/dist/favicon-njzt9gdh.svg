@@ -1,0 +1,13 @@
+<!-- The ▛▜ mark: a 4x2 quadrant grid with six cells filled, each stepped along
+     a blue ramp around #6EA8FE. Matches src/components/Logo.tsx. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <rect width="32" height="32" rx="7" fill="#0d0d0d" />
+  <g transform="translate(4 10)">
+    <rect x="0" y="0" width="6" height="6" fill="#a6c9ff" />
+    <rect x="6" y="0" width="6" height="6" fill="#8cb8fe" />
+    <rect x="12" y="0" width="6" height="6" fill="#6ea8fe" />
+    <rect x="18" y="0" width="6" height="6" fill="#5c9af6" />
+    <rect x="0" y="6" width="6" height="6" fill="#7fb0fe" />
+    <rect x="18" y="6" width="6" height="6" fill="#4a83dc" />
+  </g>
+</svg>

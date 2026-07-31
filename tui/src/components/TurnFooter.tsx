@@ -15,7 +15,7 @@ const TICK_INTERVAL_MS = 100;
 const PULSE_INTERVAL_MS = 240;
 
 /** Breathes the marker while the turn is in flight. */
-const pulseColors = ["#1e40af", "#2563eb", "#3b82f6", "#60a5fa", "#3b82f6", "#2563eb"] as const;
+const pulseColors = ["#453B82", "#7263CE", "#8F83E0", "#ACA3EC", "#8F83E0", "#7263CE"] as const;
 
 /** Takes the palette as an argument so it fades with the layer it renders in. */
 function outcomeColor(outcome: TurnOutcome, colors: Palette) {

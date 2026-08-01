@@ -1,4 +1,5 @@
 {
+  "installCommand": "bun install",
   "buildCommand": "bun run site:build:static",
   "outputDirectory": "site/dist",
   "framework": null,

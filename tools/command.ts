@@ -28,31 +28,48 @@ function signalProcess(pid: number, signal: NodeJS.Signals) {
   Bun.spawnSync({ cmd: ["kill", `-${signal.replace("SIG", "")}`, String(pid)], stdout: "ignore", stderr: "ignore" });
 }
 
+/**
+ * Signals a whole process group, reporting whether the signal actually landed.
+ *
+ * `Bun.spawnSync` resolves for a `kill` that ran and failed — a wrong group id
+ * exits non-zero rather than throwing — so a `try/catch` here would report
+ * success for a signal nobody received. The exit status is the only honest
+ * answer, and the caller needs it to know whether to fall back.
+ */
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
+  const result = Bun.spawnSync({
+    cmd: ["kill", `-${signal.replace("SIG", "")}`, `-${pid}`],
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+
+  return result.success;
+}
+
+/** Signals every descendant, then the shell itself. */
+function signalTree(pid: number, signal: NodeJS.Signals) {
+  for (const descendant of descendantPids(pid)) {
+    signalProcess(descendant, signal);
+  }
+  signalProcess(pid, signal);
+}
+
 function terminateProcessTree(proc: ReturnType<typeof Bun.spawn>, processGroup: boolean) {
   if (proc.exitCode !== null) return;
 
-  if (processGroup) {
-    try {
-      Bun.spawnSync({ cmd: ["kill", "-TERM", `-${proc.pid}`], stdout: "ignore", stderr: "ignore" });
-    } catch {
-      signalProcess(proc.pid, "SIGTERM");
-    }
-  } else {
-    // macOS does not ship `setsid`. Kill descendants before the shell so
-    // foreground pipelines and test runners cannot outlive the timeout.
-    const descendants = descendantPids(proc.pid);
-    for (const pid of descendants) {
-      signalProcess(pid, "SIGTERM");
-    }
-    signalProcess(proc.pid, "SIGTERM");
+  // A group kill is preferred where `setsid` gave the command its own group, but
+  // it is not guaranteed to land: `setsid` forks when it is already a group
+  // leader, and the new leader's id is then not this pid. When that happens the
+  // signal reaches nothing, the command runs to completion, and the timeout the
+  // caller asked for is silently not honoured. Falling back to the tree walk
+  // that platforms without `setsid` already use keeps one behaviour everywhere.
+  if (!processGroup || !signalProcessGroup(proc.pid, "SIGTERM")) {
+    signalTree(proc.pid, "SIGTERM");
   }
 
   const forceKillTimer = setTimeout(() => {
-    try {
-        if (processGroup) Bun.spawnSync({ cmd: ["kill", "-KILL", `-${proc.pid}`], stdout: "ignore", stderr: "ignore" });
-      else signalProcess(proc.pid, "SIGKILL");
-    } catch {
-      signalProcess(proc.pid, "SIGKILL");
+    if (!processGroup || !signalProcessGroup(proc.pid, "SIGKILL")) {
+      signalTree(proc.pid, "SIGKILL");
     }
   }, 500);
   forceKillTimer.unref?.();

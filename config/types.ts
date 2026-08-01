@@ -47,7 +47,7 @@ export interface ToolParameter {
   name: string;
   description: string;
   required: boolean;
-  type?: "string" | "number" | "array";
+  type?: "string" | "number" | "boolean" | "array";
 }
 
 export interface ToolCall {

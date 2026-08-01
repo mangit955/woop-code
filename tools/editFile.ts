@@ -2,11 +2,14 @@ import type { Tool } from "../config/types";
 import { createTwoFilesPatch } from "diff";
 import { store } from "../tui/src/store/ui-store";
 import type { PendingEdit } from "../tui/src/types";
+import { applyEdit, describeAmbiguity } from "./textEdit";
 import { resolveWorkspacePath } from "./workspace";
 
 export const editFileTool: Tool = {
   name: "edit_file",
-  description: "Replace text inside an existing file.",
+  description:
+    "Replace text inside an existing file. oldText must match exactly one place in the file, " +
+    "or the edit is refused so the wrong occurrence is never changed.",
 
   parameters: [
     {
@@ -16,13 +19,23 @@ export const editFileTool: Tool = {
     },
     {
       name: "oldText",
-      description: "Exact current text to replace, copied verbatim from read_file output.",
+      description:
+        "Exact current text to replace, copied verbatim from read_file output. Include enough " +
+        "surrounding lines to match exactly one place in the file.",
       required: true,
     },
     {
       name: "newText",
-      description: "Exact replacement text.",
+      description: "Exact replacement text. Inserted literally; no substitution patterns are expanded.",
       required: true,
+    },
+    {
+      name: "replaceAll",
+      description:
+        "Set to true only to deliberately change every non-overlapping occurrence, such as a rename. " +
+        "Omit it otherwise; omitting means the single unique occurrence.",
+      required: false,
+      type: "boolean",
     },
   ],
 
@@ -48,11 +61,29 @@ export const editFileTool: Tool = {
 
     const content = await file.text();
 
-    if (!content.includes(oldText)) {
-      throw new Error("Text to replace not found.");
+    const outcome = applyEdit(content, oldText, newText, {
+      // Absent and `false` mean the same thing: the caller did not ask for every
+      // occurrence. Only an explicit yes counts as one.
+      ...(args.replaceAll === true || args.replaceAll === "true"
+        ? { replaceAll: true as const }
+        : {}),
+    });
+
+    switch (outcome.kind) {
+      case "empty-pattern":
+        throw new Error(
+          "oldText must not be empty. Provide the exact text to replace, copied from read_file.",
+        );
+      case "not-found":
+        throw new Error(
+          `Text to replace not found in ${path}. Read the file again and copy oldText verbatim, ` +
+            "including its indentation.",
+        );
+      case "ambiguous":
+        throw new Error(describeAmbiguity(outcome.occurrences, path));
     }
 
-    const updated = content.replace(oldText, newText);
+    const updated = outcome.content;
 
     // If content is identical, skip diff preview
     if (content === updated) {
@@ -79,20 +110,22 @@ export const editFileTool: Tool = {
     try {
       approved = await store.setPendingEdit(pendingEdit);
     } catch (error) {
-      const outcome = `Edit cancelled for ${path}. No changes were applied.`;
-      store.addSystemMessage(outcome);
-      return outcome;
+      const message = `Edit cancelled for ${path}. No changes were applied.`;
+      store.addSystemMessage(message);
+      return message;
     }
 
     if (!approved) {
-      const outcome = `Edit rejected for ${path}. No changes were applied. Do not claim this edit was completed.`;
-      store.addSystemMessage(outcome);
-      return outcome;
+      const message = `Edit rejected for ${path}. No changes were applied. Do not claim this edit was completed.`;
+      store.addSystemMessage(message);
+      return message;
     }
 
     // Write file after approval
     await Bun.write(path, updated);
 
-    return `Edited ${path}`;
+    return outcome.replacements > 1
+      ? `Edited ${path} (${outcome.replacements} occurrences replaced)`
+      : `Edited ${path}`;
   },
 };

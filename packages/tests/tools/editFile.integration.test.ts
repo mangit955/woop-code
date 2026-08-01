@@ -58,16 +58,35 @@ describe("editFile Tool - Integration Tests", () => {
       expect(await readFile(path)).toBe("hello universe");
     });
 
-    test("replaces first occurrence only", async () => {
+    test("refuses an ambiguous match instead of taking the first", async () => {
+      // This tool used to replace the first occurrence silently, which is a
+      // guess about which one the caller meant.
       const path = await createFile("test.txt", "hello world world");
 
-      await editFileTool.execute({
+      await expect(
+        editFileTool.execute({
+          path,
+          oldText: "world",
+          newText: "universe",
+        }),
+      ).rejects.toThrow("Found 2 matches");
+
+      expect(await readFile(path)).toBe("hello world world");
+      expect(mockStore.setPendingEdit).not.toHaveBeenCalled();
+    });
+
+    test("replaces every occurrence when replaceAll is set", async () => {
+      const path = await createFile("test.txt", "hello world world");
+
+      const result = await editFileTool.execute({
         path,
         oldText: "world",
         newText: "universe",
+        replaceAll: true,
       });
 
-      expect(await readFile(path)).toBe("hello universe world");
+      expect(result).toBe(`Edited ${path} (2 occurrences replaced)`);
+      expect(await readFile(path)).toBe("hello universe universe");
     });
 
     test("replaces entire line", async () => {
@@ -262,6 +281,67 @@ describe("editFile Tool - Integration Tests", () => {
           newText: "new",
         })
       ).rejects.toThrow("Text to replace not found");
+    });
+
+    test("ambiguity error carries every match in context", async () => {
+      const path = await createFile(
+        "api.ts",
+        [
+          "function load() {",
+          "  const result = fetchUser(id);",
+          "  return result;",
+          "}",
+          "",
+          "function reload() {",
+          "  const result = fetchUser(id);",
+          "  return result;",
+          "}",
+        ].join("\n"),
+      );
+
+      const failure = await editFileTool
+        .execute({ path, oldText: "const result = fetchUser(id);", newText: "x" })
+        .catch((error: Error) => error.message);
+
+      // Everything needed to extend oldText, without reading the file again.
+      expect(failure).toContain(`Found 2 matches for oldText in ${path} (lines 2, 7).`);
+      expect(failure).toContain("Line 2, column 3:");
+      expect(failure).toContain("  1 | function load() {");
+      expect(failure).toContain("> 2 |   const result = fetchUser(id);");
+      expect(failure).toContain("  6 | function reload() {");
+      expect(failure).toContain("Extend oldText");
+    });
+
+    test("throws when oldText is empty", async () => {
+      const path = await createFile("test.txt", "hello world");
+
+      await expect(
+        editFileTool.execute({ path, oldText: "", newText: "X" }),
+      ).rejects.toThrow("oldText must not be empty");
+
+      expect(await readFile(path)).toBe("hello world");
+    });
+
+    test("a replaceAll of false is not a request to replace all", async () => {
+      const path = await createFile("test.txt", "foo foo");
+
+      await expect(
+        editFileTool.execute({ path, oldText: "foo", newText: "bar", replaceAll: false }),
+      ).rejects.toThrow("Found 2 matches");
+
+      expect(await readFile(path)).toBe("foo foo");
+    });
+
+    test("newText is inserted literally, not as a substitution pattern", async () => {
+      const path = await createFile("test.sh", "cost=PLACEHOLDER");
+
+      await editFileTool.execute({
+        path,
+        oldText: "PLACEHOLDER",
+        newText: "$&{total}",
+      });
+
+      expect(await readFile(path)).toBe("cost=$&{total}");
     });
 
     test("throws when path is directory", async () => {

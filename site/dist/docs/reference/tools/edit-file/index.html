@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>edit_file — Woopcode docs</title>
-    <meta name="description" content="Replace text inside an existing file." />
+    <meta name="description" content="Replace text inside an existing file. oldText must match exactly one place in the file, or the edit is refused so the wrong occurrence is never changed." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
     <link rel="stylesheet" href="/docs/tokens.css" />
@@ -34,7 +34,7 @@
           <span>Search</span>
           <kbd class="search-trigger__key">⌘K</kbd>
         </button>
-        <span class="topbar__version">v0.6.0</span>
+        <span class="topbar__version">v0.6.1</span>
         <button class="topbar__theme" type="button" data-theme-toggle
           aria-label="Switch between light and dark">Theme</button>
         <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
@@ -65,7 +65,7 @@
       <main class="layout__main"><article class="page">
     <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Reference</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">edit_file</span></nav>
     <h1 id="edit_file"><code>edit_file</code></h1>
-<p>Replace text inside an existing file. Changes the workspace, so it pauses on a unified diff and waits for you.</p>
+<p>Replace text inside an existing file. oldText must match exactly one place in the file, or the edit is refused so the wrong occurrence is never changed. Changes the workspace, so it pauses on a unified diff and waits for you.</p>
 <h2 id="parameters">Parameters<a class="anchor" href="#parameters" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll"><table>
 <thead>
@@ -86,13 +86,19 @@
 <td><code>oldText</code></td>
 <td><code>string</code></td>
 <td>Yes</td>
-<td>Exact current text to replace, copied verbatim from read_file output.</td>
+<td>Exact current text to replace, copied verbatim from read_file output. Include enough surrounding lines to match exactly one place in the file.</td>
 </tr>
 <tr>
 <td><code>newText</code></td>
 <td><code>string</code></td>
 <td>Yes</td>
-<td>Exact replacement text.</td>
+<td>Exact replacement text. Inserted literally; no substitution patterns are expanded.</td>
+</tr>
+<tr>
+<td><code>replaceAll</code></td>
+<td><code>boolean</code></td>
+<td>No</td>
+<td>Set to true only to deliberately change every non-overlapping occurrence, such as a rename. Omit it otherwise; omitting means the single unique occurrence.</td>
 </tr>
 </tbody></table></div>
 <h2 id="example">Example<a class="anchor" href="#example" aria-label="Link to this section">#</a></h2>

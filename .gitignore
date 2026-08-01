@@ -1,2 +1,19 @@
 node_modules
 .env
+
+# OS noise
+.DS_Store
+
+# Build output
+# site/dist/ is deliberately committed — it is Vercel's outputDirectory — so
+# there is no blanket dist/ rule here. A rule like that would silently ignore
+# new files the static build adds to it.
+*.tgz
+*.log
+
+# Bun is the package manager for this repo (see CLAUDE.md); bun.lock is the
+# lockfile. A second lockfile means a second possible dependency tree, and
+# whichever one a contributor's tooling picks decides what they actually test.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

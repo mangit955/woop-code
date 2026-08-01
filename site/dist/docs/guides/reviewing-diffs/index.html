@@ -34,7 +34,7 @@
           <span>Search</span>
           <kbd class="search-trigger__key">⌘K</kbd>
         </button>
-        <span class="topbar__version">v0.6.0</span>
+        <span class="topbar__version">v0.6.1</span>
         <button class="topbar__theme" type="button" data-theme-toggle
           aria-label="Switch between light and dark">Theme</button>
         <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
@@ -116,7 +116,7 @@ removed. Added lines carry <code>+</code>, removed lines <code>−</code>.</p>
 </tr>
 <tr>
 <td><code>edit_file</code></td>
-<td>Replace text inside an existing file.</td>
+<td>Replace text inside an existing file. oldText must match exactly one place in the file, or the edit is refused so the wrong occurrence is never changed.</td>
 <td>Pauses on a unified diff. Nothing is written until you approve it.</td>
 </tr>
 </tbody></table></div>

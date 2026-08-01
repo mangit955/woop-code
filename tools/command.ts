@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 export type CommandResult = {
   stdout: string;
   stderr: string;
@@ -11,7 +13,18 @@ const EXIT_GRACE_MS = 750;
 const FORCE_KILL_AFTER_MS = 500;
 
 function childPids(pid: number): number[] {
-  const result = Bun.spawnSync({ cmd: ["pgrep", "-P", String(pid)], stdout: "pipe", stderr: "ignore" });
+  // `Bun.spawnSync` throws outright when the executable is missing, and `pgrep`
+  // is not installed everywhere — a minimal container is enough to lose it. This
+  // runs while a command is being killed, so a throw here would escape into a
+  // timer callback and strand the caller; an empty list just means the other
+  // signals do the work.
+  let result: ReturnType<typeof Bun.spawnSync>;
+  try {
+    result = Bun.spawnSync({ cmd: ["pgrep", "-P", String(pid)], stdout: "pipe", stderr: "ignore" });
+  } catch {
+    return [];
+  }
+
   return new TextDecoder().decode(result.stdout)
     .trim()
     .split(/\s+/)
@@ -55,8 +68,38 @@ function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
   return sendSignal(pid, signal);
 }
 
-/** A negative pid addresses the whole process group. */
+/**
+ * The process group a pid belongs to, or null when it cannot be determined.
+ *
+ * Read from /proc, which exists precisely where `setsid` does. The comm field
+ * can itself contain spaces and brackets, so the fields are counted from the
+ * last ')' rather than by splitting the whole line.
+ */
+function processGroupOf(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    const pgrp = Number(fields[2]); // state, ppid, pgrp
+    return Number.isInteger(pgrp) ? pgrp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Signals the command's process group, but only once it is confirmed to be the
+ * command's own.
+ *
+ * A negative pid addresses a whole group, and getting that wrong is the worst
+ * failure available here: if the command never became a group leader, this pid's
+ * group is the one Woopcode itself is running in, and the signal takes down the
+ * agent — or, under a CI runner, the shell the job is executing in. `setsid`
+ * forks when it is already a leader, which is exactly the case where the pid we
+ * hold is not the leader we assumed. Confirming pgrp === pid costs one small
+ * read and turns a catastrophic misfire into a skipped optimisation.
+ */
 function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
+  if (processGroupOf(pid) !== pid) return false;
   return sendSignal(-pid, signal);
 }
 
@@ -81,13 +124,31 @@ function signalEverything(
   signalProcess(proc.pid, signal);
 }
 
+/**
+ * Stops the command, and never throws.
+ *
+ * Both callers run inside a timer or an abort listener and report the outcome
+ * immediately afterwards, so an exception raised here does not just fail to kill
+ * anything — it escapes before the timeout or cancellation is reported, leaving
+ * the promise nobody settles and the caller waiting for a command that is still
+ * running. Killing is best-effort by nature; failing to kill must stay a
+ * best-effort failure rather than becoming a hang.
+ */
 function terminateProcessTree(proc: ReturnType<typeof Bun.spawn>, processGroup: boolean) {
   if (proc.exitCode !== null) return;
 
-  signalEverything(proc, processGroup, "SIGTERM");
+  try {
+    signalEverything(proc, processGroup, "SIGTERM");
+  } catch {
+    // Reported by the caller as a timeout or cancellation either way.
+  }
 
   const forceKillTimer = setTimeout(() => {
-    signalEverything(proc, processGroup, "SIGKILL");
+    try {
+      signalEverything(proc, processGroup, "SIGKILL");
+    } catch {
+      // Same: the bounded wait below is what guarantees a return.
+    }
   }, FORCE_KILL_AFTER_MS);
   forceKillTimer.unref?.();
   // Bun reports null for a process killed by a signal, so exitCode cannot be

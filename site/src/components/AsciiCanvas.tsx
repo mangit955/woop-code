@@ -11,20 +11,32 @@ type Cell = {
   character: number;
   alpha: number;
   phase: number;
-  /** Current lavender carry-over from the pointer interaction. */
-  interaction: number;
+  /** How stirred this cell currently is. Decays to zero on its own. */
+  stir: number;
+  /** Displacement from the grid position, in pixels. Springs back to zero. */
+  flowX: number;
+  flowY: number;
 };
 
 const CELL = 14;
 
 const CLEAR_RADIUS = 220;
 
-// The interaction colours existing glyphs; it does not paint a blurred layer
-// over the canvas. Keeping the radius in cell units makes the patch feel the
-// same as the density changes at different viewport sizes.
-const INTERACTION_RADIUS = CELL * 8;
+// The interaction radius in pixels. A moving pointer stirs cells within this
+// distance. The radius is in cell units so the patch scales with density.
+const INTERACTION_RADIUS = CELL * 9.5;
 
 const FONT = `"Berkeley Mono","SF Mono","JetBrains Mono",monospace`;
+
+/**
+ * One colour for every glyph, ambient and highlighted alike.
+ *
+ * The field used to run a hue ramp from a pale lavender to a deeper violet and
+ * the cursor pushed cells toward this value. Everything is now this value, so
+ * the drift that ramp used to carry is expressed in opacity instead — see the
+ * `neutral` factor at fill time.
+ */
+const GLYPH = "124,88,238";
 
 function smoothstep(edge0: number, edge1: number, x: number) {
   x = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -91,14 +103,25 @@ export function AsciiCanvas({
     let width = 0;
     let height = 0;
     let animationId = 0;
+    // Smoothed pointer position (lerped toward target each frame).
     let pointerX = 0;
     let pointerY = 0;
+    // Raw target from the latest pointermove event.
     let targetPointerX = 0;
     let targetPointerY = 0;
     let pointerIsOverCanvas = false;
-    let pointerPresence = 0;
-    let targetPointerPresence = 0;
     let lastRenderTime = 0;
+
+    // ── Velocity tracking ────────────────────────────────────────────────
+    // The pointer's velocity drives *all* interaction now. A stationary
+    // cursor produces zero effect; a fast one stirs the characters hard.
+    let prevPointerX = 0;
+    let prevPointerY = 0;
+    /** Smoothed speed in px/ms. Decays toward zero each frame. */
+    let pointerSpeed = 0;
+    /** Smoothed velocity direction (unit-length when speed > 0). */
+    let velDirX = 0;
+    let velDirY = 0;
 
     function generateField() {
       const rect = canvas.getBoundingClientRect();
@@ -155,7 +178,9 @@ export function AsciiCanvas({
             character: random(),
             alpha: random(),
             phase: random(),
-            interaction: 0,
+            stir: 0,
+            flowX: 0,
+            flowY: 0,
           });
         }
       }
@@ -166,24 +191,50 @@ export function AsciiCanvas({
       // ever contributes glyphs.
       ctx.clearRect(0, 0, width, height);
 
-      // Density controls the field's subtle weight, but never whether a grid
-      // position has a character. The reference interaction is a continuous
-      // ASCII lattice, not clusters of glyphs appearing and disappearing.
-      //
-      // Everything ambient is driven from this one clock, and every field it
-      // feeds is sampled from noise in both space and time. That is what keeps
-      // the motion calm: neighbouring cells always hold near-identical values,
-      // so the field drifts as a whole instead of each cell acting alone.
-      const t = time * 0.00005;
       const elapsed = time - lastRenderTime;
       lastRenderTime = time;
-      // Cursor events arrive in uneven bursts. Filtering both the position and
-      // the presence of the interaction gives the colour field a soft, liquid
-      // response instead of sharp pointer-following jumps.
-      const easing = 1 - Math.exp(-elapsed * 0.018);
-      pointerX = lerp(pointerX, targetPointerX, easing);
-      pointerY = lerp(pointerY, targetPointerY, easing);
-      pointerPresence = lerp(pointerPresence, targetPointerPresence, easing);
+
+      // ── Smooth the pointer position ──────────────────────────────────
+      const posEasing = 1 - Math.exp(-elapsed * 0.018);
+      pointerX = lerp(pointerX, targetPointerX, posEasing);
+      pointerY = lerp(pointerY, targetPointerY, posEasing);
+
+      // ── Compute instantaneous velocity and smooth it ─────────────────
+      // The velocity of the smoothed pointer, not the raw one, so jitter
+      // in the event stream does not make the field nervous.
+      if (elapsed > 0) {
+        const dx = pointerX - prevPointerX;
+        const dy = pointerY - prevPointerY;
+        const instantSpeed = Math.hypot(dx, dy) / elapsed;
+
+        // Smooth speed with asymmetric easing: rises fast when the user
+        // starts moving, decays slowly for a lingering tail.
+        const speedUp = 1 - Math.exp(-elapsed * 0.012);
+        const speedDown = 1 - Math.exp(-elapsed * 0.004);
+        const speedEasing = instantSpeed > pointerSpeed ? speedUp : speedDown;
+        pointerSpeed = lerp(pointerSpeed, instantSpeed, speedEasing);
+
+        // Direction smoothing (only update when there is meaningful motion).
+        if (instantSpeed > 0.01) {
+          const invSpeed = 1 / (instantSpeed * elapsed);
+          const rawDirX = dx * invSpeed;
+          const rawDirY = dy * invSpeed;
+          const dirEasing = 1 - Math.exp(-elapsed * 0.01);
+          velDirX = lerp(velDirX, rawDirX, dirEasing);
+          velDirY = lerp(velDirY, rawDirY, dirEasing);
+        }
+      }
+      prevPointerX = pointerX;
+      prevPointerY = pointerY;
+
+      // A normalised 0–1 "stirring intensity" derived from speed.
+      // Clamp to a comfortable range: gentle movement → subtle stir,
+      // fast swipe → full effect. The curve is tuned so you need a real
+      // gesture to saturate it.
+      const speedNorm = smoothstep(0.04, 0.9, pointerSpeed);
+
+      // ── Density and ambient motion (unchanged) ───────────────────────
+      const t = time * 0.00005;
 
       for (const cell of cells) {
         // Two octaves, both drifting the same way and at close to the same
@@ -200,16 +251,13 @@ export function AsciiCanvas({
           0.5;
 
         let density = n1 * 0.72 + n2 * 0.28;
-        density = Math.min(1, Math.pow(density, 1.55) * 1.35);
+        density = Math.min(1, Math.pow(density, 2.1) * 1.26);
         density *= smoothstep(
           CLEAR_RADIUS * 0.6,
           CLEAR_RADIUS * 1.8,
           cell.focusDistance,
         );
 
-        // Measured against the half-diagonal rather than the width, so the fade
-        // reaches the same way whatever shape the canvas is. The two constants
-        // are where the old width-based pair landed on a single pane.
         const maxDistance = Math.hypot(width / 2, height / 2);
         const edgeFade =
           1 -
@@ -217,116 +265,114 @@ export function AsciiCanvas({
 
         density *= edgeFade * 0.85 + 0.15;
 
-        // Every cell has a minimum opacity. The density still gives the field
-        // shape, but no location goes empty as the noise evolves.
+        const strength = lerp(strengthLeft, strengthRight, cell.x / width);
         const alpha =
-          lerp(0.28, 0.76, density * 0.78 + cell.alpha * 0.22) *
-          lerp(strengthLeft, strengthRight, cell.x / width);
+          lerp(0.1, 0.92, density * 0.82 + cell.alpha * 0.18) * strength;
 
-        // A low-frequency noise field carries lavender through the glyphs. It
-        // has no brightening or hard bands, so the interaction reads as colour
-        // flowing through the ASCII rather than light cast by the cursor.
-        const offsetX = cell.x - pointerX;
-        const offsetY = cell.y - pointerY;
-        const radius = 1 -
-          smoothstep(
-            INTERACTION_RADIUS * 0.28,
-            INTERACTION_RADIUS,
-            Math.hypot(offsetX, offsetY),
-          );
-        const current =
-          (noise2D(
-            cell.x * 0.024 + time * 0.00016,
-            cell.y * 0.024 - time * 0.00011,
-          ) +
-            1) *
-          0.5;
-        const targetInteraction =
-          radius * lerp(0.38, 1, current) * pointerPresence;
-        // Each character keeps a little of the colour it picked up. It takes
-        // on lavender promptly, then returns to its base colour more slowly;
-        // that lingering per-cell fade is what makes the response feel fluid
-        // after the cursor has already moved away.
-        const interactionEasing =
-          1 -
-          Math.exp(
-            -elapsed *
-              (targetInteraction > cell.interaction ? 0.018 : 0.0042),
-          );
-        cell.interaction = lerp(
-          cell.interaction,
-          targetInteraction,
-          interactionEasing,
-        );
-        // The field's normal motion: pale to lavender and back. This used to be
-        // a per-cell sawtooth — every cell ran its own timer from its own phase
-        // offset, so cells snapped back to pale at the wrap, at a different
-        // moment each. Hundreds of independent snaps is what read as chaos.
-        //
-        // Reading the tone from a slow, very low-frequency noise field fixes
-        // both halves of that: it is continuous in time, so there is no wrap to
-        // snap at, and continuous in space, so the colour arrives as a broad
-        // wash moving across the panel rather than cell by cell.
+        // ── Fluid‐flow interaction ─────────────────────────────────────
+        // Instead of a torch/spotlight, the cursor *stirs* nearby characters.
+        // The stir is proportional to pointer SPEED, so a stationary cursor
+        // has no effect and the interaction naturally stops when the pointer
+        // does.
+        const offsetX = cell.x + cell.flowX - pointerX;
+        const offsetY = cell.y + cell.flowY - pointerY;
+        const dist = Math.hypot(offsetX, offsetY);
+        const proximity =
+          1 - smoothstep(INTERACTION_RADIUS * 0.15, INTERACTION_RADIUS, dist);
+
+        // The push vector: cells are pushed away from the cursor path. This
+        // combines the pointer's velocity direction (downstream push) with a
+        // radial outward push. The blend gives the swirl its organic character.
+        let pushX = 0;
+        let pushY = 0;
+        if (dist > 0.001) {
+          // Radial: outward from the pointer.
+          const radialX = offsetX / dist;
+          const radialY = offsetY / dist;
+          // Tangential/downstream: along the velocity direction.
+          // Mix 30% radial + 50% velocity direction for a wake-like shape.
+          pushX = radialX * 0.3 + velDirX * 0.5;
+          pushY = radialY * 0.3 + velDirY * 0.5;
+        }
+
+        // Drive stir from speed × proximity. It rises fast and decays slowly,
+        // so the trail lingers behind the cursor like water settling.
+        const targetStir = proximity * speedNorm * (pointerIsOverCanvas ? 1 : 0);
+        const stirUp = 1 - Math.exp(-elapsed * 0.014);
+        const stirDown = 1 - Math.exp(-elapsed * 0.0018);
+        const stirEasing = targetStir > cell.stir ? stirUp : stirDown;
+        cell.stir = lerp(cell.stir, targetStir, stirEasing);
+
+        // Displacement: push cells away from the path. Spring back to zero
+        // with gentle damping so characters slide home instead of snapping.
+        const maxDisplace = CELL * 1.2;
+        const targetFlowX = pushX * cell.stir * maxDisplace;
+        const targetFlowY = pushY * cell.stir * maxDisplace;
+        // Spring constant: cells resist more at high displacement, keeping
+        // them from flying too far, and return gently at low displacement.
+        const springK = 1 - Math.exp(-elapsed * 0.006);
+        cell.flowX = lerp(cell.flowX, targetFlowX, springK);
+        cell.flowY = lerp(cell.flowY, targetFlowY, springK);
+
+        // ── Ambient field tone (unchanged) ─────────────────────────────
         const tone =
           (noise2D(cell.x * 0.0055 - t * 0.72, cell.y * 0.0055 + t * 0.26) +
             1) *
           0.5;
         const neutral = smoothstep(0.24, 0.76, tone);
-        const baseRed = 236 - neutral * 92;
-        const baseGreen = 222 - neutral * 96;
-        const baseBlue = 252 - neutral * 28;
-        const red = Math.round(lerp(baseRed, 137, cell.interaction));
-        const green = Math.round(lerp(baseGreen, 104, cell.interaction));
-        const blue = Math.round(lerp(baseBlue, 239, cell.interaction));
-        // The ambient field keeps changing even while the pointer is still or
-        // away from the canvas. This is independent from the hover state, so
-        // the interaction only affects the nearby characters.
-        //
-        // Which glyph a cell picks also comes from noise now. It used to step
-        // on `Math.floor(time + phase)`, so every cell swapped character at its
-        // own instant and the panel was permanently sprinkled with unrelated
-        // flips. From a noise field a region agrees on its glyph and the change
-        // sweeps through, which is the difference between shimmer and drift.
-        // `cell.character` stays in as a small offset so the whole region does
-        // not turn over on precisely the same frame.
+        const wash = lerp(0.72, 1, neutral);
+
+        // ── Character selection ────────────────────────────────────────
         const grain =
           ((noise2D(cell.x * 0.012 + t * 0.86, cell.y * 0.012 - t * 0.4) + 1) *
             0.5 +
             cell.character * 0.06) %
           1;
         const baseCharacter = pickCharacter(grain, density);
-        // Nearby cells crossfade into a deliberately small family of glyphs.
-        // Because `interaction` recedes slowly, the original symbol returns
-        // with the soft flicker visible in the reference clip.
-        const hoverCharacters = ["+", "*", "#"];
-        const hoverCharacter =
-          hoverCharacters[
-            Math.floor(time * 0.005 + cell.phase * hoverCharacters.length) %
-              hoverCharacters.length
+
+        // When stirred, crossfade into a denser/more agitated glyph family.
+        // The stir value drives the crossfade, so when speed drops to zero
+        // the character reverts to its ambient glyph.
+        const stirredCharacters = ["+", "*", "#", "%"];
+        const stirredCharacter =
+          stirredCharacters[
+            Math.floor(
+              time * 0.003 + cell.phase * stirredCharacters.length + cell.stir * 4,
+            ) % stirredCharacters.length
           ]!;
 
-        ctx.fillStyle = `rgba(${red},${green},${blue},${
-          alpha * (1 - cell.interaction * 0.48)
-        })`;
-        ctx.fillText(baseCharacter, cell.x, cell.y);
+        // Render position includes the flow displacement.
+        const drawX = cell.x + cell.flowX;
+        const drawY = cell.y + cell.flowY;
 
-        if (cell.interaction > 0.01) {
-          // Highlighted glyphs bounce vertically in place. The motion is
-          // deliberately one-dimensional so it reads as a bounce, while the
-          // underlying grid stays evenly spaced and easy to scan.
-          const hoverX = cell.x;
-          const hoverY =
-            cell.y -
-            Math.abs(Math.sin(time * 0.0065 + cell.phase * 8)) *
-              cell.interaction *
-              4;
-          const hoverAlpha =
-            alpha *
-            cell.interaction *
-            (0.76 + 0.24 * Math.sin(time * 0.006 + cell.phase * 9));
+        if (cell.stir > 0.01) {
+          // ── Stirred rendering ──────────────────────────────────────
+          // The base glyph fades back and the stirred glyph takes over.
+          // The effect is proportional to stir, so partial movement gives
+          // a partial crossfade — no hard on/off threshold.
 
-          ctx.fillStyle = `rgba(137,104,239,${hoverAlpha})`;
-          ctx.fillText(hoverCharacter, hoverX, hoverY);
+          // Base glyph recedes.
+          const baseAlpha = alpha * wash * (1 - cell.stir * 0.82);
+          ctx.fillStyle = `rgba(${GLYPH},${baseAlpha})`;
+          ctx.fillText(baseCharacter, drawX, drawY);
+
+          // Stirred glyph: brighter, bolder, displaced.
+          const hoverStrength = 0.72 + 0.28 * strength;
+          const stirAlpha =
+            hoverStrength *
+            cell.stir *
+            lerp(0.88, 1, density) *
+            // A subtle pulse tied to stir intensity — alive, not static.
+            (0.9 + 0.1 * Math.sin(time * 0.008 + cell.phase * 7));
+
+          ctx.font = `700 16px ${FONT}`;
+          ctx.fillStyle = `rgba(${GLYPH},${stirAlpha})`;
+          ctx.fillText(stirredCharacter, drawX, drawY);
+          ctx.font = `500 16px ${FONT}`;
+        } else {
+          // ── Ambient rendering (no stir) ────────────────────────────
+          ctx.fillStyle = `rgba(${GLYPH},${alpha * wash})`;
+          ctx.fillText(baseCharacter, drawX, drawY);
         }
       }
 
@@ -350,7 +396,6 @@ export function AsciiCanvas({
 
       const wasOverCanvas = pointerIsOverCanvas;
       pointerIsOverCanvas = isOverCanvas;
-      targetPointerPresence = isOverCanvas ? 1 : 0;
 
       if (isOverCanvas) {
         const nextX = event.clientX - rect.left;
@@ -361,7 +406,9 @@ export function AsciiCanvas({
           pointerY = nextY;
           targetPointerX = nextX;
           targetPointerY = nextY;
-          pointerPresence = 0;
+          prevPointerX = nextX;
+          prevPointerY = nextY;
+          pointerSpeed = 0;
         }
 
         targetPointerX = nextX;
@@ -371,7 +418,6 @@ export function AsciiCanvas({
 
     const hidePointer = () => {
       pointerIsOverCanvas = false;
-      targetPointerPresence = 0;
     };
 
     window.addEventListener("resize", resize);

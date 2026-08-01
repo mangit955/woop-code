@@ -16,7 +16,11 @@ export function App() {
         <main className="page">
           {/* One field across the whole panel, ramping from a whisper on the
               left to full strength under the artwork on the right. */}
-          <Backdrop strengthLeft={0.3} strengthRight={1} focusX={0.74} />
+          {/* The left stays well below the right because the pitch and the
+              install field are read on top of it. The glyphs themselves carry
+              far more colour now, so a low multiplier here still lands well
+              clear of the old near-invisible field. */}
+          <Backdrop strengthLeft={0.34} strengthRight={1} focusX={0.74} />
 
           <section className="pane">
             <div className="lede">

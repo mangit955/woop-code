@@ -102,11 +102,8 @@ const server = Bun.serve({
     },
 
     "/terminal.png": () => asset("terminal.png"),
-    "/demo.mp4": () => asset("demo.mp4"),
+    "/terminal1.mp4": () => asset("terminal1.mp4"),
     "/demo-poster.jpg": () => asset("demo-poster.jpg"),
-    // Unused by the page; kept so the scene can swap to a still or a webm.
-    "/hero.jpg": () => asset("hero.jpg"),
-    "/demo.webm": () => asset("demo.webm"),
   },
   development: {
     hmr: true,

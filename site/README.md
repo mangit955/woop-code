@@ -18,19 +18,19 @@ bun run site:build   # static output in site/dist
 
 ## Layout
 
-| Path                        | What it is                                                  |
-| --------------------------- | ----------------------------------------------------------- |
-| `index.html`                | Entry document and metadata.                                 |
-| `server.ts`                  | `Bun.serve` — the page plus the static assets in `public/`.  |
-| `src/App.tsx`               | The whole page: left pane and the scene.                     |
-| `src/styles.css`            | The design system; tokens live in `:root`.                   |
-| `src/components/Scene.tsx`  | Right pane — drawn backdrop plus the demo card.              |
-| `src/components/CopyCommand.tsx` | The install field and its copy button.                  |
-| `src/components/Logo.tsx`   | The ▛▜ mark and the wordmark. See below.                     |
-| `public/fonts/`             | Inter, latin subset. See Typography.                         |
-| `public/demo.mp4`           | What the demo card plays — `../public/demo.gif` re-encoded.   |
-| `public/main.png`           | Source screenshot, 3200x1672. Not served.                    |
-| `public/hero.jpg`           | Still frame from `main.png`, unused. Route kept in `server.ts`.|
+| Path                             | What it is                                                      |
+| -------------------------------- | --------------------------------------------------------------- |
+| `index.html`                     | Entry document and metadata.                                    |
+| `server.ts`                      | `Bun.serve` — the page plus the static assets in `public/`.     |
+| `src/App.tsx`                    | The whole page: left pane and the scene.                        |
+| `src/styles.css`                 | The design system; tokens live in `:root`.                      |
+| `src/components/Scene.tsx`       | Right pane — drawn backdrop plus the demo card.                 |
+| `src/components/CopyCommand.tsx` | The install field and its copy button.                          |
+| `src/components/Logo.tsx`        | The ▛▜ mark and the wordmark. See below.                        |
+| `public/fonts/`                  | Inter, latin subset. See Typography.                            |
+| `public/terminal1.mp4`           | What the demo card plays — `../public/demo.gif` re-encoded.     |
+| `public/main.png`                | Source screenshot, 3200x1672. Not served.                       |
+| `public/hero.jpg`                | Still frame from `main.png`, unused. Route kept in `server.ts`. |
 
 The page holds itself to one screen with `overflow: hidden` on `body` and a
 full-height grid. **Below 900px it stacks and scrolls** — a 50/50 split cannot
@@ -85,7 +85,7 @@ pinned to the bottom and crops the sides.
 ## Regenerating the media
 
 ```bash
-ffmpeg -y -i ../public/demo.gif -movflags faststart -pix_fmt yuv420p -crf 26 public/demo.mp4
+ffmpeg -y -i ../public/demo.gif -movflags faststart -pix_fmt yuv420p -crf 26 public/terminal1.mp4
 ffmpeg -y -i ../public/demo.gif -vframes 1 public/demo-poster.jpg
 ```
 

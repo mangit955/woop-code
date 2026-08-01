@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll, beforeEach, afterEach, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { PendingEdit } from "../../../tui/src/types";
@@ -10,9 +10,24 @@ const { store: realStore } = await import("../../../tui/src/store/ui-store");
 let approve = true;
 let lastPendingEdit: PendingEdit | null = null;
 
+// A module mock is registered for the whole run and cannot be taken back, so the
+// interception is switched off once this file's tests are over. Without that,
+// the trap below keeps answering for every later file: a suite that assigns its
+// own `store.setPendingEdit` would have the assignment silently ignored, because
+// a `get` trap wins over whatever was written to the target.
+let intercepting = false;
+
+beforeAll(() => {
+  intercepting = true;
+});
+
+afterAll(() => {
+  intercepting = false;
+});
+
 const storeStub = new Proxy(realStore, {
   get(target, property, receiver) {
-    if (property === "setPendingEdit") {
+    if (intercepting && property === "setPendingEdit") {
       return async (edit: PendingEdit) => {
         lastPendingEdit = edit;
         return approve;

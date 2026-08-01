@@ -26,26 +26,40 @@ import {
  */
 
 // Mock the provider client creation
-import { afterAll, mock } from "bun:test";
+import { beforeAll, afterAll, mock } from "bun:test";
 
 let mockClient: MockProviderClient;
 
-// Captured before the mock is registered, and used two ways: the stub keeps the
-// module's other exports (DEFAULT_MODEL_ID and friends, which unrelated modules
-// import), and the file puts the real module back when it is done. A module mock
-// is global to the whole run, so without this a later file asserting on the real
-// createProviderClient would get this stub instead.
+// Captured before the mock is registered, so the stub can keep the module's
+// other exports (DEFAULT_MODEL_ID and friends, which unrelated modules import)
+// and can hand back to the real implementation when this file is not running.
 const actualClient = await import("../../../config/client");
+
+// Only answers while this file's own tests are running. A module mock is
+// registered for the whole run and restoring it afterwards does not work — Bun
+// binds a static import during the load phase, long before any afterAll — so the
+// override delegates to the real implementation the rest of the time. Otherwise
+// a later suite asserting that createProviderClient refuses an unsupported
+// provider gets this stub and sees no error at all.
+let usingMockClient = false;
+
+beforeAll(() => {
+  usingMockClient = true;
+});
+
+afterAll(() => {
+  usingMockClient = false;
+});
 
 mock.module("../../../config/client", () => ({
   ...actualClient,
-  createProviderClient: () => mockClient,
-  ACTIVE_PROVIDER_MODELS: { test: "Test Model" },
+  createProviderClient: (provider: string, apiKey: string, model?: string) =>
+    usingMockClient ? mockClient : actualClient.createProviderClient(provider, apiKey, model),
+  get ACTIVE_PROVIDER_MODELS() {
+    return usingMockClient ? { test: "Test Model" } : actualClient.ACTIVE_PROVIDER_MODELS;
+  },
 }));
 
-afterAll(() => {
-  mock.module("../../../config/client", () => actualClient);
-});
 
 describe("E2E Chat - Simple Workflow", () => {
   let controller: AgentController;

@@ -540,3 +540,62 @@ a.card:hover {
     transition: none;
   }
 }
+
+/* ── Not found ────────────────────────────────────────────────────────── */
+
+.notfound__code {
+  margin: 0 0 4px;
+  font-family: var(--doc-mono);
+  font-size: 13px;
+  color: var(--doc-faint);
+}
+
+.page--notfound .lede {
+  font-size: 17px;
+  color: var(--doc-text-2);
+}
+
+.notfound__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 8px;
+}
+
+.notfound__search {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--doc-strong);
+  color: var(--doc-bg);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.18s var(--doc-ease);
+}
+
+.notfound__search:hover {
+  opacity: 0.84;
+}
+
+.notfound__link {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--doc-line);
+  border-radius: 9px;
+  color: var(--doc-text-2);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    color 0.18s var(--doc-ease),
+    border-color 0.18s var(--doc-ease);
+}
+
+.notfound__link:hover {
+  color: var(--doc-text);
+  border-color: var(--doc-line-2);
+}

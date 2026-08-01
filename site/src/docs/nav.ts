@@ -22,6 +22,8 @@
  * they are being written, rather than shipping a sidebar full of 404s.
  */
 
+import { TOOL_PAGES } from "./pages";
+
 export interface NavEntry {
   /** Site path, without `/docs`. Matches the file path under `docs/`. */
   slug: string;
@@ -46,9 +48,12 @@ export const NAV: NavSection[] = [
   {
     title: "Getting started",
     entries: [
+      // Reading order is the install order. Your first session used to sit in
+      // the middle, which asked the reader to run a session before they had a
+      // provider — and left it repeating both of the pages around it.
       { slug: "getting-started/install", title: "Install" },
-      { slug: "getting-started/first-session", title: "Your first session" },
       { slug: "getting-started/connect-a-provider", title: "Connect a provider" },
+      { slug: "getting-started/first-session", title: "Your first session" },
     ],
   },
   {
@@ -73,10 +78,14 @@ export const NAV: NavSection[] = [
         slug: "reference/tools",
         title: "Tools",
         // The one place a third level is allowed: these are instances of a
-        // single kind, generated from the registry, not a nested taxonomy.
-        children: [
-          { slug: "reference/tools/read-file", title: "read_file" },
-        ],
+        // single kind, not a nested taxonomy. Taken from the registry rather
+        // than listed here, so the nav always advertises every tool that
+        // exists and never a subset of them — a Tools section showing one of
+        // thirteen reads as an abandoned site, not as a decision.
+        children: TOOL_PAGES.map((page) => ({
+          slug: page.slug,
+          title: page.name,
+        })),
       },
       { slug: "reference/configuration", title: "Configuration" },
       { slug: "reference/keyboard", title: "Keyboard" },

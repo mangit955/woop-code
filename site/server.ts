@@ -1,5 +1,6 @@
 import index from "./index.html";
-import { renderIndex, renderPage } from "./src/docs/render";
+import { renderIndex, renderNotFound, renderPage } from "./src/docs/render";
+import { buildIndex } from "./src/docs/search";
 
 const PUBLIC = new URL("./public/", import.meta.url).pathname;
 const DOCS_CSS = new URL("./src/docs/", import.meta.url).pathname;
@@ -46,8 +47,9 @@ async function docsAsset(name: string) {
     : new Response("Not found", { status: 404 });
 }
 
-function html(body: string) {
+function html(body: string, status = 200) {
   return new Response(body, {
+    status,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
@@ -66,12 +68,25 @@ const server = Bun.serve({
     "/docs/tokens.css": () => docsAsset("tokens.css"),
     "/docs/tokens.generated.css": () => docsAsset("tokens.generated.css"),
     "/docs/layout.css": () => docsAsset("layout.css"),
+    "/docs/components.css": () => docsAsset("components.css"),
     "/docs/client.js": () => docsAsset("client.js"),
+
+    // The search index, built from the same markdown the pages render from.
+    // Fetched once, lazily, the first time the palette is opened.
+    "/docs/search.json": async () =>
+      new Response(JSON.stringify(await buildIndex()), {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      }),
     "/docs/*": async (request) => {
       const slug = new URL(request.url).pathname.replace(/^\/docs\//, "");
       const page = await renderPage(slug);
 
-      return page ? html(page) : new Response("Not found", { status: 404 });
+      // A miss still gets the full shell — sidebar, search, somewhere to go —
+      // and a real 404 status so crawlers do not index it.
+      return page ? html(page) : html(await renderNotFound(slug), 404);
     },
 
     // The docs shell loads the font directly rather than through the bundler,

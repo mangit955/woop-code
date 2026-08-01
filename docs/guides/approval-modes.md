@@ -23,7 +23,7 @@ always pause on a diff — no approval mode turns that off.
 The agent wants to run `bun test`. Here is what happens in each mode, and
 nothing else about the situation changes:
 
-```text
+```terminal
   bun test
 
     always-ask       ⏸  asks
@@ -34,7 +34,7 @@ nothing else about the situation changes:
 
 Now the agent wants to run `rm -rf dist`:
 
-```text
+```terminal
   rm -rf dist
 
     always-ask       ⏸  asks
@@ -53,7 +53,7 @@ because both commands sit at the extremes. It shows up on something like
 
 `/approval` with no argument prints the same list with the active mode marked:
 
-```text
+```terminal title="woopcode — /approval"
 Approval mode: Auto read-only
 
     always-ask — Confirm every shell command
@@ -100,16 +100,18 @@ because of the `>`.
 `full-auto` runs everything. No shell command stops, including the destructive
 and system ones every other mode refuses.
 
-```text
+```terminal
   rm -rf node_modules   ▶  runs
   git reset --hard      ▶  runs — uncommitted work is discarded
   sudo rm -rf /         ▶  runs
 ```
 
+:::danger
 Woopcode will not stop a command that destroys work in this mode. There is no
 undo, no confirmation, and no second gate behind it. Use it in a container or a
 scratch clone, on a branch you are willing to lose — not in a repository with
 uncommitted work you care about.
+:::
 
 File edits still pause on a diff even here. That is the one protection that does
 not depend on the mode.

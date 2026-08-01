@@ -97,6 +97,22 @@ The asymmetry matters: the gap *above* a heading is roughly three times the gap
 between two blocks. This is the single highest-leverage spacing decision on the
 page and it is the thing most docs sites get wrong.
 
+### Nothing scrolls sideways except a table
+
+**Code and terminal output wrap.** A horizontal scrollbar inside a code block
+hides the end of the line at rest, and the end of the line is usually the part
+that matters — the flag, the path, the marker. Wrapping is also what the
+reader's own terminal does with output too wide for it, so it is the more
+faithful rendering as well as the more usable one.
+
+**Tables are the exception** and keep a scroll container. Wrapping a table
+destroys the column alignment that is the reason it is a table.
+
+Captures should still be *written* to fit — `bun run docs:lint` warns at 78
+characters, which is the content column at its widest. The warning is not a
+failure: wrapping is designed behaviour. It exists so that a capture which will
+wrap is a decision someone made rather than a surprise they find in the browser.
+
 ---
 
 ## 5. The depth-decay rule

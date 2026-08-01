@@ -12,9 +12,14 @@
  * See site/design/system.md for the rules it implements.
  */
 
-import { marked } from "marked";
 import surface from "./surface.json";
+import {
+  renderMarkdown,
+  escapeHtml as escape,
+  type Heading,
+} from "./markdown";
 import { NAV, flatten, sectionOf, titleOf, type NavEntry } from "./nav";
+import { pageExists, pageSource } from "./pages";
 
 const DOCS_ROOT = new URL("../../../docs/", import.meta.url);
 
@@ -25,12 +30,6 @@ export interface Frontmatter {
   since?: string;
   prerequisites?: string[];
   related?: string[];
-}
-
-interface Heading {
-  level: 2 | 3;
-  id: string;
-  text: string;
 }
 
 /**
@@ -75,14 +74,6 @@ export function parseFrontmatter(source: string): {
   return { data: data as Frontmatter, body: source.slice(match[0].length) };
 }
 
-function escape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 // ─── Substitution ───────────────────────────────────────────────────────────
 
 /** Markdown table of the approval modes, straight from `APPROVAL_MODES`. */
@@ -103,6 +94,48 @@ function approvalModesTable(): string {
     "| --- | --- | --- | --- |",
     ...rows,
   ].join("\n");
+}
+
+/** Every slash command, grouped the way the registry groups them. */
+function slashCommandsTable(category?: string): string {
+  const commands = category
+    ? surface.commands.filter((command) => command.category === category)
+    : surface.commands;
+
+  const rows = commands.map((command) => {
+    const aliases = command.aliases.length
+      ? command.aliases.map((alias) => `\`/${alias}\``).join(", ")
+      : "—";
+
+    return `| \`/${command.name}\` | ${aliases} | ${command.description} |`;
+  });
+
+  if (rows.length === 0) return `> No commands in \`${category}\`.`;
+
+  return ["| Command | Aliases | Description |", "| --- | --- | --- |", ...rows].join(
+    "\n",
+  );
+}
+
+/**
+ * Every tool, with what it is allowed to do. The effect column is the reason
+ * this table exists: it is the answer to "which of these can change my files",
+ * and it should never be maintained by hand.
+ */
+function toolsTable(effect?: string): string {
+  const tools = effect
+    ? surface.tools.filter((tool) => tool.effect === effect)
+    : surface.tools;
+
+  const rows = tools.map(
+    (tool) => `| \`${tool.name}\` | ${tool.description} | ${tool.gate} |`,
+  );
+
+  if (rows.length === 0) return `> No tools with effect \`${effect}\`.`;
+
+  return ["| Tool | What it does | Approval |", "| --- | --- | --- |", ...rows].join(
+    "\n",
+  );
 }
 
 /** Markdown parameter table for one tool, straight from its registry entry. */
@@ -145,6 +178,14 @@ export function substitute(body: string): string {
       return String(surface.counts.approvalModes);
     }
     if (key === "approval-modes-table") return approvalModesTable();
+    if (key === "slash-commands-table") return slashCommandsTable();
+    if (key === "tools-table") return toolsTable();
+
+    const slash = key.match(/^slash-commands-table:(\w+)$/);
+    if (slash) return slashCommandsTable(slash[1]);
+
+    const tools = key.match(/^tools-table:(\w+)$/);
+    if (tools) return toolsTable(tools[1]);
 
     const tool = key.match(/^tool:([a-z_]+):(description|gate|params)$/);
     if (tool) {
@@ -161,63 +202,10 @@ export function substitute(body: string): string {
   });
 }
 
-// ─── Markdown ───────────────────────────────────────────────────────────────
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/<[^>]+>/g, "")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
-/**
- * Renders the body and collects its h2/h3 headings in one pass.
- *
- * Headings get an id and a `#` anchor. The anchor is a real link so it can be
- * copied from the context menu and followed with the keyboard; it is hidden
- * until the heading is hovered or the link is focused, which is styled in
- * layout.css rather than here.
- */
-async function renderBody(
-  markdown: string,
-): Promise<{ html: string; headings: Heading[] }> {
-  const headings: Heading[] = [];
-  const seen = new Map<string, number>();
-
-  const renderer = new marked.Renderer();
-
-  renderer.heading = function ({ tokens, depth }) {
-    const text = this.parser.parseInline(tokens);
-    const base = slugify(text) || `section-${headings.length + 1}`;
-
-    // Two headings can share a title across a long page; the id must not.
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    const id = count === 0 ? base : `${base}-${count + 1}`;
-
-    if (depth === 2 || depth === 3) {
-      headings.push({ level: depth, id, text: text.replace(/<[^>]+>/g, "") });
-    }
-
-    const anchor =
-      depth === 1
-        ? ""
-        : `<a class="anchor" href="#${id}" aria-label="Link to this section">#</a>`;
-
-    return `<h${depth} id="${id}">${text}${anchor}</h${depth}>\n`;
-  };
-
-  const html = await marked.parse(markdown, { renderer });
-
-  return { html: html as string, headings };
-}
-
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
 async function exists(slug: string): Promise<boolean> {
-  return Bun.file(new URL(`${slug}.md`, DOCS_ROOT)).exists();
+  return pageExists(slug);
 }
 
 /**
@@ -366,6 +354,7 @@ function shell({
     <link rel="stylesheet" href="/docs/tokens.css" />
     <link rel="stylesheet" href="/docs/tokens.generated.css" />
     <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
     <script>
       // Before first paint: a saved theme must not flash the other one.
       try {
@@ -385,6 +374,10 @@ function shell({
       <div class="topbar__actions">
         <button class="topbar__menu" type="button" aria-expanded="false"
           aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
         <span class="topbar__version">v${surface.version}</span>
         <button class="topbar__theme" type="button" data-theme-toggle
           aria-label="Switch between light and dark">Theme</button>
@@ -400,6 +393,23 @@ function shell({
     </div>
 
     <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
     <script src="/docs/client.js" defer></script>
   </body>
 </html>
@@ -410,15 +420,13 @@ function shell({
 
 /** Renders one docs page, or null when there is no markdown file for the path. */
 export async function renderPage(slug: string): Promise<string | null> {
-  // `slug` comes off the URL. Anything with a traversal segment is refused
-  // rather than normalised — the same posture as resolveWorkspacePath.
-  if (slug.includes("..") || slug.startsWith("/")) return null;
+  // Traversal is refused inside pageSource — the same posture as
+  // resolveWorkspacePath in the product.
+  const source = await pageSource(slug);
+  if (source === null) return null;
 
-  const file = Bun.file(new URL(`${slug}.md`, DOCS_ROOT));
-  if (!(await file.exists())) return null;
-
-  const { data, body } = parseFrontmatter(await file.text());
-  const { html, headings } = await renderBody(substitute(body));
+  const { data, body } = parseFrontmatter(source);
+  const { html, headings } = await renderMarkdown(substitute(body));
 
   const title = data.title ?? titleOf(slug) ?? slug;
 
@@ -438,6 +446,55 @@ export async function renderPage(slug: string): Promise<string | null> {
     description: data.summary,
     sidebar: await sidebar(slug),
     toc: tableOfContents(headings),
+    content,
+  });
+}
+
+/**
+ * The page someone lands on after a stale link or a typo.
+ *
+ * Rendered in the full shell rather than as bare text: arriving at a docs site
+ * through a broken URL is common — search engines index paths that later move,
+ * and people mistype — and the reader still needs the sidebar, the search, and
+ * somewhere obvious to go. A plain "Not found" string strands them.
+ */
+export async function renderNotFound(slug: string): Promise<string> {
+  const attempted = slug ? `/docs/${slug}` : "/docs";
+
+  const content = `<article class="page page--notfound">
+    <p class="notfound__code">404</p>
+    <h1>This page does not exist</h1>
+    <p class="lede">Nothing is published at
+      <code>${escape(attempted)}</code>. It may have moved, or the link that
+      brought you here may be out of date.</p>
+
+    <div class="notfound__actions">
+      <button class="notfound__search" type="button" data-search-open>
+        Search the docs
+      </button>
+      <a class="notfound__link" href="/docs">Documentation home</a>
+    </div>
+
+    <div class="cards">
+      <a class="card" href="/docs/getting-started/install">
+        <span class="card__title">Install</span>
+        <span class="card__meta">Start here if you are new</span>
+      </a>
+      <a class="card" href="/docs/getting-started/first-session">
+        <span class="card__title">Your first session</span>
+        <span class="card__meta">One change, end to end</span>
+      </a>
+      <a class="card" href="/docs/reference/cli">
+        <span class="card__title">CLI</span>
+        <span class="card__meta">Every command and flag</span>
+      </a>
+    </div>
+  </article>`;
+
+  return shell({
+    title: "Page not found",
+    description: "That documentation page does not exist.",
+    sidebar: await sidebar(""),
     content,
   });
 }

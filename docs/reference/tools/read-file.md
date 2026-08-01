@@ -21,8 +21,8 @@ never asks for approval.
 
 ## Example
 
-```text
-read_file(path: "src/auth/login.ts")
+```ts
+read_file({ path: "src/auth/login.ts" })
 ```
 
 Returns the file's contents as text.
@@ -41,7 +41,7 @@ Woopcode was launched from.
 
 Files over 16 KB are cut at the limit and the tool appends:
 
-```text
+```terminal
 ... File truncated. Showing first 16384 characters of 48291.
 ```
 
@@ -62,8 +62,8 @@ the path and try again.
 
 ## See also
 
-- [`list_files`](/docs/reference/tools/list-files) — directory contents
-- [`grep`](/docs/reference/tools/grep) — search inside files without reading
-  them whole
-- [Tools overview](/docs/reference/tools) — all {{counts.tools}} tools and what
-  each one can change
+- [Tools](/docs/reference/tools) — every tool and what each one can change,
+  including `list_files` for directory contents and `grep` for searching inside
+  files without reading them whole
+- [Approval modes](/docs/guides/approval-modes) — what gates the tools that do
+  change things

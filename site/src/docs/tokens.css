@@ -345,6 +345,16 @@ pre code {
   padding: 0;
 }
 
+/* One source line per block, so a line that wraps continues under itself rather
+   than restarting at column zero — where it would read as the next line of
+   output instead of the rest of this one. The offset is deeper than the four
+   spaces our captures indent with, so the continuation is unambiguous. */
+pre .line {
+  display: block;
+  padding-left: 6ch;
+  text-indent: -6ch;
+}
+
 /* ── Tables ───────────────────────────────────────────────────────────── */
 
 table {

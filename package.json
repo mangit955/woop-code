@@ -52,7 +52,8 @@
     "site:build": "bun build ./site/index.html --outdir ./site/dist --minify",
     "docs:extract": "bun ./site/scripts/extract.ts",
     "docs:tokens": "bun ./site/scripts/generate-tokens.ts",
-    "docs:check": "bun ./site/scripts/extract.ts --check",
+    "docs:lint": "bun ./site/scripts/check-docs.ts",
+    "docs:check": "bun ./site/scripts/extract.ts --check && bun ./site/scripts/check-docs.ts",
     "test": "bun test && bunx --no-install tsc --noEmit",
     "test:watch": "bun test --watch",
     "prepublishOnly": "bun test"

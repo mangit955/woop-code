@@ -26,14 +26,26 @@ import {
  */
 
 // Mock the provider client creation
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
 
 let mockClient: MockProviderClient;
 
+// Captured before the mock is registered, and used two ways: the stub keeps the
+// module's other exports (DEFAULT_MODEL_ID and friends, which unrelated modules
+// import), and the file puts the real module back when it is done. A module mock
+// is global to the whole run, so without this a later file asserting on the real
+// createProviderClient would get this stub instead.
+const actualClient = await import("../../../config/client");
+
 mock.module("../../../config/client", () => ({
+  ...actualClient,
   createProviderClient: () => mockClient,
   ACTIVE_PROVIDER_MODELS: { test: "Test Model" },
 }));
+
+afterAll(() => {
+  mock.module("../../../config/client", () => actualClient);
+});
 
 describe("E2E Chat - Simple Workflow", () => {
   let controller: AgentController;

@@ -1,9 +1,16 @@
 import { Command } from "commander";
 import { getConfig } from "../../config/config";
 import { isProviderEnabled } from "../../config/providerRegistry";
+import { renderTable } from "../table";
+
+interface ProviderRow {
+  provider: string;
+  loggedIn: boolean;
+  isDefault: boolean;
+}
 
 export const listCommand = new Command("list")
-  .description("Returns all the Providers with their default & auth status)")
+  .description("List the configured providers with their auth and default status")
   .option(
     "-p, --provider <providerName>",
     "Name of the provider (gemini, claude etc)",
@@ -12,19 +19,28 @@ export const listCommand = new Command("list")
   .action(async () => {
     const config = await getConfig();
 
-    const rows = Object.entries(config.providers).map(
-      ([provider, details]: [string, any]) => {
-        const loggedIn = !!details.apiKey;
-        const isDefault = config.defaultProvider === provider;
-
-        return {
-          provider,
-          status: loggedIn ? "Logged in" : "Not Logged in",
-          supported: isProviderEnabled(provider) ? "✔︎" : "not yet",
-          default: isDefault ? "✔︎" : "",
-        };
-      },
+    const rows: ProviderRow[] = Object.entries(config.providers).map(
+      ([provider, details]: [string, any]) => ({
+        provider,
+        loggedIn: !!details.apiKey,
+        isDefault: config.defaultProvider === provider,
+      }),
     );
 
-    console.table(rows);
+    if (rows.length === 0) {
+      console.log("No providers configured. Run `woopcode providers login` to add one.");
+      return;
+    }
+
+    // Same wording as `models`: a planned provider is on the roadmap, not broken.
+    console.log(
+      renderTable(rows, [
+        { header: "  Provider", value: (row) => `${row.isDefault ? "●" : " "} ${row.provider}` },
+        { header: "Auth", value: (row) => (row.loggedIn ? "Logged in" : "Not logged in") },
+        {
+          header: "Status",
+          value: (row) => (isProviderEnabled(row.provider) ? "Ready" : "Coming Soon"),
+        },
+      ]),
+    );
   });

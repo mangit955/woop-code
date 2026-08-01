@@ -7,27 +7,15 @@ import {
   getConversation,
   saveConversation,
 } from "../../config/config";
-import {
-  getProviderInfo,
-  isProviderEnabled,
-  unsupportedProviderMessage,
-} from "../../config/providerRegistry";
+import { isProviderEnabled, unsupportedProviderMessage } from "../../config/providerRegistry";
 import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../config/client";
 import { toolRegistery } from "../../tools";
 import { VERSION } from "../../config/version";
-// Imported rather than read through import.meta.dir at load time, which was a
-// path-resolution failure waiting to happen and diverged from commands/models.ts.
-// This is a shipped asset, not user data: if it is unreadable the install is
-// broken, and failing loudly is the right outcome. User-owned files
-// (providers.json, conversation.json) are recovered instead — see config.ts.
-import modelsData from "../../config/models.json";
+// The catalog owns the shape of models.json and the join with providerRegistry,
+// so the CLI command and this slash command cannot describe a model differently.
+import { allModels, providerLabel } from "../../config/modelCatalog";
 
-const models = modelsData as Array<{
-  id: string;
-  provider: string;
-  name: string;
-  contextWindow: number | string;
-}>;
+const models = allModels();
 
 /**
  * The model the next turn will use. The running controller is authoritative —
@@ -39,11 +27,6 @@ function activeModel(
   config: { selectedModel?: string },
 ): string {
   return context.controller?.getModel?.() ?? config.selectedModel ?? DEFAULT_MODEL_ID;
-}
-
-/** Human-readable provider name, from the same registry the rest of the CLI uses. */
-function providerLabel(provider: string): string {
-  return getProviderInfo(provider)?.name ?? provider ?? "none";
 }
 
 /**

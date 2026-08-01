@@ -1,0 +1,421 @@
+/* ==========================================================================
+   Woopcode docs — components.
+   ==========================================================================
+
+   Six components, each one earned by a page that needed it. Diff and state
+   colours come from the tokens generated out of tui/src/styles/theme.ts, so a
+   diff in the docs and the same diff in the terminal are the same colours.
+
+   The restraint rule still applies here (system.md §5): no icons, no filled
+   pastel boxes, no shadows. A component is a hairline, a rule, and type. */
+
+/* ── Code blocks ──────────────────────────────────────────────────────── */
+
+.code {
+  position: relative;
+  margin: var(--doc-gap-block) 0;
+}
+
+.code pre {
+  margin: 0;
+}
+
+.code__filename {
+  margin: 0 0 -1px;
+  padding: 7px 14px;
+  width: fit-content;
+  border: 1px solid var(--doc-line);
+  border-bottom: 0;
+  border-radius: var(--doc-radius) var(--doc-radius) 0 0;
+  background: var(--doc-raised);
+  font-family: var(--doc-mono);
+  font-size: 12px;
+  color: var(--doc-text-2);
+}
+
+.code__filename + .code__copy + pre,
+.code__filename + pre {
+  border-top-left-radius: 0;
+}
+
+/* Visible on hover and on keyboard focus, not permanently: the button sits on
+   top of the code, and a control that is always lit competes with the thing it
+   is sitting on. */
+.code__copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 4px 9px;
+  border: 1px solid var(--doc-line);
+  border-radius: 7px;
+  background: var(--doc-raised);
+  color: var(--doc-text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.16s var(--doc-ease),
+    color 0.16s var(--doc-ease);
+}
+
+.code:hover .code__copy,
+.code__copy:focus-visible {
+  opacity: 1;
+}
+
+.code__copy:hover {
+  color: var(--doc-text);
+}
+
+.code__copy[data-copied] {
+  opacity: 1;
+  color: var(--doc-accent);
+  border-color: var(--doc-accent);
+}
+
+/* ── Terminal frame ───────────────────────────────────────────────────── */
+
+/* Product output, framed so it reads as something the program printed rather
+   than something the reader should type. */
+.code--terminal {
+  margin: var(--doc-gap-block) 0;
+  border: 1px solid var(--doc-line);
+  border-radius: var(--doc-radius);
+  overflow: hidden;
+  background: var(--doc-raised);
+}
+
+.code--terminal pre {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.code__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--doc-line);
+  background: color-mix(in srgb, var(--doc-text) 4%, transparent);
+}
+
+/* Three dots, drawn rather than three elements. */
+.code__dots {
+  flex: none;
+  width: 34px;
+  height: 8px;
+  background:
+    radial-gradient(circle 4px at 4px 4px, var(--doc-line-2) 96%, transparent) 0 0 / 13px 8px repeat-x;
+}
+
+.code__title {
+  font-family: var(--doc-mono);
+  font-size: 12px;
+  color: var(--doc-faint);
+}
+
+/* ── Diff ─────────────────────────────────────────────────────────────── */
+
+/* Bands, not text colours: the marker is the saturated pair and the background
+   stays dark enough for syntax highlighting to read on top of it — the same
+   reasoning as the comment on `diffAdd` in theme.ts. */
+.code--diff .line {
+  /* The hanging indent from tokens.css plus room for the full-bleed band. */
+  padding-right: 14px;
+  margin-inline: -16px;
+  padding-left: calc(16px + 6ch);
+}
+
+.line--add {
+  background: var(--doc-diff-add-bg);
+  color: var(--doc-diff-add);
+}
+
+.line--remove {
+  background: var(--doc-diff-remove-bg);
+  color: var(--doc-diff-remove);
+}
+
+.line--meta {
+  color: var(--doc-faint);
+}
+
+/* ── Callouts ─────────────────────────────────────────────────────────── */
+
+/* A rule and a label. No filled box, no icon, no emoji — the colour of the rule
+   is the whole signal, and it is the same colour the product uses for the same
+   state. */
+.callout {
+  margin: var(--doc-gap-block) 0;
+  padding: 2px 0 2px 16px;
+  border-left: 2px solid var(--doc-note);
+}
+
+.callout > :last-child {
+  margin-bottom: 0;
+}
+
+.callout__label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--doc-text-2);
+}
+
+.callout--tip {
+  border-left-color: var(--doc-tip);
+}
+
+.callout--warning {
+  border-left-color: var(--doc-warning);
+}
+
+.callout--danger {
+  border-left-color: var(--doc-danger);
+}
+
+.callout--tip .callout__label {
+  color: var(--doc-tip);
+}
+
+.callout--warning .callout__label {
+  color: var(--doc-warning);
+}
+
+.callout--danger .callout__label {
+  color: var(--doc-danger);
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+
+.tabs {
+  margin: var(--doc-gap-block) 0;
+}
+
+.tabs__list {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--doc-line);
+}
+
+.tabs__tab {
+  padding: 7px 12px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 1.5px solid transparent;
+  background: none;
+  color: var(--doc-faint);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition:
+    color 0.16s var(--doc-ease),
+    border-color 0.16s var(--doc-ease);
+}
+
+.tabs__tab:hover {
+  color: var(--doc-text-2);
+}
+
+.tabs__tab[aria-selected="true"] {
+  color: var(--doc-strong);
+  border-bottom-color: var(--doc-accent);
+}
+
+.tabs__panel > :first-child {
+  margin-top: var(--doc-gap-block);
+}
+
+.tabs__panel > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Keys ─────────────────────────────────────────────────────────────── */
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--doc-line-2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--doc-raised);
+  font-family: var(--doc-mono);
+  font-size: 0.82em;
+  line-height: 1.5;
+  color: var(--doc-text);
+}
+
+/* ── Search ───────────────────────────────────────────────────────────── */
+
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 8px 0 11px;
+  border: 1px solid var(--doc-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--doc-faint);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color 0.18s var(--doc-ease),
+    border-color 0.18s var(--doc-ease);
+}
+
+.search-trigger:hover {
+  color: var(--doc-text-2);
+  border-color: var(--doc-line-2);
+}
+
+.search-trigger__key {
+  padding: 0 5px;
+  border-width: 1px;
+  font-size: 11px;
+  color: var(--doc-faint);
+}
+
+/* The palette sits above everything, including the mobile sidebar sheet. */
+.palette {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  /* Not centred vertically: a dialog that grows downward from a fixed point is
+     steadier to read than one that recentres itself on every keystroke. */
+  padding: max(10vh, 48px) 20px 20px;
+}
+
+.palette[hidden] {
+  display: none;
+}
+
+.palette__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.44);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.palette__box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  max-height: min(60vh, 520px);
+  border: 1px solid var(--doc-line-2);
+  border-radius: 14px;
+  background: var(--doc-surface);
+  box-shadow: 0 20px 60px rgba(38, 32, 74, 0.22);
+  overflow: hidden;
+}
+
+.palette__input {
+  flex: none;
+  padding: 16px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--doc-line);
+  background: transparent;
+  color: var(--doc-text);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.palette__input::placeholder {
+  color: var(--doc-faint);
+}
+
+.palette__results {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.palette__group {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-faint);
+}
+
+.palette__result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.palette__result[aria-selected="true"] {
+  background: color-mix(in srgb, var(--doc-accent) 14%, transparent);
+}
+
+.palette__crumb {
+  font-size: 11.5px;
+  color: var(--doc-faint);
+}
+
+.palette__title {
+  font-size: 14.5px;
+  font-weight: 480;
+  color: var(--doc-strong);
+}
+
+.palette__snippet {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--doc-text-2);
+  /* Two lines, so a long section does not push the next result off screen. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.palette__empty {
+  padding: 18px 12px;
+  font-size: 14px;
+  color: var(--doc-faint);
+}
+
+.palette__hint {
+  flex: none;
+  margin: 0;
+  padding: 9px 14px;
+  border-top: 1px solid var(--doc-line);
+  font-size: 11.5px;
+  color: var(--doc-faint);
+}
+
+.palette__hint kbd {
+  padding: 0 4px;
+  margin-right: 2px;
+  border-bottom-width: 1px;
+  font-size: 11px;
+}
+
+@media (max-width: 560px) {
+  .search-trigger span {
+    display: none;
+  }
+
+  .search-trigger {
+    padding: 0 8px;
+  }
+}

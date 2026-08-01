@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Configuration — Woopcode docs</title>
+    <meta name="description" content="Where Woopcode stores its settings, what each key means, and what happens when the file breaks." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration" aria-current="page">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Reference</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Configuration</span></nav>
+    <h1 id="configuration">Configuration</h1>
+<h2 id="location">Location<a class="anchor" href="#location" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Directory</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>macOS, Linux</td>
+<td><code>$XDG_CONFIG_HOME/woopcode/</code>, or <code>~/.config/woopcode/</code></td>
+</tr>
+<tr>
+<td>Windows</td>
+<td><code>%LOCALAPPDATA%\woopcode\</code></td>
+</tr>
+</tbody></table></div>
+<p>The directory is created on first run.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>providers.json</code></td>
+<td>Provider keys, the default provider, the selected model, the approval mode</td>
+</tr>
+<tr>
+<td><code>conversation.json</code></td>
+<td>Saved conversation history</td>
+</tr>
+<tr>
+<td><code>models.json</code></td>
+<td>The model list</td>
+</tr>
+</tbody></table></div>
+<p>Configuration is global, not per-repository. Conversation history is the one
+thing scoped to where you are working.</p>
+<h2 id="providersjson"><code>providers.json</code><a class="anchor" href="#providersjson" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="json"><code><span class="line">{</span><span class="line">  &quot;defaultProvider&quot;: &quot;google&quot;,</span><span class="line">  &quot;selectedModel&quot;: &quot;gemini-3.6-flash&quot;,</span><span class="line">  &quot;approvalMode&quot;: &quot;auto-read-only&quot;,</span><span class="line">  &quot;providers&quot;: {</span><span class="line">    &quot;google&quot;: { &quot;type&quot;: &quot;api&quot;, &quot;apiKey&quot;: &quot;...&quot; }</span><span class="line">  }</span><span class="line">}</span></code></pre>
+  </div>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>defaultProvider</code></td>
+<td><code>string</code></td>
+<td><code>&quot;google&quot;</code></td>
+<td>Which provider a session starts with</td>
+</tr>
+<tr>
+<td><code>selectedModel</code></td>
+<td><code>string</code></td>
+<td>first model of the provider</td>
+<td>Model id, as listed by <code>woopcode models</code></td>
+</tr>
+<tr>
+<td><code>approvalMode</code></td>
+<td><code>string</code></td>
+<td><code>&quot;auto-read-only&quot;</code></td>
+<td>One of the four <a href="/docs/guides/approval-modes">approval modes</a></td>
+</tr>
+<tr>
+<td><code>providers</code></td>
+<td><code>object</code></td>
+<td>three entries</td>
+<td>Keyed by provider id</td>
+</tr>
+<tr>
+<td><code>providers.&lt;id&gt;.type</code></td>
+<td><code>string</code></td>
+<td><code>&quot;api&quot;</code></td>
+<td>How the provider authenticates</td>
+</tr>
+<tr>
+<td><code>providers.&lt;id&gt;.apiKey</code></td>
+<td><code>string</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>The stored key</td>
+</tr>
+</tbody></table></div>
+<p>Unrecognised keys are preserved when Woopcode rewrites the file, so anything
+you add by hand survives.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p><code>apiKey</code> is stored in plain text, with no encryption and no keychain
+integration. The file is only as protected as your home directory.</p>
+</aside>
+<h2 id="editing-it-by-hand">Editing it by hand<a class="anchor" href="#editing-it-by-hand" aria-label="Link to this section">#</a></h2>
+<p>You can, and Woopcode will read it. The safer path for the values that have a
+command is to use the command, because it validates:
+<a href="/docs/reference/cli"><code>woopcode providers login</code></a> verifies a key before saving
+it, and <code>/approval</code> cannot write a mode that does not exist.</p>
+<p>An approval mode the parser does not recognise falls back to the default rather
+than being treated as permissive. An unreadable setting must not be able to
+widen what runs without asking.</p>
+<h2 id="when-the-file-is-corrupt">When the file is corrupt<a class="anchor" href="#when-the-file-is-corrupt" aria-label="Link to this section">#</a></h2>
+<p>A <code>providers.json</code> or <code>conversation.json</code> that is not valid JSON — a truncated
+write, a bad hand edit — is moved aside rather than crashing every command that
+touches it:</p>
+<figure class="code code--terminal">
+      <figcaption class="code__bar">
+        <span class="code__dots" aria-hidden="true"></span>
+        <span class="code__title">woopcode</span>
+      </figcaption>
+      <pre data-lang="terminal"><code><span class="line">Could not read provider config (invalid JSON). Moved it to</span><span class="line">~/.config/woopcode/providers.json.corrupt-1785508675645 and started from</span><span class="line">defaults.</span></code></pre>
+    </figure>
+<p>Your broken copy is kept under that <code>.corrupt-&lt;timestamp&gt;</code> name; the next
+launch starts clean.</p>
+<h2 id="retired-providers">Retired providers<a class="anchor" href="#retired-providers" aria-label="Link to this section">#</a></h2>
+<p>A provider that an earlier version offered and Woopcode has since dropped is
+removed from your config on startup — but only if it has no key stored. An
+entry with a key is left alone: deleting a credential silently would hide
+something you may want to remove yourself.</p>
+<h2 id="environment">Environment<a class="anchor" href="#environment" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>XDG_CONFIG_HOME</code></td>
+<td>Moves the config directory on macOS and Linux</td>
+</tr>
+<tr>
+<td><code>LOCALAPPDATA</code></td>
+<td>Moves the config directory on Windows</td>
+</tr>
+</tbody></table></div>
+<p>Woopcode does not read an API key from the environment. Pass it once through
+<code>woopcode providers login</code>, which stores it.</p>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/guides/configuring-providers">Configuring providers</a> — the task, not
+the schema</li>
+<li><a href="/docs/guides/sessions-and-history">Sessions &amp; history</a> — what
+<code>conversation.json</code> holds</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/reference/tools/ask-user">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">ask_user</span>
+        </a><a class="pager__card pager__card--next" href="/docs/reference/keyboard">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Keyboard</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#location" data-toc="location">Location</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#providersjson" data-toc="providersjson">providers.json</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#editing-it-by-hand" data-toc="editing-it-by-hand">Editing it by hand</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-the-file-is-corrupt" data-toc="when-the-file-is-corrupt">When the file is corrupt</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#retired-providers" data-toc="retired-providers">Retired providers</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#environment" data-toc="environment">Environment</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#see-also" data-toc="see-also">See also</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

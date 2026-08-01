@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tools — Woopcode docs</title>
+    <meta name="description" content="Every tool the agent can call, and which of them can change your files." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools" aria-current="page">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Reference</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Tools</span></nav>
+    <h1 id="tools">Tools</h1>
+<p>Woopcode ships 13 tools. The agent chooses which to call; you
+control what happens when it calls one that writes.</p>
+<h2 id="which-of-these-can-change-my-files">Which of these can change my files<a class="anchor" href="#which-of-these-can-change-my-files" aria-label="Link to this section">#</a></h2>
+<p>These, and only these. Everything else either reads the repository, runs a
+command, or asks you a question.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>create_file</code></td>
+<td>Creates a new file with the provided content. Pass an empty string to create an empty file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>write_file</code></td>
+<td>Overwrite an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>edit_file</code></td>
+<td>Replace text inside an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+</tbody></table></div>
+<p>Every one of those pauses on a unified diff and waits. No approval mode turns
+that off — see <a href="/docs/guides/reviewing-diffs">Reviewing diffs</a>.</p>
+<h2 id="explore-and-read">Explore and read<a class="anchor" href="#explore-and-read" aria-label="Link to this section">#</a></h2>
+<p>These never change anything and never ask.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>list_files</code></td>
+<td>List files in a directory, skipping dependency and build directories. Returns up to 500 files. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>read_file</code></td>
+<td>Reads the contents of a file.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>grep</code></td>
+<td>Searches recursively for text in project files.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>find_files</code></td>
+<td>Finds files by name or partial filename, skipping dependency and build directories. Returns up to 200 matches. Use specific queries (e.g., &#39;websocket&#39;, &#39;config&#39;) rather than broad patterns (e.g., &#39;.&#39;).</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>glob</code></td>
+<td>Search for files matching a glob pattern. Supports wildcards like *, **, ?, [abc], etc.</td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p>Examples:</p>
+<ul>
+<li>&quot;*.ts&quot; - All TypeScript files in current directory</li>
+<li>&quot;**/*.test.ts&quot; - All test files recursively</li>
+<li>&quot;src/**/*.{ts,tsx}&quot; - TypeScript/TSX files in src/</li>
+<li>&quot;*.{js,json}&quot; - JS and JSON files</li>
+</ul>
+<p>Returns up to 100 matching file paths. | Runs without asking. Reads only; never changes the workspace. |
+| <code>web_search</code> | Search the web for current information, documentation, or answers to questions.</p>
+<p>Use this when you need:</p>
+<ul>
+<li>Current/up-to-date information (news, prices, versions, etc.)</li>
+<li>Documentation or API references</li>
+<li>Technical solutions or stack overflow answers</li>
+<li>Verify information that may have changed recently</li>
+</ul>
+<p>Returns a list of relevant web pages with titles, URLs, and snippets.</p>
+<p>Current year: 2026 | Runs without asking. Reads only; never changes the workspace. |
+| <code>web_fetch</code> | Fetch and extract content from a specific URL.</p>
+<p>Use this to:</p>
+<ul>
+<li>Read documentation pages</li>
+<li>Fetch article content</li>
+<li>Get data from specific web pages</li>
+<li>Read content found via web_search</li>
+</ul>
+<p>Supports:</p>
+<ul>
+<li>HTML pages (converts to readable text)</li>
+<li>Plain text</li>
+<li>JSON data</li>
+<li>Markdown</li>
+</ul>
+<p>Max response size: 5MB
+Default timeout: 30 seconds | Runs without asking. Reads only; never changes the workspace. |</p>
+<h2 id="shell">Shell<a class="anchor" href="#shell" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>run_terminal</code></td>
+<td>Runs a terminal command in the current project. For quick commands only (tests, builds, installs). Do not use for starting servers or long-running processes.</td>
+<td>Gated by the approval mode.</td>
+</tr>
+<tr>
+<td><code>run_tests</code></td>
+<td>Runs the project&#39;s test command. For quick test execution only - do not use to start servers.</td>
+<td>Gated by the approval mode.</td>
+</tr>
+</tbody></table></div>
+<p>Gated by the approval mode, not by a diff. The default runs reads and tests
+without asking and stops before anything that writes.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p><code>run_terminal</code> and <code>run_tests</code> are for short, non-interactive commands. They do
+not start servers or watch processes, and a command that waits for input will
+sit there until you cancel the turn.</p>
+</aside>
+<h2 id="ask">Ask<a class="anchor" href="#ask" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ask_user</code></td>
+<td>Ask the user questions to gather information needed to complete their request.</td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p>Use this when you need:</p>
+<ul>
+<li>Clarification on ambiguous requests</li>
+<li>Additional details or preferences</li>
+<li>User confirmation before proceeding</li>
+<li>Input that only the user can provide</li>
+</ul>
+<p>You can ask multiple questions at once. Each question will be presented to the user,
+and their answers will be returned to you.</p>
+<p>Examples:</p>
+<ul>
+<li>&quot;Which API endpoint should I modify?&quot;</li>
+<li>&quot;Do you want to use TypeScript or JavaScript?&quot;</li>
+<li>&quot;Should I update the tests as well?&quot; | Stops the turn and waits for your answer. |</li>
+</ul>
+<p>The turn stops and waits for your answer, then continues with it.</p>
+<h2 id="every-tool">Every tool<a class="anchor" href="#every-tool" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>list_files</code></td>
+<td>List files in a directory, skipping dependency and build directories. Returns up to 500 files. Use sparingly - only when you need to see directory structure. For finding specific files, use find_files instead.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>read_file</code></td>
+<td>Reads the contents of a file.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>run_terminal</code></td>
+<td>Runs a terminal command in the current project. For quick commands only (tests, builds, installs). Do not use for starting servers or long-running processes.</td>
+<td>Gated by the approval mode.</td>
+</tr>
+<tr>
+<td><code>create_file</code></td>
+<td>Creates a new file with the provided content. Pass an empty string to create an empty file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>write_file</code></td>
+<td>Overwrite an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>edit_file</code></td>
+<td>Replace text inside an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>grep</code></td>
+<td>Searches recursively for text in project files.</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>run_tests</code></td>
+<td>Runs the project&#39;s test command. For quick test execution only - do not use to start servers.</td>
+<td>Gated by the approval mode.</td>
+</tr>
+<tr>
+<td><code>find_files</code></td>
+<td>Finds files by name or partial filename, skipping dependency and build directories. Returns up to 200 matches. Use specific queries (e.g., &#39;websocket&#39;, &#39;config&#39;) rather than broad patterns (e.g., &#39;.&#39;).</td>
+<td>Runs without asking. Reads only; never changes the workspace.</td>
+</tr>
+<tr>
+<td><code>glob</code></td>
+<td>Search for files matching a glob pattern. Supports wildcards like *, **, ?, [abc], etc.</td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p>Examples:</p>
+<ul>
+<li>&quot;*.ts&quot; - All TypeScript files in current directory</li>
+<li>&quot;**/*.test.ts&quot; - All test files recursively</li>
+<li>&quot;src/**/*.{ts,tsx}&quot; - TypeScript/TSX files in src/</li>
+<li>&quot;*.{js,json}&quot; - JS and JSON files</li>
+</ul>
+<p>Returns up to 100 matching file paths. | Runs without asking. Reads only; never changes the workspace. |
+| <code>web_search</code> | Search the web for current information, documentation, or answers to questions.</p>
+<p>Use this when you need:</p>
+<ul>
+<li>Current/up-to-date information (news, prices, versions, etc.)</li>
+<li>Documentation or API references</li>
+<li>Technical solutions or stack overflow answers</li>
+<li>Verify information that may have changed recently</li>
+</ul>
+<p>Returns a list of relevant web pages with titles, URLs, and snippets.</p>
+<p>Current year: 2026 | Runs without asking. Reads only; never changes the workspace. |
+| <code>web_fetch</code> | Fetch and extract content from a specific URL.</p>
+<p>Use this to:</p>
+<ul>
+<li>Read documentation pages</li>
+<li>Fetch article content</li>
+<li>Get data from specific web pages</li>
+<li>Read content found via web_search</li>
+</ul>
+<p>Supports:</p>
+<ul>
+<li>HTML pages (converts to readable text)</li>
+<li>Plain text</li>
+<li>JSON data</li>
+<li>Markdown</li>
+</ul>
+<p>Max response size: 5MB
+Default timeout: 30 seconds | Runs without asking. Reads only; never changes the workspace. |
+| <code>ask_user</code> | Ask the user questions to gather information needed to complete their request.</p>
+<p>Use this when you need:</p>
+<ul>
+<li>Clarification on ambiguous requests</li>
+<li>Additional details or preferences</li>
+<li>User confirmation before proceeding</li>
+<li>Input that only the user can provide</li>
+</ul>
+<p>You can ask multiple questions at once. Each question will be presented to the user,
+and their answers will be returned to you.</p>
+<p>Examples:</p>
+<ul>
+<li>&quot;Which API endpoint should I modify?&quot;</li>
+<li>&quot;Do you want to use TypeScript or JavaScript?&quot;</li>
+<li>&quot;Should I update the tests as well?&quot; | Stops the turn and waits for your answer. |</li>
+</ul>
+<h2 id="how-a-tool-call-goes-wrong">How a tool call goes wrong<a class="anchor" href="#how-a-tool-call-goes-wrong" aria-label="Link to this section">#</a></h2>
+<p>Tool failures are returned to the agent rather than ending the turn, so it can
+correct itself and try again. Three limits shape what it sees:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tool result size</td>
+<td>4,000 characters</td>
+<td>Longer results are truncated with a notice</td>
+</tr>
+<tr>
+<td>Identical calls per turn</td>
+<td>4</td>
+<td>The fifth is skipped and the agent told why</td>
+</tr>
+<tr>
+<td>Iterations per turn</td>
+<td>20</td>
+<td>The turn ends; a warning is issued at 15</td>
+</tr>
+</tbody></table></div>
+<p>The duplicate check compares the tool name and its exact arguments. The first
+four identical calls run normally; from the fifth on, the agent gets a skip
+notice instead of the result:</p>
+<figure class="code code--terminal">
+      <figcaption class="code__bar">
+        <span class="code__dots" aria-hidden="true"></span>
+        <span class="code__title">woopcode</span>
+      </figcaption>
+      <pre data-lang="terminal"><code><span class="line">Skipped duplicate read_file call. The result for these exact arguments is</span><span class="line">already in the conversation; use it and continue with a different action.</span></code></pre>
+    </figure>
+<p>That is what stops a turn from looping on the same lookup. Reading the same
+file twice is fine and happens often.</p>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/reference/tools/read-file"><code>read_file</code></a> — one tool in full</li>
+<li><a href="/docs/guides/approval-modes">Approval modes</a> — what gates the shell tools</li>
+<li><a href="/docs/architecture/adding-a-tool">Adding a tool</a> — the registry these come
+from</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/reference/slash-commands">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Slash commands</span>
+        </a><a class="pager__card pager__card--next" href="/docs/reference/tools/list-files">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">list_files</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#which-of-these-can-change-my-files" data-toc="which-of-these-can-change-my-files">Which of these can change my files</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#explore-and-read" data-toc="explore-and-read">Explore and read</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#shell" data-toc="shell">Shell</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#ask" data-toc="ask">Ask</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#every-tool" data-toc="every-tool">Every tool</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#how-a-tool-call-goes-wrong" data-toc="how-a-tool-call-goes-wrong">How a tool call goes wrong</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#see-also" data-toc="see-also">See also</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

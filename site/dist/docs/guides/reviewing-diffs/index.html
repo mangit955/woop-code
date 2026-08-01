@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Reviewing diffs — Woopcode docs</title>
+    <meta name="description" content="The gate that no approval mode removes — reading the diff, applying it, and what happens when you reject." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs" aria-current="page">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Guides</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Reviewing diffs</span></nav>
+    <h1 id="reviewing-diffs">Reviewing diffs</h1>
+<p>Every edit to an existing file stops and shows you a unified diff before
+anything is written. This is the one protection that does not depend on your
+approval mode.</p>
+<h2 id="what-you-see">What you see<a class="anchor" href="#what-you-see" aria-label="Link to this section">#</a></h2>
+<div class="code code--diff">
+    
+    <pre data-lang="diff"><code><span class="line"> ← Editing  src/auth/login.ts                        +6 −0</span><span class="line">&nbsp;</span><span class="line">   export async function login(req: Request) {</span><span class="line line--add">+    /**</span><span class="line line--add">+     * Exchanges a set of credentials for a session cookie.</span><span class="line line--add">+     */</span><span class="line">     const body = await req.json();</span><span class="line">&nbsp;</span><span class="line"> Esc reject · ↑↓ scroll                    Enter apply</span></code></pre>
+  </div>
+<p>The header names the action and the file, and counts the lines added and
+removed. Added lines carry <code>+</code>, removed lines <code>−</code>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><kbd>Enter</kbd></td>
+<td>Apply the edit</td>
+</tr>
+<tr>
+<td><kbd>Esc</kbd></td>
+<td>Reject it</td>
+</tr>
+<tr>
+<td><kbd>↑</kbd> <kbd>↓</kbd></td>
+<td>Scroll, when the diff is longer than the screen</td>
+</tr>
+</tbody></table></div>
+<h2 id="which-tools-stop-here">Which tools stop here<a class="anchor" href="#which-tools-stop-here" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+<th>Approval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>create_file</code></td>
+<td>Creates a new file with the provided content. Pass an empty string to create an empty file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>write_file</code></td>
+<td>Overwrite an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+<tr>
+<td><code>edit_file</code></td>
+<td>Replace text inside an existing file.</td>
+<td>Pauses on a unified diff. Nothing is written until you approve it.</td>
+</tr>
+</tbody></table></div>
+<p>Creating a <em>new</em> file is also shown before it is written — an empty file is a
+valid thing to create, and you should still get to see it coming.</p>
+<h2 id="rejecting-is-a-normal-move">Rejecting is a normal move<a class="anchor" href="#rejecting-is-a-normal-move" aria-label="Link to this section">#</a></h2>
+<p><kbd>Esc</kbd> is not an error and not a cancellation. The agent is told the
+edit was declined and continues from there, so the useful pattern is to reject
+and immediately say what you wanted instead:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">Not quite — keep the existing return type and only add the docstring.</span></code></pre>
+  </div>
+<p>The rejected edit stays in the conversation as context, so you do not have to
+re-explain the whole task.</p>
+<p>To stop the turn entirely rather than decline one edit, use
+<kbd>Ctrl</kbd><kbd>C</kbd>. <kbd>Esc</kbd> rejects what is in front of you;
+it does not stop the agent.</p>
+<h2 id="reading-a-long-diff">Reading a long diff<a class="anchor" href="#reading-a-long-diff" aria-label="Link to this section">#</a></h2>
+<p>Diffs longer than the screen scroll with the arrow keys. Two habits help:</p>
+<p><strong>Check the counts first.</strong> <code>+6 −0</code> on a docstring is expected. <code>+6 −40</code> is
+worth reading closely.</p>
+<p><strong>Check the file path.</strong> It is the fastest way to catch an edit aimed at the
+wrong file — a test instead of the source, or a generated file that will be
+overwritten.</p>
+<h2 id="why-the-review-is-here-and-not-in-git">Why the review is here and not in git<a class="anchor" href="#why-the-review-is-here-and-not-in-git" aria-label="Link to this section">#</a></h2>
+<p>An agent that writes first and lets you inspect afterwards is faster right up
+until it is wrong, and then you are reading <code>git diff</code> reconstructing what
+happened and why. Reviewing before the write means the change never lands, the
+agent learns immediately, and your working tree is never in a state you did not
+choose.</p>
+<aside class="callout callout--note"><p class="callout__label">Note</p><p>This gate covers file edits. Shell commands are governed separately by the
+<a href="/docs/guides/approval-modes">approval mode</a> — a command that writes a file is
+checked there, not here.</p>
+</aside>
+<h2 id="when-it-does-not-work">When it does not work<a class="anchor" href="#when-it-does-not-work" aria-label="Link to this section">#</a></h2>
+<p><strong>A diff appeared for a file you did not expect</strong> — Reject it. The agent
+inferred the wrong target; say which file you meant.</p>
+<p><strong>The diff is enormous</strong> — Reject and narrow the request. A turn that produces
+a several-hundred-line diff has usually misunderstood the scope, and reviewing
+it properly costs more than redoing the ask.</p>
+<p><strong>No diff appeared and a file changed anyway</strong> — That was a shell command, not
+an edit tool. Check your approval mode with <code>/status</code>.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/guides/approval-modes">Approval modes</a> — the other gate</li>
+<li><a href="/docs/reference/keyboard">Keyboard</a> — every key</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/guides/approval-modes">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Approval modes</span>
+        </a><a class="pager__card pager__card--next" href="/docs/guides/working-in-a-repository">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Working in a repository</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#what-you-see" data-toc="what-you-see">What you see</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#which-tools-stop-here" data-toc="which-tools-stop-here">Which tools stop here</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#rejecting-is-a-normal-move" data-toc="rejecting-is-a-normal-move">Rejecting is a normal move</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#reading-a-long-diff" data-toc="reading-a-long-diff">Reading a long diff</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#why-the-review-is-here-and-not-in-git" data-toc="why-the-review-is-here-and-not-in-git">Why the review is here and not in git</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-it-does-not-work" data-toc="when-it-does-not-work">When it does not work</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

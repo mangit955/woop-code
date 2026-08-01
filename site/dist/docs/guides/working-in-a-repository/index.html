@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Working in a repository — Woopcode docs</title>
+    <meta name="description" content="What Woopcode knows about your project, where the workspace boundary is, and how to ask questions it can answer well." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository" aria-current="page">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Guides</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Working in a repository</span></nav>
+    <h1 id="working-in-a-repository">Working in a repository</h1>
+<p>Woopcode operates on the directory it was launched from. Not the one your
+editor has open, not the git root — the working directory of the process.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">cd path/to/your-project</span><span class="line">woopcode</span></code></pre>
+  </div>
+<p>Confirm it any time:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">/workspace</span></code></pre>
+  </div>
+<p>That reports the directory, the current git branch, and a file count.</p>
+<h2 id="what-it-knows-before-you-ask">What it knows before you ask<a class="anchor" href="#what-it-knows-before-you-ask" aria-label="Link to this section">#</a></h2>
+<p>At the start of a turn Woopcode assembles a short description of the project:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Cap</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Package metadata summary</td>
+<td>2,000 characters</td>
+</tr>
+<tr>
+<td>README</td>
+<td>4,000 characters</td>
+</tr>
+<tr>
+<td>Top-level directory structure</td>
+<td>—</td>
+</tr>
+<tr>
+<td>The whole context, after assembly</td>
+<td>8,000 characters</td>
+</tr>
+</tbody></table></div>
+<p>It does not include a file listing. That can be enormous on a real repository,
+and the agent has <code>find_files</code>, <code>glob</code>, and <code>list_files</code> to look things up when
+it needs them. The context is a starting point, not a snapshot — everything
+else is read on demand.</p>
+<p>A single file over 512 KB is not read into context.</p>
+<h2 id="the-workspace-boundary">The workspace boundary<a class="anchor" href="#the-workspace-boundary" aria-label="Link to this section">#</a></h2>
+<p>Every path a tool touches is resolved against the workspace root, and anything
+that lands outside it is refused:</p>
+<figure class="code code--terminal">
+      <figcaption class="code__bar">
+        <span class="code__dots" aria-hidden="true"></span>
+        <span class="code__title">woopcode</span>
+      </figcaption>
+      <pre data-lang="terminal"><code><span class="line">Path escapes the workspace: ../other-project/src/index.ts</span></code></pre>
+    </figure>
+<p>Symlinks are resolved before the check, so a link pointing out of the tree does
+not get around it. If you need Woopcode to work on a different project, quit
+and restart there.</p>
+<h2 id="asking-questions-it-can-answer-well">Asking questions it can answer well<a class="anchor" href="#asking-questions-it-can-answer-well" aria-label="Link to this section">#</a></h2>
+<p><strong>Name things.</strong> &quot;Where is the session cookie set&quot; beats &quot;how does auth work&quot;.
+The agent searches for what you name, so a concrete noun from the codebase
+saves it several lookups.</p>
+<p><strong>Say what you want changed, not how.</strong> &quot;Add validation to the create-user
+endpoint and cover it with tests&quot; gives the agent room to find the right file.
+Prescribing an approach when you have not read the code often produces a worse
+edit than describing the outcome.</p>
+<p><strong>Ask before you change.</strong> A question costs one turn and no writes, and it
+tells you whether the agent has understood the project before you let it edit.</p>
+<p><strong>Keep the scope to one thing.</strong> A turn has a budget of 20 iterations. Two
+unrelated changes in one prompt tends to produce a partial result for both.</p>
+<h2 id="git">Git<a class="anchor" href="#git" aria-label="Link to this section">#</a></h2>
+<p>Woopcode has no special git integration. It sees your working tree as files,
+and it can run git commands through the shell tools subject to your approval
+mode — <code>git status</code> and <code>git log</code> are classified read-only, <code>git add</code> and
+<code>git commit</code> as workspace writes, and <code>git reset</code>, <code>git clean</code>, and
+<code>git rebase</code> as destructive.</p>
+<aside class="callout callout--tip"><p class="callout__label">Tip</p><p>Commit before a session where you expect several edits. Not because Woopcode is
+reckless — every edit stops for review — but because a clean tree makes
+<code>git diff</code> the record of what the session actually changed.</p>
+</aside>
+<h2 id="when-it-does-not-work">When it does not work<a class="anchor" href="#when-it-does-not-work" aria-label="Link to this section">#</a></h2>
+<p><strong>The agent answers about the wrong project</strong> — Check <code>/workspace</code>. You almost
+certainly launched from a different directory than you meant.</p>
+<p><strong>It cannot find a file you know exists</strong> — It may be excluded from the
+structure scan, which skips <code>node_modules</code>, <code>.git</code>, and <code>dist</code>. Name the path
+directly and it will read it.</p>
+<p><strong>It keeps re-reading the same file</strong> — After four identical calls, the rest are
+skipped with a notice. That usually means the turn has lost the thread; cancel
+and re-ask more specifically.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/guides/sessions-and-history">Sessions &amp; history</a> — what carries over</li>
+<li><a href="/docs/reference/tools">Tools</a> — how it looks things up</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/guides/reviewing-diffs">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Reviewing diffs</span>
+        </a><a class="pager__card pager__card--next" href="/docs/guides/sessions-and-history">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Sessions &amp; history</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#what-it-knows-before-you-ask" data-toc="what-it-knows-before-you-ask">What it knows before you ask</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#the-workspace-boundary" data-toc="the-workspace-boundary">The workspace boundary</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#asking-questions-it-can-answer-well" data-toc="asking-questions-it-can-answer-well">Asking questions it can answer well</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#git" data-toc="git">Git</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-it-does-not-work" data-toc="when-it-does-not-work">When it does not work</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

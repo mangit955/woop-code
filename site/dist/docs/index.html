@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Documentation — Woopcode docs</title>
+    <meta name="description" content="Guides and reference for Woopcode, the terminal-native coding agent." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout layout--no-toc">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page page--home">
+    <h1>Woopcode documentation</h1>
+    <p class="lede">A terminal-native coding agent that reads the repository you
+      are in, shows its work, and pauses on a diff before it changes a line.</p>
+    <div class="cards"><a class="card" href="/docs/introduction/what-is-woopcode"><span class="card__title">Introduction</span>
+        <span class="card__meta">3 of 3 pages</span></a><a class="card" href="/docs/getting-started/install"><span class="card__title">Getting started</span>
+        <span class="card__meta">3 of 3 pages</span></a><a class="card" href="/docs/guides/approval-modes"><span class="card__title">Guides</span>
+        <span class="card__meta">5 of 5 pages</span></a><a class="card" href="/docs/reference/cli"><span class="card__title">Reference</span>
+        <span class="card__meta">18 of 18 pages</span></a><a class="card" href="/docs/architecture/how-it-works"><span class="card__title">Architecture</span>
+        <span class="card__meta">3 of 3 pages</span></a></div>
+  </article></main>
+      
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Connect a provider — Woopcode docs</title>
+    <meta name="description" content="Create a Google Gemini API key and give it to Woopcode, from the setup flow or the command line." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider" aria-current="page">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Getting started</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Connect a provider</span></nav>
+    <h1 id="connect-a-provider">Connect a provider</h1>
+<p>Woopcode needs an API key before it can do anything.</p>
+<aside class="callout callout--note"><p class="callout__label">Note</p><p>Google Gemini is the only implemented provider. <code>openai</code> and <code>anthropic</code> appear
+in <code>woopcode providers list</code> so you can see they are planned, but selecting one
+will not give you a working session.</p>
+</aside>
+<h2 id="get-a-key">Get a key<a class="anchor" href="#get-a-key" aria-label="Link to this section">#</a></h2>
+<p>Create one at <a href="https://aistudio.google.com/apikey">Google AI Studio</a>. It is
+free to generate and takes about a minute.</p>
+<h2 id="give-it-to-woopcode">Give it to Woopcode<a class="anchor" href="#give-it-to-woopcode" aria-label="Link to this section">#</a></h2>
+<p>The first launch asks for it:</p>
+<figure class="code code--terminal">
+      <figcaption class="code__bar">
+        <span class="code__dots" aria-hidden="true"></span>
+        <span class="code__title">woopcode — setup</span>
+      </figcaption>
+      <pre data-lang="terminal"><code><span class="line">  Welcome to Woopcode!</span><span class="line">&nbsp;</span><span class="line">  You can create a free API key at:</span><span class="line">  https://aistudio.google.com/apikey</span><span class="line">&nbsp;</span><span class="line">  Paste your Google Gemini API key:</span><span class="line">  &gt; ...</span><span class="line">&nbsp;</span><span class="line">  ✓ API key verified</span></code></pre>
+    </figure>
+<p>The key is checked against the provider before it is saved, so a bad paste
+fails here rather than halfway through your first turn.</p>
+<p>Or do it from your shell, which is the better option when the key is already in
+an environment variable:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers login --provider google --api-key &quot;$GOOGLE_API_KEY&quot;</span></code></pre>
+  </div>
+<h2 id="confirm-it">Confirm it<a class="anchor" href="#confirm-it" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers list</span></code></pre>
+  </div>
+<p>Inside a session, <code>/status</code> shows the provider, the model, and the approval
+mode in one line.</p>
+<h2 id="where-the-key-goes">Where the key goes<a class="anchor" href="#where-the-key-goes" aria-label="Link to this section">#</a></h2>
+<p>Into <code>providers.json</code> in your config directory — <code>~/.config/woopcode/</code> on macOS
+and Linux, <code>%LOCALAPPDATA%\woopcode\</code> on Windows.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p>The key is stored in plain text. There is no encryption and no keychain
+integration; the file is only as protected as your home directory. Use a key
+scoped to development, and remove it with <code>woopcode providers logout</code> when you
+are done.</p>
+</aside>
+<h2 id="when-it-does-not-work">When it does not work<a class="anchor" href="#when-it-does-not-work" aria-label="Link to this section">#</a></h2>
+<p><strong><code>Invalid API key. Please try again.</code></strong> — The key was rejected before being
+saved. Check for a trailing space or newline in the paste, and confirm it is a
+Google AI Studio key rather than a Google Cloud one.</p>
+<p><strong>The setup flow does not appear</strong> — A key is already stored. <code>/login</code> inside a
+session, or <code>woopcode providers login</code>, replaces it.</p>
+<p><strong>Requests fail after working yesterday</strong> — The key may have been revoked or
+hit a quota. Google AI Studio shows both.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/getting-started/first-session">Your first session</a></li>
+<li><a href="/docs/guides/configuring-providers">Configuring providers</a> — switching
+models, changing the default</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/getting-started/install">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Install</span>
+        </a><a class="pager__card pager__card--next" href="/docs/getting-started/first-session">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Your first session</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#get-a-key" data-toc="get-a-key">Get a key</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#give-it-to-woopcode" data-toc="give-it-to-woopcode">Give it to Woopcode</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#confirm-it" data-toc="confirm-it">Confirm it</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#where-the-key-goes" data-toc="where-the-key-goes">Where the key goes</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-it-does-not-work" data-toc="when-it-does-not-work">When it does not work</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

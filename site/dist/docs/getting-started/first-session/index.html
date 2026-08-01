@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Your first session — Woopcode docs</title>
+    <meta name="description" content="Point Woopcode at a repository and take it through one change, from prompt to applied diff." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session" aria-current="page">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Getting started</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Your first session</span></nav>
+    <h1 id="your-first-session">Your first session</h1>
+<p>By the end of this page you will have run Woopcode in a real repository, read
+its answer to a question about your own code, and applied one edit through the
+diff review.</p>
+<p>This page assumes Woopcode is <a href="/docs/getting-started/install">installed</a> and a
+<a href="/docs/getting-started/connect-a-provider">provider is connected</a>. One command
+confirms both:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers list</span></code></pre>
+  </div>
+<h2 id="start-it-in-a-repository">Start it in a repository<a class="anchor" href="#start-it-in-a-repository" aria-label="Link to this section">#</a></h2>
+<p>Woopcode reads the directory it is launched from, so this is the step that
+decides what it can see:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">cd path/to/your-project</span><span class="line">woopcode</span></code></pre>
+  </div>
+<h2 id="ask-it-something-first">Ask it something first<a class="anchor" href="#ask-it-something-first" aria-label="Link to this section">#</a></h2>
+<p>Start with a question rather than a change. It costs nothing, it shows you how
+the agent moves through your repository, and it tells you whether it has
+understood the codebase before you let it edit anything.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">Explain how authentication is structured in this repository.</span></code></pre>
+  </div>
+<p>Woopcode streams its work as it goes. You will see tool calls appear as they
+run — reading a file, grepping for a symbol, listing a directory — and then the
+answer builds underneath them. Nothing in that sequence writes to disk; every
+tool used to answer a question is read-only.</p>
+<h2 id="make-one-change">Make one change<a class="anchor" href="#make-one-change" aria-label="Link to this section">#</a></h2>
+<p>Now ask for something small and specific:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">Add a docstring to the login handler explaining what it returns.</span></code></pre>
+  </div>
+<p>When the agent is ready to change an existing file, it stops. It does not write
+and then tell you. It shows the edit as a unified diff and waits:</p>
+<div class="code code--diff">
+    
+    <pre data-lang="diff"><code><span class="line"> ← Editing  src/auth/login.ts                        +6 −0</span><span class="line">&nbsp;</span><span class="line">   export async function login(req: Request) {</span><span class="line line--add">+    /**</span><span class="line line--add">+     * Exchanges a set of credentials for a session cookie.</span><span class="line line--add">+     *</span><span class="line line--add">+     * Returns 401 with an empty body when the password</span><span class="line line--add">+     * does not match; never reveals if the account exists.</span><span class="line line--add">+     */</span><span class="line">     const body = await req.json();</span><span class="line">&nbsp;</span><span class="line"> Esc reject · ↑↓ scroll                    Enter apply</span></code></pre>
+  </div>
+<p>Press <kbd>Enter</kbd> to apply the edit, or <kbd>Esc</kbd> to reject it.
+Rejecting is not an error — the agent is told the edit was declined and carries
+on from there, so you can reject a diff and immediately explain what you wanted
+instead.</p>
+<p>That pause is the part of Woopcode worth understanding properly. It applies to
+every edit to an existing file, and it is not the same mechanism that governs
+shell commands. Those are controlled separately — see
+<a href="/docs/guides/approval-modes">Approval modes</a> before you run anything that
+builds or tests.</p>
+<h2 id="what-to-do-next-in-the-same-session">What to do next in the same session<a class="anchor" href="#what-to-do-next-in-the-same-session" aria-label="Link to this section">#</a></h2>
+<p>A few commands are worth knowing on day one:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/help</code></td>
+<td>List every command</td>
+</tr>
+<tr>
+<td><code>/status</code></td>
+<td>Show the provider, model, and approval mode in use</td>
+</tr>
+<tr>
+<td><code>/approval</code></td>
+<td>Change how much runs without asking</td>
+</tr>
+<tr>
+<td><code>/new</code></td>
+<td>Clear the conversation and start fresh</td>
+</tr>
+<tr>
+<td><code>/workspace</code></td>
+<td>Show the repository Woopcode thinks it is in</td>
+</tr>
+</tbody></table></div>
+<p>Your conversation is saved after every turn, so quitting and restarting resumes
+where you left off. <code>/new</code> is how you deliberately drop that history.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p>There is one history file, not one per repository. Starting Woopcode in a
+different project resumes the same conversation, so run <code>/new</code> when you switch
+— otherwise the agent begins with context from somewhere else entirely.</p>
+</aside>
+<h2 id="when-it-does-not-work">When it does not work<a class="anchor" href="#when-it-does-not-work" aria-label="Link to this section">#</a></h2>
+<p><strong><code>Path escapes the workspace: ../other-project/file.ts</code></strong> — The agent tried to
+reach outside the directory you launched it in. Woopcode resolves every path
+against the workspace root and refuses anything above it, symlinks included.
+Restart it inside the directory you actually want it to work on.</p>
+<p><strong>The agent answers about the wrong project</strong> — Check <code>/workspace</code>. Woopcode
+uses the directory it was launched from, not the one your editor has open.</p>
+<p><strong>A shell command you expected to run stopped and asked</strong> — That is the
+approval mode doing its job. The default runs reads and tests without asking
+and stops before anything that writes.</p>
+<p>Trouble before you get this far is covered where it belongs:
+<a href="/docs/getting-started/install#when-it-does-not-work">Install</a> for <code>bun: command not found</code>, <a href="/docs/getting-started/connect-a-provider#when-it-does-not-work">Connect a
+provider</a> for a
+rejected API key.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/guides/approval-modes">Approval modes</a> — decide how much runs without
+asking, and understand what <code>full-auto</code> gives up.</li>
+<li><a href="/docs/guides/reviewing-diffs">Reviewing diffs</a> — scrolling long diffs, and
+what happens to a rejected edit.</li>
+<li><a href="/docs/reference/tools">Tools</a> — the 13 tools the agent can
+call, and which of them can change your files.</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/getting-started/connect-a-provider">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Connect a provider</span>
+        </a><a class="pager__card pager__card--next" href="/docs/guides/approval-modes">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Approval modes</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#start-it-in-a-repository" data-toc="start-it-in-a-repository">Start it in a repository</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#ask-it-something-first" data-toc="ask-it-something-first">Ask it something first</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#make-one-change" data-toc="make-one-change">Make one change</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#what-to-do-next-in-the-same-session" data-toc="what-to-do-next-in-the-same-session">What to do next in the same session</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-it-does-not-work" data-toc="when-it-does-not-work">When it does not work</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

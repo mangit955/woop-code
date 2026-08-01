@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CLI — Woopcode docs</title>
+    <meta name="description" content="Every command, flag, and subcommand Woopcode accepts from your shell." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli" aria-current="page">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Reference</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">CLI</span></nav>
+    <h1 id="cli">CLI</h1>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode [options] [command]</span></code></pre>
+  </div>
+<p>With no command, Woopcode starts the interactive session in the current
+directory.</p>
+<h2 id="options">Options<a class="anchor" href="#options" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --prompt &lt;prompt&gt;</code></td>
+<td>Run a single prompt without the interface and exit</td>
+</tr>
+<tr>
+<td><code>--no-auto-approve</code></td>
+<td>With <code>--prompt</code>, reject tool edits and commands instead of approving them</td>
+</tr>
+<tr>
+<td><code>-V, --version</code></td>
+<td>Print the version</td>
+</tr>
+<tr>
+<td><code>-h, --help</code></td>
+<td>Print usage</td>
+</tr>
+</tbody></table></div>
+<h2 id="commands">Commands<a class="anchor" href="#commands" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>woopcode</code></td>
+<td>Start the interactive session</td>
+</tr>
+<tr>
+<td><code>woopcode agent</code></td>
+<td>The same thing, named explicitly</td>
+</tr>
+<tr>
+<td><code>woopcode models</code></td>
+<td>List the models Woopcode knows about</td>
+</tr>
+<tr>
+<td><code>woopcode providers</code></td>
+<td>Inspect and configure providers</td>
+</tr>
+</tbody></table></div>
+<h2 id="woopcode"><code>woopcode</code><a class="anchor" href="#woopcode" aria-label="Link to this section">#</a></h2>
+<p>Starts the session in the current working directory. Woopcode reads the
+repository it is launched from, so the directory matters.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">cd path/to/your-project</span><span class="line">woopcode</span></code></pre>
+  </div>
+<h3 id="headless">Headless<a class="anchor" href="#headless" aria-label="Link to this section">#</a></h3>
+<p><code>--prompt</code> runs one turn without the interface and exits. There is nobody to
+answer an approval prompt, so tool edits and shell commands are approved
+automatically.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode --prompt &quot;summarise the auth flow&quot;</span></code></pre>
+  </div>
+<p><code>--no-auto-approve</code> inverts that: edits and commands are rejected rather than
+approved. The agent can read and reason, and anything that would change the
+checkout is refused.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode --prompt &quot;summarise the auth flow&quot; --no-auto-approve</span></code></pre>
+  </div>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p>Plain <code>--prompt</code> approves everything, including shell commands, regardless of
+the approval mode saved in your config. Use <code>--no-auto-approve</code> anywhere the
+checkout matters — CI in particular.</p>
+</aside>
+<h2 id="woopcode-models"><code>woopcode models</code><a class="anchor" href="#woopcode-models" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode models [-m &lt;model-id&gt;]</span></code></pre>
+  </div>
+<p>Prints the model table. With <code>-m, --model &lt;model-id&gt;</code>, prints one row.</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode models --model gemini-3.6-flash</span></code></pre>
+  </div>
+<p>An unknown id prints <code>Model &quot;&lt;id&gt;&quot; not found.</code> and exits without error.</p>
+<h2 id="woopcode-providers"><code>woopcode providers</code><a class="anchor" href="#woopcode-providers" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Subcommand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>list</code></td>
+<td>Every provider with its default and auth status</td>
+</tr>
+<tr>
+<td><code>login</code></td>
+<td>Store an API key and make that provider the default</td>
+</tr>
+<tr>
+<td><code>logout</code></td>
+<td>Remove a stored API key</td>
+</tr>
+<tr>
+<td><code>set</code></td>
+<td>Change the default provider without touching keys</td>
+</tr>
+</tbody></table></div>
+<p><code>login</code> takes the provider and the key:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers login --provider google --api-key &quot;$GOOGLE_API_KEY&quot;</span></code></pre>
+  </div>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Applies to</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --provider &lt;name&gt;</code></td>
+<td>all four</td>
+<td>Which provider to act on</td>
+</tr>
+<tr>
+<td><code>-a, --api-key &lt;key&gt;</code></td>
+<td><code>login</code></td>
+<td>The key to store</td>
+</tr>
+</tbody></table></div>
+<p>Google Gemini is the only implemented provider. <code>openai</code> and <code>anthropic</code> appear
+in <code>providers list</code> so you can see they are planned, but selecting one will not
+give you a working session.</p>
+<h2 id="exit-codes">Exit codes<a class="anchor" href="#exit-codes" aria-label="Link to this section">#</a></h2>
+<p>Woopcode exits <code>0</code> on success and non-zero when a command fails to parse. A
+turn that the agent could not complete is reported in the output, not in the
+exit code.</p>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/reference/slash-commands">Slash commands</a> — the commands you type
+inside a session</li>
+<li><a href="/docs/reference/configuration">Configuration</a> — where these settings are
+written</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/guides/configuring-providers">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Configuring providers</span>
+        </a><a class="pager__card pager__card--next" href="/docs/reference/slash-commands">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Slash commands</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#options" data-toc="options">Options</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#commands" data-toc="commands">Commands</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#woopcode" data-toc="woopcode">woopcode</a>
+        </li><li class="toc-item toc-item--h3">
+          <a href="#headless" data-toc="headless">Headless</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#woopcode-models" data-toc="woopcode-models">woopcode models</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#woopcode-providers" data-toc="woopcode-providers">woopcode providers</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#exit-codes" data-toc="exit-codes">Exit codes</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#see-also" data-toc="see-also">See also</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

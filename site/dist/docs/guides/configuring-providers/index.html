@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Configuring providers — Woopcode docs</title>
+    <meta name="description" content="Switch models, rotate a key, change the default provider — from a session or your shell." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers" aria-current="page">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Guides</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Configuring providers</span></nav>
+    <h1 id="configuring-providers">Configuring providers</h1>
+<p>Everything here can be done two ways: from inside a session with a slash
+command, or from your shell with <code>woopcode providers</code>. The slash command opens
+a picker; the CLI is what you script.</p>
+<h2 id="see-what-is-configured">See what is configured<a class="anchor" href="#see-what-is-configured" aria-label="Link to this section">#</a></h2>
+<div class="tabs" data-tabs><div class="tabs__list" role="tablist"><button class="tabs__tab" type="button" role="tab"
+          data-tab="In a session"
+          aria-selected="true"
+          aria-controls="tabs-1-0">In a session</button><button class="tabs__tab" type="button" role="tab"
+          data-tab="From your shell"
+          aria-selected="false"
+          aria-controls="tabs-1-1">From your shell</button></div><div class="tabs__panel" id="tabs-1-0" role="tabpanel"
+          data-tab="In a session"><div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">/status</span></code></pre>
+  </div>
+</div><div class="tabs__panel" id="tabs-1-1" role="tabpanel"
+          data-tab="From your shell" hidden><div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers list</span></code></pre>
+  </div>
+</div></div>
+<p><code>/status</code> gives you the provider, model, and approval mode in one line.
+<code>providers list</code> gives you every provider with its default and auth status.</p>
+<h2 id="change-the-model">Change the model<a class="anchor" href="#change-the-model" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">/model</span></code></pre>
+  </div>
+<p>The picker lists the models for your current provider. The choice is saved and
+survives restarts.</p>
+<p>From the shell you can see what is available, though not select it:</p>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode models</span></code></pre>
+  </div>
+<p>All current models are Gemini, with a one-million-token context window. The
+practical difference is speed against capability: <code>flash-lite</code> is quickest,
+<code>flash</code> is the middle, <code>pro</code> is the most capable and the slowest.</p>
+<aside class="callout callout--tip"><p class="callout__label">Tip</p><p>Start on <code>flash</code> for exploration and questions, and move to <code>pro</code> when a change
+needs real reasoning about your code. Most turns do not.</p>
+</aside>
+<h2 id="rotate-a-key">Rotate a key<a class="anchor" href="#rotate-a-key" aria-label="Link to this section">#</a></h2>
+<div class="tabs" data-tabs><div class="tabs__list" role="tablist"><button class="tabs__tab" type="button" role="tab"
+          data-tab="In a session"
+          aria-selected="true"
+          aria-controls="tabs-2-0">In a session</button><button class="tabs__tab" type="button" role="tab"
+          data-tab="From your shell"
+          aria-selected="false"
+          aria-controls="tabs-2-1">From your shell</button></div><div class="tabs__panel" id="tabs-2-0" role="tabpanel"
+          data-tab="In a session"><div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">/login</span></code></pre>
+  </div>
+</div><div class="tabs__panel" id="tabs-2-1" role="tabpanel"
+          data-tab="From your shell" hidden><div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers login --provider google --api-key &quot;$NEW_KEY&quot;</span></code></pre>
+  </div>
+</div></div>
+<p>The new key is validated before it replaces the old one, so a bad paste leaves
+you with a working setup.</p>
+<p>The session you are in keeps using the client it started with. A <code>/login</code> does
+not silently redirect the turn you are in the middle of — switch the provider
+to pick it up, or restart.</p>
+<h2 id="remove-a-key">Remove a key<a class="anchor" href="#remove-a-key" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers logout --provider google</span></code></pre>
+  </div>
+<p>Do this when you are done on a shared or temporary machine. The key is stored
+in plain text and <code>logout</code> is what removes it.</p>
+<h2 id="change-the-default-provider">Change the default provider<a class="anchor" href="#change-the-default-provider" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">woopcode providers set --provider google</span></code></pre>
+  </div>
+<p>Only useful once there is more than one implemented provider.</p>
+<aside class="callout callout--note"><p class="callout__label">Note</p><p>Google Gemini is the only provider that runs. <code>openai</code> and <code>anthropic</code> are
+listed so you can see they are planned; selecting one does not produce a
+working session.</p>
+</aside>
+<h2 id="where-this-is-written">Where this is written<a class="anchor" href="#where-this-is-written" aria-label="Link to this section">#</a></h2>
+<p>All of it lands in <code>providers.json</code> in your config directory. See
+<a href="/docs/reference/configuration">Configuration</a> for the schema, and for what
+happens when that file is corrupt.</p>
+<h2 id="when-it-does-not-work">When it does not work<a class="anchor" href="#when-it-does-not-work" aria-label="Link to this section">#</a></h2>
+<p><strong><code>Invalid API key. Please try again.</code></strong> — Rejected before saving. Check for a
+trailing newline in the paste, and that it is a Google AI Studio key rather
+than a Google Cloud one.</p>
+<p><strong>The model picker is empty</strong> — No models are registered for the selected
+provider. Switch back to <code>google</code>.</p>
+<p><strong>A model you selected is no longer used</strong> — Selecting a provider whose model
+list does not include your saved model resets it to that provider&#39;s first
+model.</p>
+<p><strong>Changes are not taking effect</strong> — Some changes apply to the next session
+rather than the running one. Restart.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/reference/configuration">Configuration</a> — the file itself</li>
+<li><a href="/docs/guides/approval-modes">Approval modes</a> — the other saved setting</li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/guides/sessions-and-history">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Sessions &amp; history</span>
+        </a><a class="pager__card pager__card--next" href="/docs/reference/cli">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">CLI</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#see-what-is-configured" data-toc="see-what-is-configured">See what is configured</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#change-the-model" data-toc="change-the-model">Change the model</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#rotate-a-key" data-toc="rotate-a-key">Rotate a key</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#remove-a-key" data-toc="remove-a-key">Remove a key</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#change-the-default-provider" data-toc="change-the-default-provider">Change the default provider</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#where-this-is-written" data-toc="where-this-is-written">Where this is written</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#when-it-does-not-work" data-toc="when-it-does-not-work">When it does not work</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

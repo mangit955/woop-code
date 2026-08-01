@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>How it works — Woopcode docs</title>
+    <meta name="description" content="The pieces Woopcode is built from and how a prompt travels through them." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works" aria-current="page">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Architecture</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">How it works</span></nav>
+    <h1 id="how-it-works">How it works</h1>
+<p>This page is for people changing Woopcode. If you only want to use it,
+<a href="/docs/introduction/how-a-turn-works">How a turn works</a> is the version you
+want.</p>
+<h2 id="the-layers">The layers<a class="anchor" href="#the-layers" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="text"><code><span class="line">cli.ts              argument parsing, subcommands</span><span class="line">  commands/         the agent controller and slash commands</span><span class="line">    tui/            the React Ink interface</span><span class="line">  config/           the agent loop, provider client, context, persistence</span><span class="line">    runtime/        approval classification and policy</span><span class="line">      tools/        the tool registry</span></code></pre>
+  </div>
+<p>Two things are worth noticing about that shape. <strong>The agent loop lives in
+<code>config/runtime.ts</code>, not in <code>commands/</code></strong> — it is deliberately free of any
+knowledge of the interface, which is what lets the same loop drive both the TUI
+and the headless <code>--prompt</code> path. And <strong>approval is split in two</strong>:
+<code>runtime/approval/classifier.ts</code> decides how risky a command is,
+<code>runtime/approval/policy.ts</code> decides whether that risk needs asking. Neither
+knows about shell syntax and the UI respectively, so adding a mode is one entry
+in a table.</p>
+<h2 id="a-prompt-end-to-end">A prompt, end to end<a class="anchor" href="#a-prompt-end-to-end" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong><code>cli.ts</code></strong> parses arguments and hands off to <code>runAgent</code>. A non-empty
+<code>--prompt</code> takes the headless path; otherwise the TUI renders.</li>
+<li><strong><code>AgentController</code></strong> owns the session — the provider client, the selected
+model, cancellation, and the pending user message.</li>
+<li><strong><code>buildRepositoryContext</code></strong> in <code>config/config.ts</code> assembles package
+metadata, README, and top-level structure, each capped, the whole capped
+again at 8,000 characters.</li>
+<li><strong><code>agentLoop</code></strong> in <code>config/runtime.ts</code> runs the cycle: stream from the
+provider, collect tool calls, execute them, feed results back. Up to 20
+iterations.</li>
+<li><strong>Tools</strong> resolve through <code>toolRegistery</code> in <code>tools/index.ts</code>. Writing tools
+raise an approval request; shell tools are classified and checked against
+the policy.</li>
+<li><strong>Callbacks</strong> (<code>AgentCallbacks</code>) carry text, tool starts, tool finishes, and
+errors back out. The TUI renders them; the headless path prints them.</li>
+</ol>
+<h2 id="design-decisions-worth-knowing">Design decisions worth knowing<a class="anchor" href="#design-decisions-worth-knowing" aria-label="Link to this section">#</a></h2>
+<p><strong>Unrecognised means risky.</strong> A shell command the classifier does not recognise
+is treated as destructive, not safe. Failing closed is the only defensible
+default for something with write access to a repository.</p>
+<p><strong>Tool errors go back to the agent.</strong> A failed tool call returns its error as a
+result rather than ending the turn, so the model can correct a bad path and
+retry. Only the iteration budget ends a turn.</p>
+<p><strong>Persistence drops tool traffic.</strong> Only user and assistant messages are saved.
+Half of a call/result pair would make restored history invalid for the
+provider.</p>
+<p><strong>Config failures never block startup.</strong> A corrupt <code>providers.json</code> is moved
+aside and defaults are recreated. A malformed approval mode falls back to the
+default rather than to permissive.</p>
+<p><strong>The workspace boundary is resolved, not string-matched.</strong> Paths are resolved
+through symlinks before the containment check, so a link cannot be used to
+escape.</p>
+<h2 id="provider-clients">Provider clients<a class="anchor" href="#provider-clients" aria-label="Link to this section">#</a></h2>
+<p><code>config/client.ts</code> builds a client for the configured provider. The interface is
+<code>ProviderClient</code>, whose <code>stream()</code> yields <code>StreamEvent</code>s — <code>text</code>, <code>tool_call</code>,
+<code>done</code>. Adding a provider means implementing that interface and enabling the
+entry in <code>config/providerRegistry.ts</code>; the loop above does not change.</p>
+<p>Today only the Google entry is enabled. <code>openai</code> and <code>anthropic</code> are listed
+with <code>enabled: false</code> so the interface can show them as planned rather than
+pretending they work.</p>
+<h2 id="tests">Tests<a class="anchor" href="#tests" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">bun test</span></code></pre>
+  </div>
+<p>Unit, integration, and property suites across the runtime and the tools.
+<code>bun run test</code> runs them together with <code>tsc --noEmit</code>, which is what CI does.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/architecture/running-from-source">Running from source</a></li>
+<li><a href="/docs/architecture/adding-a-tool">Adding a tool</a></li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/reference/keyboard">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Keyboard</span>
+        </a><a class="pager__card pager__card--next" href="/docs/architecture/running-from-source">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Running from source</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#the-layers" data-toc="the-layers">The layers</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#a-prompt-end-to-end" data-toc="a-prompt-end-to-end">A prompt, end to end</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#design-decisions-worth-knowing" data-toc="design-decisions-worth-knowing">Design decisions worth knowing</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#provider-clients" data-toc="provider-clients">Provider clients</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#tests" data-toc="tests">Tests</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

@@ -50,6 +50,7 @@
     "start": "bun ./cli.ts",
     "site": "bun --hot ./site/server.ts",
     "site:build": "bun build ./site/index.html --outdir ./site/dist --minify",
+    "site:build:static": "bun ./site/scripts/build-static.ts",
     "docs:extract": "bun ./site/scripts/extract.ts",
     "docs:tokens": "bun ./site/scripts/generate-tokens.ts",
     "docs:lint": "bun ./site/scripts/check-docs.ts",

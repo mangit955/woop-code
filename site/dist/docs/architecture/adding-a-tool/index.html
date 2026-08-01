@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Adding a tool — Woopcode docs</title>
+    <meta name="description" content="Write a tool, register it, classify its effect, and let the docs pick it up." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.6.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool" aria-current="page">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Architecture</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Adding a tool</span></nav>
+    <h1 id="adding-a-tool">Adding a tool</h1>
+<p>A tool is an object with a name, a description, a parameter list, and an
+<code>execute</code> function. Everything else — schema generation, dispatch, error
+handling, the docs — follows from registering it.</p>
+<h2 id="the-shape">The shape<a class="anchor" href="#the-shape" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="ts"><code><span class="line">export interface Tool {</span><span class="line">  name: string;</span><span class="line">  description: string;</span><span class="line">  parameters: ToolParameter[];</span><span class="line">  execute(</span><span class="line">    args: Record&lt;string, unknown&gt;,</span><span class="line">    signal?: AbortSignal,</span><span class="line">  ): Promise&lt;string&gt;;</span><span class="line">}</span><span class="line">&nbsp;</span><span class="line">export interface ToolParameter {</span><span class="line">  name: string;</span><span class="line">  description: string;</span><span class="line">  required: boolean;</span><span class="line">  type?: &quot;string&quot; | &quot;number&quot; | &quot;array&quot;;</span><span class="line">}</span></code></pre>
+  </div>
+<p><code>execute</code> returns a string. That string is what the model sees, so it is part
+of the interface, not a log line.</p>
+<h2 id="write-it">Write it<a class="anchor" href="#write-it" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    <p class="code__filename">tools/countLines.ts</p>
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="ts"><code><span class="line">import type { Tool } from &quot;../config/types&quot;;</span><span class="line">import { resolveWorkspacePath } from &quot;./workspace&quot;;</span><span class="line">&nbsp;</span><span class="line">export const countLinesTool: Tool = {</span><span class="line">  name: &quot;count_lines&quot;,</span><span class="line">  description: &quot;Counts the lines in a file.&quot;,</span><span class="line">  parameters: [</span><span class="line">    { name: &quot;path&quot;, description: &quot;Path to the file&quot;, required: true },</span><span class="line">  ],</span><span class="line">&nbsp;</span><span class="line">  async execute(args) {</span><span class="line">    const requested = args.path as string;</span><span class="line">    if (!requested) throw Error(&quot;File path is required&quot;);</span><span class="line">&nbsp;</span><span class="line">    // Never join paths by hand. This resolves symlinks before checking</span><span class="line">    // containment, which is what stops a link being used to escape.</span><span class="line">    const path = await resolveWorkspacePath(requested, { mustExist: true });</span><span class="line">    const text = await Bun.file(path).text();</span><span class="line">&nbsp;</span><span class="line">    return `${text.split(&quot;\n&quot;).length} lines`;</span><span class="line">  },</span><span class="line">};</span></code></pre>
+  </div>
+<h2 id="register-it">Register it<a class="anchor" href="#register-it" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    <p class="code__filename">tools/index.ts</p>
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="ts"><code><span class="line">export const toolRegistery: Tool[] = [</span><span class="line">  // ...</span><span class="line">  countLinesTool,</span><span class="line">];</span></code></pre>
+  </div>
+<p>That is the whole wiring. The registry is what the provider schema, the
+dispatcher, and the docs all read.</p>
+<h2 id="classify-its-effect">Classify its effect<a class="anchor" href="#classify-its-effect" aria-label="Link to this section">#</a></h2>
+<p>The registry does not record whether a tool writes — approval is enforced in
+the tool and in the policy, not declared as metadata. The docs need to know, so
+there is one table:</p>
+<div class="code">
+    <p class="code__filename">site/scripts/extract.ts</p>
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="ts"><code><span class="line">const EFFECT: Record&lt;string, &quot;read&quot; | &quot;write&quot; | &quot;shell&quot; | &quot;ask&quot;&gt; = {</span><span class="line">  // ...</span><span class="line">  count_lines: &quot;read&quot;,</span><span class="line">};</span></code></pre>
+  </div>
+<p>A tool missing from that table shows up as <code>unclassified</code> and
+<code>bun run docs:extract</code> warns about it — it is not silently documented as safe.</p>
+<h2 id="regenerate-the-docs-data">Regenerate the docs data<a class="anchor" href="#regenerate-the-docs-data" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">bun run docs:extract</span></code></pre>
+  </div>
+<p>Commit the updated <code>site/src/docs/surface.json</code>. Nothing in <code>docs/</code> states a
+tool name, parameter, or count in prose, so the tools page, the counts, and the
+tables all pick up your tool with no page edits. <code>bun run docs:check</code> fails if
+you forget.</p>
+<h2 id="rules-worth-following">Rules worth following<a class="anchor" href="#rules-worth-following" aria-label="Link to this section">#</a></h2>
+<p><strong>Throw for bad input.</strong> Errors are returned to the agent as results, so it can
+correct a path and retry. Write the message for the model: <code>File &lt;path&gt; does not exist</code> is actionable, <code>ENOENT</code> is not.</p>
+<p><strong>Use <code>resolveWorkspacePath</code> for every path.</strong> It is the workspace boundary.</p>
+<p><strong>Bound your output.</strong> Tool results are truncated at 4,000 characters before
+reaching the model. Truncate deliberately, with a notice, rather than being cut
+mid-structure — <code>read_file</code> is the example to copy.</p>
+<p><strong>Respect the signal.</strong> Long-running work should check the <code>AbortSignal</code> so
+<kbd>Ctrl</kbd><kbd>C</kbd> stops it.</p>
+<p><strong>Keep the description short and literal.</strong> It is prompt text, and the model
+chooses tools from it.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p>A tool that writes must raise an approval request rather than writing directly.
+Copy <code>tools/editFile.ts</code>. A tool that quietly writes bypasses the diff review,
+which is the guarantee the whole product rests on.</p>
+</aside>
+<h2 id="test-it">Test it<a class="anchor" href="#test-it" aria-label="Link to this section">#</a></h2>
+<div class="code">
+    
+    <button class="code__copy" type="button" data-copy aria-label="Copy to clipboard">Copy</button><pre data-lang="bash"><code><span class="line">bun test</span></code></pre>
+  </div>
+<p>Tool tests live in <code>packages/tests/tools/</code>. Cover the happy path, a missing
+required argument, and a path outside the workspace.</p>
+<h2 id="next">Next<a class="anchor" href="#next" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/architecture/how-it-works">How it works</a></li>
+<li><a href="/docs/reference/tools">Tools</a></li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.6.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/architecture/running-from-source">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Running from source</span>
+        </a><span></span>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#the-shape" data-toc="the-shape">The shape</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#write-it" data-toc="write-it">Write it</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#register-it" data-toc="register-it">Register it</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#classify-its-effect" data-toc="classify-its-effect">Classify its effect</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#regenerate-the-docs-data" data-toc="regenerate-the-docs-data">Regenerate the docs data</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#rules-worth-following" data-toc="rules-worth-following">Rules worth following</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#test-it" data-toc="test-it">Test it</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#next" data-toc="next">Next</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

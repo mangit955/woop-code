@@ -5,14 +5,41 @@
  * policy's job. Keeping the two apart means a new command is one table entry
  * and a new mode is one policy rule, and neither touches the runtime.
  *
- * Two rules shape the whole file:
+ * Three rules shape the whole file:
  *
  *  - **A command line is only as safe as its riskiest part.** `git status &&
  *    rm -rf node_modules` is destructive. Every segment is classified and the
  *    highest risk wins, including inside `$(...)`.
  *  - **Unrecognised means risky.** Anything not in a table is DESTRUCTIVE, so a
  *    command nobody has thought about asks for approval instead of running.
+ *  - **A workspace write must prove it stays in the workspace.** WORKSPACE_WRITE
+ *    is the one level that runs unattended, so a command only reaches it by
+ *    declaring its destinations in `destinations.ts` and having all of them land
+ *    inside the root. Anything else — a path outside, a path that cannot be
+ *    resolved, a command with no declaration — is SYSTEM.
+ *
+ * That third rule is a single check in `classifyProgram`, not a habit each
+ * command is trusted to follow. Risk used to be a property of the command name
+ * while escaping was a property of its arguments, and the two only met inside
+ * `cp` and `mv`; every other write command left through the gap.
  */
+
+import { destinationsOf, GIT_LOCATION_FLAGS, positionals } from "./destinations";
+import {
+  escapesWorkspace,
+  UNRESOLVABLE,
+  workspaceContext,
+  type WorkspaceContext,
+} from "./paths";
+
+export {
+  escapesWorkspace,
+  normalizePath,
+  workspaceContext,
+  type NormalizedPath,
+  type PathLocation,
+  type WorkspaceContext,
+} from "./paths";
 
 /** Ordered by severity: a higher value always wins when combining segments. */
 export enum CommandRisk {
@@ -36,9 +63,12 @@ const READ_ONLY_COMMANDS = new Set([
   "pytest", "jest", "vitest", "phpunit", "rspec", "ctest",
 ]);
 
-/** Writes, but only ever inside the tree it is pointed at. */
+/**
+ * Writes. Whether it writes *here* is decided by the boundary check, not by
+ * membership of this set — every name below also appears in `DESTINATIONS`.
+ */
 const WORKSPACE_WRITE_COMMANDS = new Set([
-  "mkdir", "touch", "tee", "patch", "ln",
+  "mkdir", "touch", "tee", "patch", "ln", "cp", "mv",
 ]);
 
 /** Can destroy work that is not recoverable from the workspace itself. */
@@ -88,11 +118,18 @@ const ARGUMENT_SENSITIVE: Record<string, SubcommandClassifier> = {
   sed: classifySed,
   find: classifyFind,
   awk: classifyAwk,
-  mv: classifyPathMover,
-  cp: classifyPathMover,
+  gawk: classifyAwk,
 };
 
-export function classifyCommand(command: string): CommandRisk {
+/**
+ * @param context The workspace to judge paths against. Defaults to the process
+ * working directory, which is the root the file tools already use.
+ */
+export function classifyCommand(
+  command: string,
+  context?: Partial<WorkspaceContext>,
+): CommandRisk {
+  const workspace = workspaceContext(context);
   const segments = splitSegments(command);
 
   // Nothing to run is nothing to worry about, but it must not read as safe
@@ -100,20 +137,20 @@ export function classifyCommand(command: string): CommandRisk {
   if (segments.length === 0) return CommandRisk.DESTRUCTIVE;
 
   return segments.reduce<CommandRisk>(
-    (highest, segment) => Math.max(highest, classifySegment(segment)),
+    (highest, segment) => Math.max(highest, classifySegment(segment, workspace)),
     CommandRisk.READ_ONLY,
   );
 }
 
-function classifySegment(segment: string): CommandRisk {
+function classifySegment(segment: string, workspace: WorkspaceContext): CommandRisk {
   const tokens = tokenize(segment);
   if (tokens.length === 0) return CommandRisk.READ_ONLY;
 
-  const redirect = classifyRedirect(tokens);
+  const redirect = classifyRedirect(tokens, workspace);
   const [name, args] = resolveCommand(tokens);
   if (!name) return Math.max(redirect, CommandRisk.READ_ONLY);
 
-  return Math.max(redirect, classifyProgram(name, args));
+  return Math.max(redirect, classifyProgram(name, args, workspace));
 }
 
 /**
@@ -146,7 +183,12 @@ function resolveCommand(tokens: string[]): [string | undefined, string[]] {
   return [undefined, []];
 }
 
-function classifyProgram(name: string, args: string[]): CommandRisk {
+function classifyProgram(name: string, args: string[], workspace: WorkspaceContext): CommandRisk {
+  return enforceBoundary(name, args, baseRisk(name, args), workspace);
+}
+
+/** What the command does, before asking where it does it. */
+function baseRisk(name: string, args: string[]): CommandRisk {
   const handler = ARGUMENT_SENSITIVE[name];
   if (handler) return handler(args);
 
@@ -158,6 +200,34 @@ function classifyProgram(name: string, args: string[]): CommandRisk {
   // Unrecognised: it asks. Adding a command to a table is the way to make it
   // run unattended, never a guess made here.
   return CommandRisk.DESTRUCTIVE;
+}
+
+/**
+ * The one place the workspace boundary is enforced.
+ *
+ * Only WORKSPACE_WRITE is examined, and that is the whole point: it is the only
+ * risk level a mode runs unattended without also opting into the machine. The
+ * levels above it already require approval everywhere except FULL_AUTO, which
+ * is a deliberate "run anything" — escalating them would flatten the distinction
+ * the UI shows the user without changing a single decision.
+ */
+function enforceBoundary(
+  name: string,
+  args: string[],
+  base: CommandRisk,
+  workspace: WorkspaceContext,
+): CommandRisk {
+  if (base !== CommandRisk.WORKSPACE_WRITE) return base;
+
+  const destinations = destinationsOf(name, args);
+
+  // Write-capable but undeclared. Someone added a command to a table and not to
+  // `DESTINATIONS`; that costs a prompt, never the boundary.
+  if (!destinations) return CommandRisk.SYSTEM;
+
+  return destinations.some((destination) => escapesWorkspace(destination, workspace))
+    ? CommandRisk.SYSTEM
+    : CommandRisk.WORKSPACE_WRITE;
 }
 
 // ─── Per-command rules ───────────────────────────────────────────────────────
@@ -176,7 +246,9 @@ const GIT_DESTRUCTIVE = new Set(["reset", "clean", "rm", "restore", "rebase", "f
 const GIT_NETWORK = new Set(["push", "pull", "fetch", "clone", "remote", "submodule", "archive"]);
 
 function classifyGit(args: string[]): CommandRisk {
-  const [subcommand, ...rest] = args.filter((arg) => !arg.startsWith("-"));
+  // `git -C dir status` is a status, not a subcommand called `dir`: the value of
+  // a global flag must not be mistaken for the verb.
+  const [subcommand, ...rest] = positionals(args, { valueFlags: GIT_LOCATION_FLAGS });
   if (!subcommand) return CommandRisk.READ_ONLY; // bare `git` prints usage
 
   if (GIT_NETWORK.has(subcommand)) {
@@ -284,41 +356,14 @@ function classifyFind(args: string[]): CommandRisk {
   return CommandRisk.READ_ONLY;
 }
 
-/** gawk can write files with `> file` inside its program text. */
+/**
+ * gawk can write files with `> file` inside its program text. `a > b` is a
+ * comparison and not a write, but telling the two apart needs an awk parser, so
+ * the write reading wins and `destinations.ts` decides where it lands.
+ */
 function classifyAwk(args: string[]): CommandRisk {
   const program = args.join(" ");
   return program.includes(">") ? CommandRisk.WORKSPACE_WRITE : CommandRisk.READ_ONLY;
-}
-
-/**
- * Moving and copying inside the workspace is ordinary editing; doing it across
- * the workspace boundary is not something to do unattended.
- */
-function classifyPathMover(args: string[]): CommandRisk {
-  const paths = args.filter((arg) => !arg.startsWith("-"));
-  return paths.some(isOutsideWorkspace) ? CommandRisk.SYSTEM : CommandRisk.WORKSPACE_WRITE;
-}
-
-/**
- * Absolute paths and `~` leave the workspace, and so does any `..` that climbs
- * past its own root. Conservative on purpose: a path this cannot resolve counts
- * as outside.
- */
-export function isOutsideWorkspace(path: string): boolean {
-  if (path.startsWith("/") || path.startsWith("~")) return true;
-
-  let depth = 0;
-  for (const part of path.split("/")) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") {
-      depth -= 1;
-      if (depth < 0) return true;
-      continue;
-    }
-    depth += 1;
-  }
-
-  return false;
 }
 
 // ─── Shell parsing ───────────────────────────────────────────────────────────
@@ -375,10 +420,14 @@ export function splitSegments(command: string): string[] {
       continue;
     }
 
-    // Command substitution: the inside is its own command line.
+    // Command substitution: the inside is its own command line, and what it
+    // prints becomes an argument to the outer one. The placeholder keeps that
+    // argument visible — `mkdir $(dirname x)` writes somewhere, and dropping the
+    // text would leave a `mkdir` that appears to have no destination at all.
     if (char === "$" && command[index + 1] === "(") {
       const end = matchClosingParenthesis(command, index + 1);
       segments.push(...splitSegments(command.slice(index + 2, end)));
+      current += UNRESOLVABLE;
       index = end + 1;
       continue;
     }
@@ -387,6 +436,7 @@ export function splitSegments(command: string): string[] {
       const end = command.indexOf("`", index + 1);
       const stop = end === -1 ? command.length : end;
       segments.push(...splitSegments(command.slice(index + 1, stop)));
+      current += UNRESOLVABLE;
       index = stop + 1;
       continue;
     }
@@ -485,7 +535,7 @@ export function tokenize(segment: string): string[] {
  * A redirect is a write even when the command itself only reads: `cat a > b`
  * creates b. Writing outside the workspace is a system change.
  */
-function classifyRedirect(tokens: string[]): CommandRisk {
+function classifyRedirect(tokens: string[], workspace: WorkspaceContext): CommandRisk {
   let risk = CommandRisk.READ_ONLY;
 
   for (let index = 0; index < tokens.length; index++) {
@@ -499,7 +549,7 @@ function classifyRedirect(tokens: string[]): CommandRisk {
 
     risk = Math.max(
       risk,
-      isOutsideWorkspace(target) ? CommandRisk.SYSTEM : CommandRisk.WORKSPACE_WRITE,
+      escapesWorkspace(target, workspace) ? CommandRisk.SYSTEM : CommandRisk.WORKSPACE_WRITE,
     );
   }
 

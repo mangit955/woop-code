@@ -1,16 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import {
-  CommandRisk,
-  classifyCommand,
-  isOutsideWorkspace,
-  splitSegments,
-  tokenize,
-} from "./classifier";
+import { CommandRisk, classifyCommand, splitSegments, tokenize } from "./classifier";
+import { DESTINATIONS } from "./destinations";
+import { UNRESOLVABLE } from "./paths";
+
+/**
+ * A fixed workspace, so a test says the same thing on every machine. Without it
+ * the results would depend on where the suite happens to be checked out.
+ */
+const WORKSPACE = { root: "/workspace", home: "/home/dev" };
 
 /** Reads the table below as a list of `[command, expected risk]` pairs. */
 function expectRisk(cases: Array<[string, CommandRisk]>) {
   for (const [command, expected] of cases) {
-    expect({ command, risk: classifyCommand(command) }).toEqual({
+    expect({ command, risk: classifyCommand(command, WORKSPACE) }).toEqual({
       command,
       risk: expected,
     });
@@ -262,8 +264,10 @@ describe("segment splitting", () => {
   });
 
   test("lifts substitutions out as their own segments", () => {
-    expect(splitSegments("echo $(git status)")).toEqual(["git status", "echo"]);
-    expect(splitSegments("echo `ls`")).toEqual(["ls", "echo"]);
+    // The outer command keeps a placeholder where the output will land, so an
+    // argument it cannot read still counts as an argument.
+    expect(splitSegments("echo $(git status)")).toEqual(["git status", `echo ${UNRESOLVABLE}`]);
+    expect(splitSegments("echo `ls`")).toEqual(["ls", `echo ${UNRESOLVABLE}`]);
   });
 
   test("handles an unterminated substitution without hanging", () => {
@@ -294,17 +298,86 @@ describe("tokenizing", () => {
   });
 });
 
+/**
+ * One pair per write-capable command: the same command aimed inside the
+ * workspace and aimed outside it. Both directions are asserted, so a rule that
+ * is too loose and a rule that is too tight both fail here.
+ */
+const BOUNDARY_CASES: Record<string, { inside: string; outside: string }> = {
+  mkdir: { inside: "mkdir -p src/components", outside: "mkdir -p /etc/woop" },
+  touch: { inside: "touch src/new.ts", outside: "touch ~/.zshrc" },
+  tee: { inside: "tee notes.md", outside: "tee /etc/hosts" },
+  ln: { inside: "ln -s src/a src/b", outside: "ln -sf payload ~/bin/ls" },
+  cp: { inside: "cp src/a.ts src/b.ts", outside: "cp --target-directory=/etc secrets.env" },
+  mv: { inside: "mv src/a.ts src/b.ts", outside: "mv src/a.ts /etc/a.ts" },
+  patch: { inside: "patch -p1 changes.diff", outside: "patch -d /etc -p1 changes.diff" },
+  sed: { inside: "sed -i '' 's/a/b/' cli.ts", outside: "sed -i '' 's/a/b/' /etc/hosts" },
+  awk: { inside: `awk '{print > "out.txt"}' f`, outside: `awk '{print > "/etc/passwd"}' f` },
+  gawk: { inside: `gawk '{print > "out.txt"}' f`, outside: `gawk '{print > "/etc/passwd"}' f` },
+  git: { inside: "git add .", outside: "git -C /etc add ." },
+  cargo: { inside: "cargo build", outside: "cargo build --target-dir /tmp/out" },
+  go: { inside: "go build ./...", outside: "go build -o /usr/local/bin/woop" },
+};
+
 describe("workspace boundary", () => {
-  test("relative paths inside the tree stay inside", () => {
-    expect(isOutsideWorkspace("src/index.ts")).toBe(false);
-    expect(isOutsideWorkspace("./src/index.ts")).toBe(false);
-    expect(isOutsideWorkspace("a/../b")).toBe(false);
+  test("every write-capable command is covered in both directions", () => {
+    // A command declared in DESTINATIONS with no case here would otherwise
+    // change behaviour unobserved.
+    expect(Object.keys(BOUNDARY_CASES).sort()).toEqual(Object.keys(DESTINATIONS).sort());
   });
 
-  test("absolute, home and climbing paths are outside", () => {
-    expect(isOutsideWorkspace("/etc/hosts")).toBe(true);
-    expect(isOutsideWorkspace("~/.ssh/id_rsa")).toBe(true);
-    expect(isOutsideWorkspace("../sibling")).toBe(true);
-    expect(isOutsideWorkspace("a/../../escaped")).toBe(true);
+  for (const [name, { inside, outside }] of Object.entries(BOUNDARY_CASES)) {
+    test(`${name} writes inside the workspace without asking`, () => {
+      expectRisk([[inside, CommandRisk.WORKSPACE_WRITE]]);
+    });
+
+    test(`${name} asks before writing outside the workspace`, () => {
+      expectRisk([[outside, CommandRisk.SYSTEM]]);
+    });
+  }
+
+  test("a destination hidden in an attached flag value is still a destination", () => {
+    expectRisk([
+      ["cp -t /etc secrets.env", CommandRisk.SYSTEM],
+      ["cp --target-directory=/etc secrets.env", CommandRisk.SYSTEM],
+      ["go build -o/usr/local/bin/woop", CommandRisk.SYSTEM],
+      ["cargo build --target-dir=/tmp/out", CommandRisk.SYSTEM],
+    ]);
+  });
+
+  test("a destination that cannot be resolved is treated as outside", () => {
+    expectRisk([
+      ["cp src/a.ts $HOME/a.ts", CommandRisk.SYSTEM],
+      ["touch ${TARGET}", CommandRisk.SYSTEM],
+      ["mkdir -p $(dirname /etc/woop/x)", CommandRisk.SYSTEM],
+      [`awk '{print > out}' f`, CommandRisk.SYSTEM],
+    ]);
+  });
+
+  test("climbing out of the workspace asks, however it is spelled", () => {
+    expectRisk([
+      ["mkdir ../../evil", CommandRisk.SYSTEM],
+      ["touch src/../../escaped.txt", CommandRisk.SYSTEM],
+      ["mv src/a.ts ../../elsewhere/a.ts", CommandRisk.SYSTEM],
+      ["echo hi > /etc/hosts", CommandRisk.SYSTEM],
+    ]);
+  });
+
+  test("an absolute path inside the workspace is an ordinary write", () => {
+    // The whole reason the classifier is given a root: this used to be
+    // indistinguishable from writing to /etc.
+    expectRisk([
+      ["touch /workspace/src/new.ts", CommandRisk.WORKSPACE_WRITE],
+      ["sed -i '' 's/a/b/' /workspace/cli.ts", CommandRisk.WORKSPACE_WRITE],
+      ["cat pkg.json > /workspace/copy.json", CommandRisk.WORKSPACE_WRITE],
+    ]);
+  });
+
+  test("a global flag's value is not mistaken for a git subcommand", () => {
+    expectRisk([
+      ["git -C src status", CommandRisk.READ_ONLY],
+      ["git -C src add .", CommandRisk.WORKSPACE_WRITE],
+      ["git --git-dir=/etc/x add .", CommandRisk.SYSTEM],
+    ]);
   });
 });

@@ -214,6 +214,8 @@ function toolParameterType(type: string | undefined) {
   switch (type) {
     case "number":
       return Type.NUMBER;
+    case "boolean":
+      return Type.BOOLEAN;
     case "array":
       return Type.ARRAY;
     default:

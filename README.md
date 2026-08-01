@@ -12,7 +12,7 @@ Woopcode runs where you work: in the terminal and inside the current repository.
 
 ## Demo
 
-![Woopcode demo](public/demo.gif)
+![Woopcode demo](public/terminal1.gif)
 
 ## Why Woopcode
 
@@ -109,12 +109,12 @@ Woopcode currently ships with 13 tools.
 Shell commands are classified by risk before they run, so inspecting the
 repository does not interrupt you while destructive work still asks.
 
-| Mode | Runs without asking | Always asks |
-|---|---|---|
-| `always-ask` | nothing | everything |
-| `auto-read-only` *(default)* | reads and test suites — `git status`, `rg`, `cat`, `bun test` | anything that writes |
-| `auto-workspace` | the above, plus writes inside the workspace — `mkdir`, `touch`, `git add`, `git commit` | deletes, history rewrites, system and network changes |
-| `full-auto` | everything — **no protection** | nothing |
+| Mode                         | Runs without asking                                                                     | Always asks                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `always-ask`                 | nothing                                                                                 | everything                                            |
+| `auto-read-only` _(default)_ | reads and test suites — `git status`, `rg`, `cat`, `bun test`                           | anything that writes                                  |
+| `auto-workspace`             | the above, plus writes inside the workspace — `mkdir`, `touch`, `git add`, `git commit` | deletes, history rewrites, system and network changes |
+| `full-auto`                  | everything — **no protection**                                                          | nothing                                               |
 
 Deleting files, `git reset`, `git clean`, `sudo`, `chmod`, and network access
 always require approval in every mode except `full-auto`. A command the
@@ -152,13 +152,13 @@ Type `/` in the prompt to browse and autocomplete commands.
 
 Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` for `/new`, `/p` for provider, `/m` or `/model` for models, `/v` for version, `/q` or `/quit` for exit.
 
-| Key                     | Action                                                |
-| ----------------------- | ----------------------------------------------------- |
-| `↑` / `↓`               | Scroll the conversation.                              |
-| `Page Up` / `Page Down` | Move through the conversation by a page.              |
-| `Home` / `End`          | Jump to the oldest message or back to the latest one. |
+| Key                     | Action                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `↑` / `↓`               | Scroll the conversation.                                                                                                                               |
+| `Page Up` / `Page Down` | Move through the conversation by a page.                                                                                                               |
+| `Home` / `End`          | Jump to the oldest message or back to the latest one.                                                                                                  |
 | `Ctrl+C`                | Cancel an active request — including one waiting on an approval or question. Closes an open dialog when idle, and exits when there is nothing to stop. |
-| `Enter` / `Esc`         | Apply or reject a pending file-change preview.        |
+| `Enter` / `Esc`         | Apply or reject a pending file-change preview.                                                                                                         |
 
 ## Command line
 

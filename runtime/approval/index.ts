@@ -10,10 +10,18 @@ export {
   CommandRisk,
   classifyCommand,
   describeRisk,
-  isOutsideWorkspace,
   splitSegments,
   tokenize,
 } from "./classifier";
+export {
+  escapesWorkspace,
+  normalizePath,
+  workspaceContext,
+  type NormalizedPath,
+  type PathLocation,
+  type WorkspaceContext,
+} from "./paths";
+export { DESTINATIONS, destinationsOf } from "./destinations";
 export {
   createApprovalPolicy,
   requiresApproval,

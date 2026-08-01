@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.6.1",
   "counts": {
     "tools": 13,
     "commands": 11,
@@ -96,7 +96,7 @@
     },
     {
       "name": "edit_file",
-      "description": "Replace text inside an existing file.",
+      "description": "Replace text inside an existing file. oldText must match exactly one place in the file, or the edit is refused so the wrong occurrence is never changed.",
       "effect": "write",
       "gate": "Pauses on a unified diff. Nothing is written until you approve it.",
       "parameters": [
@@ -110,13 +110,19 @@
           "name": "oldText",
           "type": "string",
           "required": true,
-          "description": "Exact current text to replace, copied verbatim from read_file output."
+          "description": "Exact current text to replace, copied verbatim from read_file output. Include enough surrounding lines to match exactly one place in the file."
         },
         {
           "name": "newText",
           "type": "string",
           "required": true,
-          "description": "Exact replacement text."
+          "description": "Exact replacement text. Inserted literally; no substitution patterns are expanded."
+        },
+        {
+          "name": "replaceAll",
+          "type": "boolean",
+          "required": false,
+          "description": "Set to true only to deliberately change every non-overlapping occurrence, such as a rename. Omit it otherwise; omitting means the single unique occurrence."
         }
       ]
     },

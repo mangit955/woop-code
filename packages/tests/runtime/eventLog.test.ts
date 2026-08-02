@@ -166,6 +166,7 @@ describe("event log", () => {
       summary: {
         iterations: 2,
         retries: 0,
+        salvagedIterations: 0,
         toolCalls: 1,
         lastWriteStep: 1,
         lastShellStep: undefined,
@@ -181,6 +182,7 @@ describe("event log", () => {
       "iterations",
       "lastWriteStep",
       "retries",
+      "salvagedIterations",
       "toolCalls",
       "toolCounts",
       "unverifiedEdits",

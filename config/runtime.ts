@@ -1,5 +1,6 @@
 import { getTool } from "../tools";
 import { toolEffect } from "../runtime/toolEffects";
+import { isRetryableError } from "../runtime/retry";
 import { recentMessages } from "./config";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type {
@@ -132,6 +133,9 @@ export async function agentLoop(
   // Counted for the turn, not the iteration: a benchmark reading the summary
   // needs to tell a slow run from a flaky one.
   let retries = 0;
+  // Iterations whose stream died after the model had already said something,
+  // and whose partial output was kept rather than discarded.
+  let salvagedIterations = 0;
 
   try {
     while (iterations < MAX_ITERATIONS) {
@@ -155,46 +159,85 @@ export async function agentLoop(
       const iterationStartedAt = Date.now();
       let usage: TokenUsage | undefined;
 
-      for await (const event of client.stream(
-        sentMessages,
-        repoContext,
-        signal,
-        useTools,
-      )) {
-        switch (event.type) {
-          case "text":
-            assistantText += event.content;
-            callbacks.onText?.(event.content);
-            break;
+      // Set when the stream dies after the model has already said something.
+      // The client retries only while nothing has been observed, because
+      // repeating the request would duplicate text the user watched arrive —
+      // so recovering a half-delivered response is this loop's job.
+      let truncated: Error | undefined;
 
-          case "tool_call":
-            toolCalls.push(event);
-            break;
+      try {
+        for await (const event of client.stream(
+          sentMessages,
+          repoContext,
+          signal,
+          useTools,
+        )) {
+          switch (event.type) {
+            case "text":
+              assistantText += event.content;
+              callbacks.onText?.(event.content);
+              break;
 
-          case "retry":
-            retries++;
-            callbacks.onRetry?.({
-              attempt: event.attempt,
-              delayMs: event.delayMs,
-              reason: event.reason,
-              error: event.error,
-            });
-            // The ⚠️ prefix keeps this in the transcript as a notice rather
-            // than replacing the activity indicator: the turn is still running.
-            callbacks.onStatus?.(
-              `⚠️  provider request failed (${event.reason}), retrying in ${Math.round(event.delayMs / 100) / 10}s`,
-            );
-            break;
+            case "tool_call":
+              toolCalls.push(event);
+              break;
 
-          case "done":
-            usage = event.usage;
-            break;
+            case "retry":
+              retries++;
+              callbacks.onRetry?.({
+                attempt: event.attempt,
+                delayMs: event.delayMs,
+                reason: event.reason,
+                error: event.error,
+              });
+              // The ⚠️ prefix keeps this in the transcript as a notice rather
+              // than replacing the activity indicator: the turn is still running.
+              callbacks.onStatus?.(
+                `⚠️  provider request failed (${event.reason}), retrying in ${Math.round(event.delayMs / 100) / 10}s`,
+              );
+              break;
+
+            case "done":
+              usage = event.usage;
+              break;
+          }
         }
+      } catch (error) {
+        const failure = error instanceof Error ? error : new Error(String(error));
+
+        // Cancellation is handled by the check below, not salvaged.
+        if (signal?.aborted) {
+          callbacks.onCancel?.();
+          return "";
+        }
+
+        // Nothing was observed, so the client already exhausted its retries and
+        // there is nothing to keep. Let the failure travel.
+        if (!assistantText && toolCalls.length === 0) {
+          throw failure;
+        }
+
+        // Only a transient failure is worth continuing from. A fatal one — a
+        // rejected request, a bug — would otherwise be retried until the
+        // iteration budget ran out, burning quota to arrive at the same error
+        // twenty iterations later instead of reporting it now.
+        if (!isRetryableError(failure)) {
+          throw failure;
+        }
+
+        truncated = failure;
       }
 
       if (signal?.aborted) {
         callbacks.onCancel?.();
         return "";
+      }
+
+      if (truncated) {
+        salvagedIterations++;
+        callbacks.onStatus?.(
+          `⚠️  response was cut short (${truncated.message}); continuing from what arrived`,
+        );
       }
 
       // After the cancellation check: a turn the user interrupted did not
@@ -213,6 +256,14 @@ export async function agentLoop(
           role: "assistant",
           content: assistantText,
         });
+
+        // A stream that died mid-sentence is not the model choosing to stop.
+        // Returning here would end the turn on a half-written answer, so the
+        // partial text stays in the conversation and the loop asks again —
+        // the model reads its own unfinished reply and carries on. Nothing
+        // synthetic is injected: a fabricated user message would consume one
+        // of the turns recentMessages keeps.
+        if (truncated) continue;
 
         callbacks.onDone?.();
 
@@ -416,6 +467,7 @@ export async function agentLoop(
     callbacks.onTurnSummary?.({
       iterations,
       retries,
+      salvagedIterations,
       toolCalls: toolCallsExecuted,
       lastWriteStep,
       lastShellStep,

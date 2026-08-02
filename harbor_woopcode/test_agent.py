@@ -111,6 +111,7 @@ RUN_WITH_USAGE = [
         "summary": {
             "iterations": 2,
             "retries": 1,
+            "salvagedIterations": 0,
             "toolCalls": 1,
             "lastWriteStep": 1,
             "toolCounts": {"create_file": 1},

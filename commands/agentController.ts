@@ -1,10 +1,19 @@
 import { createProviderClient, DEFAULT_MODEL_ID } from "../config/client";
 import {
+  MAX_REPO_CONTEXT_CHARS,
   buildRepositoryContext,
   getConversation,
+  getExecutionLog,
   saveConversation,
+  saveExecutionLog,
 } from "../config/config";
 import { agentLoop } from "../config/runtime";
+import {
+  EXECUTION_LOG_BUDGET_RATIO,
+  recordsFrom,
+  renderExecutionLog,
+  type ExecutionRecord,
+} from "../runtime/executionLog";
 import type { AgentCallbacks, Message } from "../config/types";
 import { store } from "../tui/src";
 
@@ -26,6 +35,8 @@ export function isConversationalPrompt(prompt: string) {
 export class AgentController {
   private conversation: Message[] = [];
   private repoContext = "";
+  /** One line per action this session has taken; see runtime/executionLog. */
+  private executionRecords: ExecutionRecord[] = [];
   private pendingAssistantText: string | null = null;
   private pendingUserMessage: Extract<Message, { role: "user" }> | null = null;
   private abortController: AbortController | null = null;
@@ -104,6 +115,12 @@ export class AgentController {
     const conversational = isConversationalPrompt(prompt);
     this.pendingAssistantText = "";
 
+    // The loop appends this turn's tool calls and results to `conversation`,
+    // which is a copy — everything it records is discarded on return. Note
+    // where this turn's records start so they can be harvested before that
+    // happens, rather than threading new plumbing through the loop.
+    const recordsBefore = conversation.length;
+
     // Update UI before starting the agent
     store.addUserMessage(prompt);
     // Opened here rather than after the first token so the footer appears
@@ -126,7 +143,7 @@ export class AgentController {
       response = await agentLoop(
         client,
         conversational ? [userMessage] : conversation,
-        conversational ? "" : this.repoContext,
+        conversational ? "" : this.contextForTurn(),
         {
           ...this.callbacks,
           onText: (text) => {
@@ -163,6 +180,10 @@ export class AgentController {
       await this.persist();
       throw error;
     } finally {
+      // In the finally so every path harvests exactly once. A turn that failed
+      // or was cancelled still did work before it stopped, and that work is
+      // precisely what the next turn must not repeat.
+      this.harvestExecutionRecords(conversation, recordsBefore);
       this.abortController = null;
       this.isRunning = false;
       store.finishTurn(
@@ -186,7 +207,49 @@ export class AgentController {
 
   async initialize() {
     this.conversation = await getConversation();
+    this.executionRecords = await getExecutionLog();
     this.repoContext = await buildRepositoryContext();
+  }
+
+  /**
+   * Keeps a one-line record of everything the turn did, before the loop's copy
+   * of the conversation goes out of scope and takes the tool history with it.
+   *
+   * A failed or cancelled turn is harvested too: work it completed before
+   * stopping is exactly what the next turn must not redo.
+   */
+  private harvestExecutionRecords(conversation: Message[], from: number) {
+    const fresh = recordsFrom(
+      conversation.slice(from),
+      this.executionRecords.length + 1,
+    );
+    if (fresh.length === 0) return;
+
+    this.executionRecords.push(...fresh);
+
+    // Bounded here as well as at render time so a long session cannot grow the
+    // array without limit; the render budget decides what is actually sent.
+    const MAX_RETAINED = 200;
+    if (this.executionRecords.length > MAX_RETAINED) {
+      this.executionRecords = this.executionRecords.slice(-MAX_RETAINED);
+    }
+  }
+
+  /**
+   * The repository context plus what this session has already done.
+   *
+   * Appended to the context string rather than threaded through as a new
+   * parameter, so the change stays inside 1.1: the loop and the provider
+   * interface are untouched. Splitting it into its own measured segment
+   * belongs with budgeted assembly in 2.0.
+   */
+  private contextForTurn(): string {
+    const budget = Math.floor(
+      MAX_REPO_CONTEXT_CHARS * EXECUTION_LOG_BUDGET_RATIO,
+    );
+    const log = renderExecutionLog(this.executionRecords, budget);
+
+    return log ? `${this.repoContext}\n\n${log}` : this.repoContext;
   }
 
   async dispose() {
@@ -212,6 +275,7 @@ export class AgentController {
   private async persist() {
     try {
       await saveConversation(this.conversation);
+      await saveExecutionLog(this.executionRecords);
     } catch (error) {
       this.callbacks.onError?.(
         new Error(

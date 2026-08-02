@@ -227,8 +227,12 @@ describe("agentLoop - Tool Execution", () => {
     await agentLoop(dynamicClient, messages, "", callbackSpy);
 
     const toolResultMsg = messages.find((m) => m.role === "tool") as any;
-    expect(toolResultMsg.content).toHaveLength(4000 + "\n\n...output truncated...".length);
-    expect(toolResultMsg.content).toContain("...output truncated...");
+    // Truncation keeps both ends now: the tail of a tool result is where a
+    // test summary, a build error and a stack trace's root cause live.
+    expect(toolResultMsg.content.length).toBeLessThan(4000 + 200);
+    expect(toolResultMsg.content).toContain("omitted from the middle");
+    expect(toolResultMsg.content.startsWith(largeResult.slice(0, 50))).toBe(true);
+    expect(toolResultMsg.content.endsWith(largeResult.slice(-50))).toBe(true);
   });
 
   test("does not truncate tool result under limit", async () => {

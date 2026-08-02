@@ -265,10 +265,11 @@ describe("agentLoop - Robustness", () => {
 
     const result = await agentLoop(provider, messages, "", callbacks);
 
-    // Should truncate at 4000 chars
+    // Bounded regardless of input size, and both ends of the output kept.
     const toolMsg = messages.find((m) => m.role === "tool") as any;
-    expect(toolMsg.content.length).toBeLessThanOrEqual(4050); // 4000 + truncation message
-    expect(toolMsg.content).toContain("...output truncated...");
+    expect(toolMsg.content.length).toBeLessThan(4000 + 200);
+    expect(toolMsg.content).toContain("omitted from the middle");
+    expect(toolMsg.content.endsWith(largeOutput.slice(-50))).toBe(true);
   });
 
   test("handles malformed event (missing required fields)", async () => {

@@ -4,10 +4,12 @@ import { tmpdir } from "os";
 import { join } from "path";
 import {
   MAX_CONTEXT_FILE_BYTES,
+  MAX_INSTRUCTIONS_CHARS,
   MAX_PACKAGE_JSON_CHARS,
   MAX_README_CHARS,
   MAX_REPO_CONTEXT_CHARS,
   buildRepositoryContext,
+  readAgentInstructions,
   readPackageJson,
   readReadme,
   truncate,
@@ -153,5 +155,106 @@ describe("buildRepositoryContext", () => {
 
     expect(context).toContain("Repository Context");
     expect(context.length).toBeLessThan(MAX_REPO_CONTEXT_CHARS);
+  });
+});
+
+describe("repository instructions", () => {
+  test("AGENTS.md is preferred over the other names", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    writeFileSync(join(dir, "AGENTS.md"), "Use Bun, never Node.");
+    writeFileSync(join(dir, "CLAUDE.md"), "Some other tool's copy.");
+
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const found = await readAgentInstructions();
+      expect(found?.name).toBe("AGENTS.md");
+      expect(found?.text).toContain("Use Bun, never Node.");
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("another tool's file is read rather than ignored on branding grounds", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    writeFileSync(join(dir, "CLAUDE.md"), "Prefer Bun.serve over express.");
+
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const found = await readAgentInstructions();
+      expect(found?.name).toBe("CLAUDE.md");
+      expect(found?.text).toContain("Bun.serve");
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a repository with no instructions yields nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await readAgentInstructions()).toBeNull();
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an empty instructions file is not treated as instructions", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    writeFileSync(join(dir, "AGENTS.md"), "   \n\n");
+    writeFileSync(join(dir, "CLAUDE.md"), "Real content here.");
+
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      // Falling through matters: an empty placeholder must not shadow a file
+      // that actually says something.
+      expect((await readAgentInstructions())?.name).toBe("CLAUDE.md");
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("oversized instructions are bounded", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    writeFileSync(join(dir, "AGENTS.md"), "rule\n".repeat(5_000));
+
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const found = await readAgentInstructions();
+      expect(found!.text.length).toBeLessThan(MAX_INSTRUCTIONS_CHARS + 200);
+      expect(found!.text).toContain("read AGENTS.md for the rest");
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("instructions appear before the README in the assembled context", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "woopcode-instructions-"));
+    writeFileSync(join(dir, "AGENTS.md"), "INSTRUCTION-MARKER");
+    writeFileSync(join(dir, "README.md"), "README-MARKER");
+
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const context = await buildRepositoryContext();
+      // The overall ceiling cuts from the end, so ordering decides what
+      // survives in a repository with a large README.
+      expect(context.indexOf("INSTRUCTION-MARKER")).toBeLessThan(
+        context.indexOf("README-MARKER"),
+      );
+      expect(context).toContain("follow these");
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

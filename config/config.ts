@@ -196,8 +196,18 @@ export async function appendMessage(message: any) {
 export const MAX_CONTEXT_FILE_BYTES = 512 * 1024;
 export const MAX_PACKAGE_JSON_CHARS = 2_000;
 export const MAX_README_CHARS = 4_000;
+/**
+ * Budget for the repository's instructions to the agent.
+ *
+ * Larger than it looks: this is paid on every iteration, and the benchmark
+ * measured the fixed part of the prompt at 84% of the first request. It earns
+ * that because instructions are rules the project has already decided, and an
+ * agent that has to infer them spends whole iterations rediscovering what one
+ * file states outright.
+ */
+export const MAX_INSTRUCTIONS_CHARS = 4_000;
 /** Ceiling for the assembled context, applied after the per-file limits. */
-export const MAX_REPO_CONTEXT_CHARS = 8_000;
+export const MAX_REPO_CONTEXT_CHARS = 12_000;
 
 /** Number of dependency names kept per section before summarising the rest. */
 const MAX_DEPENDENCIES_LISTED = 40;
@@ -289,6 +299,44 @@ export async function readReadme() {
   return truncate(text, MAX_README_CHARS, "read README.md for the rest");
 }
 
+/**
+ * Filenames holding repository instructions for a coding agent, in preference
+ * order. Only the first one found is used: a repository carrying both usually
+ * has the same content twice, and sending both would spend the budget saying
+ * it once more.
+ *
+ * AGENTS.md is the vendor-neutral name and comes first. The rest are read
+ * because a repository set up for another tool has already written down the
+ * conventions Woopcode needs, and refusing to read them on branding grounds
+ * would only make the agent guess at rules the project has already stated.
+ */
+export const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules"];
+
+/**
+ * Reads the repository's own instructions to the agent.
+ *
+ * Woopcode advertised repository awareness while reading nothing but
+ * package.json, the README and a top-level listing — so a project stating its
+ * conventions in AGENTS.md had them ignored, and the agent inferred from
+ * surrounding code what the repository had spelled out.
+ */
+export async function readAgentInstructions(): Promise<{
+  name: string;
+  text: string;
+} | null> {
+  for (const name of INSTRUCTION_FILES) {
+    const text = await readContextFile(`${process.cwd()}/${name}`);
+    if (text.trim()) {
+      return {
+        name,
+        text: truncate(text, MAX_INSTRUCTIONS_CHARS, `read ${name} for the rest`),
+      };
+    }
+  }
+
+  return null;
+}
+
 export async function listRepositoryFiles() {
   const root = process.cwd();
 
@@ -335,6 +383,7 @@ export async function getProjectStructure() {
 }
 
 export async function buildRepositoryContext() {
+  const instructions = await readAgentInstructions();
   const packageJson = await readPackageJson();
   const readme = await readReadme();
   const structure = await getProjectStructure();
@@ -342,6 +391,14 @@ export async function buildRepositoryContext() {
   // Don't include full file list - it can be massive and waste tokens
   // The agent has list_files and find_files tools to discover files on demand
   let contextParts = ["Repository Context"];
+
+  // First, because the ceiling below cuts from the end: if anything has to go,
+  // it should be the README rather than the rules the project wrote down.
+  if (instructions) {
+    contextParts.push(
+      `\nRepository instructions (${instructions.name}) — follow these; they override general conventions:\n${instructions.text}`,
+    );
+  }
 
   if (packageJson) {
     contextParts.push(`\nPackage.json (summary):\n${packageJson}`);

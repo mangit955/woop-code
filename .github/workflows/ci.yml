@@ -58,27 +58,33 @@ jobs:
       # resolving a tree no one has tested.
       - run: bun install --frozen-lockfile
 
-      # Bounded well under the job timeout. A run that stops making progress
-      # should fail in minutes with output, not be cancelled after ten with none.
+      # Bounded by the step rather than by a `timeout` command: that is GNU
+      # coreutils and the macOS runner does not ship it. A run that stops making
+      # progress should fail in minutes, not be cancelled after ten with no
+      # output at all.
       - name: Run tests
-        run: timeout 240 bun test
+        timeout-minutes: 5
+        run: bun test
 
       # A hung suite names no file: the runner cancels the job and the log ends
-      # mid-run. Running each file on its own, with its own bound, turns that
-      # into the one line worth having. Only on failure, so it costs nothing
-      # when the suite is healthy.
+      # mid-run, which cost three rounds of guessing to learn once. Running each
+      # file on its own, with its own bound, turns that into the one line worth
+      # having. Only on failure, so it costs nothing when the suite is healthy.
       - name: Locate the failing or hanging file
         if: failure()
+        timeout-minutes: 8
         run: |
+          # perl's alarm is the portable bound: present on both runners, unlike
+          # `timeout`. It reports a killed command as 142 (SIGALRM).
           status=0
           files=$(find . -path ./node_modules -prune -o \
             \( -name '*.test.ts' -o -name '*.test.tsx' \) -print | sort)
           for file in $files; do
-            if timeout 60 bun test "$file" >/tmp/file.log 2>&1; then
+            if perl -e 'alarm shift; exec @ARGV' 60 bun test "$file" >/tmp/file.log 2>&1; then
               echo "ok       $file"
             else
               code=$?
-              if [ $code -eq 124 ]; then echo "HUNG     $file"; else echo "FAILED   $file"; fi
+              if [ $code -eq 142 ]; then echo "HUNG     $file"; else echo "FAILED   $file"; fi
               tail -30 /tmp/file.log
               status=1
             fi

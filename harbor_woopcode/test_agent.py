@@ -60,6 +60,64 @@ SIMPLE_RUN = [
     {"type": "run_end", "ts": "2026-01-01T00:00:04.000Z", "ok": True},
 ]
 
+TS = "2026-01-01T00:00:00.000Z"
+
+#: A two-iteration run that reports usage, as the CLI writes it since the
+#: runtime metrics change: one iteration that calls a tool, then one that
+#: answers with the tool's result in its prompt.
+RUN_WITH_USAGE = [
+    SIMPLE_RUN[0],
+    {
+        "type": "iteration",
+        "ts": TS,
+        "n": 1,
+        "usage": {
+            "promptTokens": 1000,
+            "completionTokens": 20,
+            "totalTokens": 1020,
+        },
+        "segments": {
+            "systemPrompt": 2400,
+            "repoContext": 800,
+            "conversation": 40,
+            "toolResults": 0,
+        },
+        "toolCalls": 1,
+        "durationMs": 900,
+    },
+    {
+        "type": "iteration",
+        "ts": TS,
+        "n": 2,
+        "usage": {
+            "promptTokens": 1800,
+            "completionTokens": 35,
+            "cachedTokens": 600,
+            "totalTokens": 1835,
+        },
+        "segments": {
+            "systemPrompt": 2400,
+            "repoContext": 800,
+            "conversation": 40,
+            "toolResults": 900,
+        },
+        "toolCalls": 0,
+        "durationMs": 700,
+    },
+    {
+        "type": "run_end",
+        "ts": TS,
+        "ok": True,
+        "summary": {
+            "iterations": 2,
+            "toolCalls": 1,
+            "lastWriteStep": 1,
+            "toolCounts": {"create_file": 1},
+            "unverifiedEdits": True,
+        },
+    },
+]
+
 
 # --------------------------------------------------------------------------
 # Registration
@@ -320,14 +378,91 @@ def test_incomplete_run_is_marked_not_completed(tmp_path: Path) -> None:
     assert context.metadata["woopcode_completed"] is False
 
 
-def test_token_metrics_are_left_unset(tmp_path: Path) -> None:
-    """Reporting a fabricated zero would corrupt Harbor's cost aggregates."""
+def test_token_metrics_are_left_unset_when_unreported(tmp_path: Path) -> None:
+    """Reporting a fabricated zero would corrupt Harbor's cost aggregates.
+
+    SIMPLE_RUN carries no iteration events, which is what a run against a
+    provider that reports no usage looks like -- and what every log written by
+    a CLI older than the metrics change looks like too.
+    """
     write_events(tmp_path, SIMPLE_RUN)
     context = AgentContext()
     make_agent(tmp_path).populate_context_post_run(context)
 
     assert context.n_input_tokens is None
+    assert context.n_output_tokens is None
     assert context.cost_usd is None
+
+
+def test_token_metrics_are_summed_across_iterations(tmp_path: Path) -> None:
+    write_events(tmp_path, RUN_WITH_USAGE)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    # Summed, not maxed: the run paid for the conversation on every iteration,
+    # and that repetition is the cost being measured.
+    assert context.n_input_tokens == 1000 + 1800
+    assert context.n_output_tokens == 20 + 35
+    assert context.n_cache_tokens == 600
+    assert context.cost_usd is None
+
+
+def test_iterations_missing_usage_do_not_zero_the_totals(tmp_path: Path) -> None:
+    events = [
+        SIMPLE_RUN[0],
+        {"type": "iteration", "ts": TS, "n": 1, "segments": {}, "toolCalls": 0,
+         "durationMs": 10},
+        {"type": "iteration", "ts": TS, "n": 2, "usage": {"promptTokens": 500},
+         "segments": {}, "toolCalls": 0, "durationMs": 10},
+        {"type": "run_end", "ts": TS, "ok": True},
+    ]
+    write_events(tmp_path, events)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.n_input_tokens == 500
+    # No iteration reported one, so it stays unknown rather than becoming 0.
+    assert context.n_output_tokens is None
+
+
+def test_trajectory_carries_the_token_totals(tmp_path: Path) -> None:
+    trajectory = make_agent(tmp_path)._build_trajectory(RUN_WITH_USAGE)
+
+    assert trajectory is not None
+    assert trajectory.final_metrics.total_prompt_tokens == 2800
+    assert trajectory.final_metrics.total_completion_tokens == 55
+    assert trajectory.final_metrics.total_cached_tokens == 600
+    trajectory.to_json_dict()
+
+
+def test_mean_segment_chars_are_averaged_over_iterations(tmp_path: Path) -> None:
+    write_events(tmp_path, RUN_WITH_USAGE)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_iterations"] == 2
+    # (0 + 900) / 2 -- the segment that grew between the two iterations.
+    assert context.metadata["woopcode_mean_segment_chars"]["toolResults"] == 450
+
+
+def test_unverified_edits_is_read_from_the_run_summary(tmp_path: Path) -> None:
+    write_events(tmp_path, RUN_WITH_USAGE)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_unverified_edits"] is True
+
+
+def test_unverified_edits_is_none_without_a_summary(tmp_path: Path) -> None:
+    """An older CLI wrote no summary. Unknown is not the same as False."""
+    write_events(tmp_path, SIMPLE_RUN)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_unverified_edits"] is None
 
 
 def test_populate_context_without_events_is_a_no_op(tmp_path: Path) -> None:

@@ -98,4 +98,90 @@ describe("event log", () => {
   test("timestamps are ISO 8601", () => {
     expect(now()).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
   });
+
+  /**
+   * Harbor reads this log from Python, by string key, in
+   * harbor_woopcode/agent.py (`_aggregate_usage` and
+   * `populate_context_post_run`). Nothing type-checks across that boundary, so
+   * renaming a field here would silently stop the benchmark reporting tokens
+   * rather than fail. These two tests are the contract; change them and
+   * harbor_woopcode/test_agent.py together or not at all.
+   */
+  test("an iteration record keeps the field names Harbor reads", () => {
+    const path = join(dir, "events.jsonl");
+    const log = createEventLog(path);
+
+    log.write({
+      type: "iteration",
+      ts: now(),
+      n: 1,
+      usage: {
+        promptTokens: 1000,
+        completionTokens: 20,
+        cachedTokens: 600,
+        totalTokens: 1020,
+      },
+      segments: {
+        systemPrompt: 2400,
+        repoContext: 800,
+        conversation: 40,
+        toolResults: 0,
+      },
+      toolCalls: 1,
+      durationMs: 900,
+    });
+
+    const [record] = readEvents(path);
+    expect(Object.keys(record!).sort()).toEqual([
+      "durationMs",
+      "n",
+      "segments",
+      "toolCalls",
+      "ts",
+      "type",
+      "usage",
+    ]);
+    expect(Object.keys(record!.usage as object).sort()).toEqual([
+      "cachedTokens",
+      "completionTokens",
+      "promptTokens",
+      "totalTokens",
+    ]);
+    expect(Object.keys(record!.segments as object).sort()).toEqual([
+      "conversation",
+      "repoContext",
+      "systemPrompt",
+      "toolResults",
+    ]);
+  });
+
+  test("a run_end summary keeps the field names Harbor reads", () => {
+    const path = join(dir, "events.jsonl");
+    const log = createEventLog(path);
+
+    log.write({
+      type: "run_end",
+      ts: now(),
+      ok: true,
+      summary: {
+        iterations: 2,
+        toolCalls: 1,
+        lastWriteStep: 1,
+        lastShellStep: undefined,
+        toolCounts: { create_file: 1 },
+        unverifiedEdits: true,
+      },
+    });
+
+    const [record] = readEvents(path);
+    const summary = record!.summary as Record<string, unknown>;
+    expect(summary.unverifiedEdits).toBe(true);
+    expect(Object.keys(summary).sort()).toEqual([
+      "iterations",
+      "lastWriteStep",
+      "toolCalls",
+      "toolCounts",
+      "unverifiedEdits",
+    ]);
+  });
 });

@@ -85,9 +85,14 @@ ran. The release zip is fetched once into `~/.cache/harbor-woopcode/` and pushed
 into each container; the official installer remains as a fallback, so a cache
 miss degrades speed rather than correctness.
 
-**Token and cost metrics are left unset.** WoopCode's provider client does not
-surface usage. Reporting zero would be worse than reporting nothing, because
-Harbor's aggregates cannot tell "free" from "unknown".
+**Token metrics come from the CLI; cost is left unset.** The CLI reports the
+provider's own token counts per iteration, which are summed across the run.
+Prompt tokens are summed rather than maxed on purpose: the run paid for its
+context on every iteration, and that repetition is what the loop's context
+handling is judged on. A run whose provider reported no usage leaves the
+totals unset rather than zero, because Harbor's aggregates cannot tell "free"
+from "unknown". Cost stays unset because pricing is per-model and lives
+outside this repository.
 
 **`SUPPORTS_RESUME = False`.** WoopCode's headless mode has no
 session-continuation flag. Declaring resume support would make Harbor silently

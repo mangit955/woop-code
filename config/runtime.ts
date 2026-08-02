@@ -13,6 +13,54 @@ import type {
   TurnSummary,
 } from "./types";
 
+/** Characters of a single tool result that reach the model. */
+export const MAX_TOOL_RESULT = 4000;
+
+/**
+ * Trims an oversized tool result, keeping both ends.
+ *
+ * Truncation used to keep the first 4000 characters and drop the rest, which
+ * discarded exactly the part that usually matters: a test run puts its summary
+ * last, a build puts its errors last, and a stack trace puts the root cause
+ * last. An agent shown only the head of a failing test run sees that it ran and
+ * not that it failed.
+ *
+ * The head is kept too, because read_file has no range parameter — an agent
+ * that loses the top of a file cannot ask for it again, it can only re-read the
+ * whole thing. Both ends are cut to line boundaries so neither resumes
+ * mid-token, and the marker states what was dropped rather than implying the
+ * output simply ended.
+ */
+export function truncateToolResult(
+  result: string,
+  limit = MAX_TOOL_RESULT,
+): string {
+  if (result.length <= limit) return result;
+
+  const half = Math.floor(limit / 2);
+
+  // Extend to the enclosing line break where one is close enough to be the
+  // real boundary; falling back to the raw offset keeps a single enormous line
+  // (minified output, a long JSON blob) from collapsing the whole budget.
+  const headCut = result.lastIndexOf("\n", half);
+  const head = result.slice(0, headCut > half * 0.5 ? headCut : half);
+
+  const tailStart = result.length - half;
+  const tailCut = result.indexOf("\n", tailStart);
+  const tail = result.slice(
+    tailCut !== -1 && tailCut < result.length - half * 0.5 ? tailCut + 1 : tailStart,
+  );
+
+  const dropped = result.length - head.length - tail.length;
+  const lines = result.slice(head.length, result.length - tail.length).split("\n").length - 1;
+
+  return (
+    `${head}\n\n…${dropped} characters omitted from the middle` +
+    `${lines > 0 ? ` (${lines} lines)` : ""}; ` +
+    `the start and end of the output are shown…\n\n${tail}`
+  );
+}
+
 /**
  * Measures the pieces of the prompt about to be sent.
  *
@@ -369,11 +417,7 @@ export async function agentLoop(
           callbacks.onCancel?.();
           return "";
         }
-        const MAX_TOOL_RESULT = 4000;
-        const toolResult =
-          result.length > MAX_TOOL_RESULT
-            ? result.slice(0, MAX_TOOL_RESULT) + "\n\n...output truncated..."
-            : result;
+        const toolResult = truncateToolResult(result);
 
         const editWasDeclined =
           toolResult.startsWith("Edit rejected") ||

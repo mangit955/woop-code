@@ -61,11 +61,15 @@ const VERIFYING_COMMANDS = new Set([
  * Keyed by program, valued by the subcommands that mean "check this works".
  */
 const VERIFYING_SUBCOMMANDS: Record<string, Set<string>> = {
-  bun: new Set(["test"]),
+  // `run` is included for every runner: a live turn ran `bun run check.ts` to
+  // verify a fix and it was not recognised, so the turn was reported as
+  // unverified after it had in fact been verified. Whether a `run` is a check
+  // is decided from the script name below.
+  bun: new Set(["test", "run"]),
   npm: new Set(["test", "run"]),
   pnpm: new Set(["test", "run"]),
   yarn: new Set(["test", "run"]),
-  deno: new Set(["test", "check", "lint"]),
+  deno: new Set(["test", "check", "lint", "run"]),
   cargo: new Set(["test", "check", "build", "clippy"]),
   go: new Set(["test", "build", "vet"]),
   python: new Set(["-m"]),

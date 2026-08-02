@@ -45,6 +45,10 @@ describe("commands that verify", () => {
     ["compile", "gcc -O2 -c unix.c"],
     ["latex", "pdflatex main.tex"],
     ["cargo", "cargo check"],
+    // A live turn ran exactly this to verify a fix and it went unrecognised,
+    // so the turn was reported unverified after it had been verified.
+    ["bun run a check script", "bun run check.ts"],
+    ["npm run test script", "npm run test:unit"],
   ])("%s verifies", (_label, command) => {
     expect(classifyCommand(command).verifies).toBe(true);
   });
@@ -54,6 +58,9 @@ describe("commands that verify", () => {
     ["reading", "cat README.md"],
     ["inspect", "readelf -h ./sim"],
     ["move", "mv a b"],
+    // `run` alone is not a check: starting a server verifies nothing.
+    ["bun run a server", "bun run server.ts"],
+    ["npm start", "npm run start"],
   ])("%s does not verify", (_label, command) => {
     // Treating every shell command as verification is what made the first
     // measurement of the verification gap meaningless.

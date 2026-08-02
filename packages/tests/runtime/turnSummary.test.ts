@@ -268,3 +268,148 @@ describe("agentLoop - edits made through the shell", () => {
     expect(summary.unverifiedEdits).toBe(false);
   });
 });
+
+describe("agentLoop - asking the turn to verify its edits", () => {
+  test("a turn that edited without checking is asked once", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+    registerTool("run_tests", "41 pass");
+
+    const contexts: string[] = [];
+    let n = 0;
+    const provider = {
+      async *stream(_m: any, ctx: string) {
+        contexts.push(ctx);
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Fixed.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "repo", callbacks);
+
+    const summary = summaryOf(callbacks);
+    expect(summary.verificationReminders).toBe(1);
+    // Delivered as a user message: Gemini rejects a request whose last
+    // message is from the model, so continuing requires one.
+    const injected = messages.filter(
+      (m) => m.role === "user" && m.content.includes("have not run anything"),
+    );
+    expect(injected).toHaveLength(1);
+  });
+
+  test("the reminder is dropped after one iteration", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    const contexts: string[] = [];
+    let n = 0;
+    const provider = {
+      async *stream(_m: any, ctx: string) {
+        contexts.push(ctx);
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Cannot verify.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "repo", callbacks);
+
+    // Asked once, never twice: the model may have a good reason, and a loop
+    // that insists would spend the budget arguing.
+    expect(summaryOf(callbacks).verificationReminders).toBe(1);
+    expect(
+      messages.filter(
+        (m) => m.role === "user" && m.content.includes("have not run anything"),
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("a turn that verified is not asked", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+    registerTool("run_tests", "41 pass");
+
+    const provider = createStreamingProvider([
+      [createToolCallEvent("edit_file", { path: "a.ts" }, "c1"), createDoneEvent()],
+      [createToolCallEvent("run_tests", { command: "bun test" }, "c2"), createDoneEvent()],
+      [createTextEvent("Fixed and verified."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    expect(summaryOf(callbacks).verificationReminders).toBe(0);
+  });
+
+  test("a read-only turn is not asked", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("read_file", "contents");
+
+    const provider = createStreamingProvider([
+      [createToolCallEvent("read_file", { path: "a.ts" }, "c1"), createDoneEvent()],
+      [createTextEvent("Here is what it says."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    // Nothing changed, so there is nothing to verify and no reason to spend an
+    // extra iteration asking.
+    expect(summaryOf(callbacks).verificationReminders).toBe(0);
+  });
+
+  test("an edit made through the shell is asked about too", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "");
+
+    let n = 0;
+    const contexts: string[] = [];
+    const provider = {
+      async *stream(_m: any, ctx: string) {
+        contexts.push(ctx);
+        if (n++ === 0) {
+          yield createToolCallEvent("run_terminal", { command: "sed -i 's/a/b/' f.c" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Patched.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    // This is the path the benchmark showed the agent actually using.
+    expect(summaryOf(callbacks).verificationReminders).toBe(1);
+  });
+
+  test("the turn still ends when the model declines to verify", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("No tests exist for this file.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const result = await agentLoop(provider, messages, "", callbacks);
+
+    expect(result).toBe("No tests exist for this file.");
+    expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
+  });
+});

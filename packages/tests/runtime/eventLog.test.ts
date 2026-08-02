@@ -167,6 +167,7 @@ describe("event log", () => {
         iterations: 2,
         retries: 0,
         salvagedIterations: 0,
+        verificationReminders: 0,
         toolCalls: 1,
         lastWriteStep: 1,
         lastShellStep: undefined,
@@ -186,6 +187,7 @@ describe("event log", () => {
       "toolCalls",
       "toolCounts",
       "unverifiedEdits",
+      "verificationReminders",
     ]);
   });
 

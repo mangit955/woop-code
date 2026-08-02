@@ -185,6 +185,22 @@ export async function agentLoop(
   // and whose partial output was kept rather than discarded.
   let salvagedIterations = 0;
 
+  /**
+   * Turns asked to check their own edits before finishing.
+   *
+   * A benchmark run ended four of five trials having changed files with nothing
+   * run afterwards to check them — one of them made four edits and ran zero
+   * verifications across two hundred iterations. The model is told to verify in
+   * the system prompt; nothing ever checked that it had.
+   */
+  let verificationReminders = 0;
+  /**
+   * Asked once, never twice. The model may have a good reason not to verify —
+   * the change may be unverifiable, or the tests may not exist — and a loop
+   * that insists would spend the budget arguing rather than let the turn end.
+   */
+  const MAX_VERIFICATION_REMINDERS = 1;
+
   try {
     while (iterations < MAX_ITERATIONS) {
       iterations++;
@@ -307,11 +323,48 @@ export async function agentLoop(
 
         // A stream that died mid-sentence is not the model choosing to stop.
         // Returning here would end the turn on a half-written answer, so the
-        // partial text stays in the conversation and the loop asks again —
-        // the model reads its own unfinished reply and carries on. Nothing
-        // synthetic is injected: a fabricated user message would consume one
-        // of the turns recentMessages keeps.
-        if (truncated) continue;
+        // partial text stays and the loop asks again.
+        //
+        // The follow-up has to be a user message. Gemini rejects a request
+        // whose last message is from the model — "Requests ending with a model
+        // turn are not supported" — so continuing after an assistant message
+        // without one fails with a 400. That costs one of the turns
+        // recentMessages keeps, which is the price of continuing at all.
+        if (truncated) {
+          messages.push({
+            role: "user",
+            content:
+              "Your previous message was cut off before it finished. Continue from where it stopped.",
+          });
+          continue;
+        }
+
+        // The turn is about to end having changed files with nothing run
+        // afterwards to check them. Ask once, then let it finish either way.
+        const unverified =
+          lastWriteStep !== undefined &&
+          (lastShellStep === undefined || lastShellStep < lastWriteStep);
+
+        if (
+          unverified &&
+          verificationReminders < MAX_VERIFICATION_REMINDERS &&
+          iterations < MAX_ITERATIONS
+        ) {
+          verificationReminders++;
+          messages.push({
+            role: "user",
+            content:
+              "You changed files and have not run anything since. Run the project's " +
+              "tests, build or type check to confirm the change works, then report the " +
+              "result. If it genuinely cannot be verified — no test exists, or the " +
+              "tooling is unavailable — say so plainly and finish. Do not claim it was " +
+              "verified unless a command actually ran.",
+          });
+          callbacks.onStatus?.(
+            "⚠️  files changed without a check - asking the agent to verify",
+          );
+          continue;
+        }
 
         callbacks.onDone?.();
 
@@ -526,6 +579,7 @@ export async function agentLoop(
       iterations,
       retries,
       salvagedIterations,
+      verificationReminders,
       toolCalls: toolCallsExecuted,
       lastWriteStep,
       lastShellStep,

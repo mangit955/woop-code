@@ -62,6 +62,7 @@ const server = Bun.serve({
   routes: {
     "/": index,
     "/favicon.svg": () => asset("favicon.svg"),
+    "/linkPreview.png": () => asset("linkPreview.png"),
 
     // Docs — see site/src/docs/render.ts.
     "/docs": async () => html(await renderIndex()),

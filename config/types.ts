@@ -68,6 +68,8 @@ export interface TurnSummary {
   retries: number;
   /** Iterations whose stream died mid-response and was recovered, not lost. */
   salvagedIterations: number;
+  /** Times the turn was asked to check its own edits before finishing. */
+  verificationReminders: number;
   toolCalls: number;
   /**
    * Index of the last tool execution that changed the workspace, counting from

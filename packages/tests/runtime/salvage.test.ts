@@ -83,7 +83,7 @@ describe("agentLoop - salvaging a truncated response", () => {
     });
   });
 
-  test("nothing synthetic is injected, so the turn window is unchanged", async () => {
+  test("a user message follows the partial text so the request stays valid", async () => {
     const { callbacks, messages } = createRuntimeTest();
 
     const provider = failingAfter(
@@ -93,9 +93,16 @@ describe("agentLoop - salvaging a truncated response", () => {
 
     await agentLoop(provider, messages, "", callbacks);
 
-    // A fabricated user message would consume one of the turns recentMessages
-    // keeps, silently shortening the model's memory.
-    expect(messages.filter((m) => m.role === "user")).toHaveLength(1);
+    // Gemini rejects a request whose last message is from the model, so the
+    // continuation has to sit directly after the partial text — that is the
+    // request the next iteration sends. The turn's own final assistant message
+    // is not resent, so it may end the array.
+    const cut = messages.findIndex(
+      (m) => m.role === "assistant" && m.content === "cut",
+    );
+    expect(cut).toBeGreaterThan(-1);
+    expect(messages[cut + 1]).toMatchObject({ role: "user" });
+    expect((messages[cut + 1] as { content: string }).content).toContain("cut off");
   });
 
   test("tool calls that did arrive are still executed", async () => {

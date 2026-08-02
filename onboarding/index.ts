@@ -3,6 +3,10 @@ import React from "react";
 import { SetupWizard } from "./setupWizard";
 import { getConfig } from "../config/config";
 import { isProviderEnabled } from "../config/providerRegistry";
+import {
+  canPromptInteractively,
+  resolveEnvCredentials,
+} from "../config/envCredentials";
 
 export interface ProviderCredentials {
   provider: string;
@@ -35,12 +39,30 @@ export async function resolveCredentials(): Promise<ProviderCredentials | null> 
  * @throws If onboarding completes without usable credentials (Ctrl+C exits).
  */
 export async function ensureProviderConfigured(): Promise<ProviderCredentials> {
+  // The environment wins over stored config. An automated caller that exports
+  // a key is stating which credentials this process should use, and a stale
+  // key left in the config directory must not silently take precedence.
+  const fromEnv = resolveEnvCredentials();
+  if (fromEnv) {
+    return { provider: fromEnv.provider, apiKey: fromEnv.apiKey };
+  }
+
   // Already configured. A provider that can no longer run (a key stored by an
   // older version) counts as unconfigured, so the wizard offers a working one
   // instead of letting the first turn fail.
   const existing = await resolveCredentials();
   if (existing) {
     return existing;
+  }
+
+  // The wizard needs a terminal. Without one it would block on input that can
+  // never arrive, so an unconfigured non-interactive run must fail with a
+  // message that names the fix rather than hanging until the caller's timeout.
+  if (!canPromptInteractively()) {
+    throw new Error(
+      "No provider is configured and there is no terminal to run setup in.\n" +
+        "Set GEMINI_API_KEY (or WOOPCODE_API_KEY with WOOPCODE_PROVIDER) in the environment.",
+    );
   }
 
   await runOnboarding();

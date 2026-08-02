@@ -7,6 +7,52 @@ import type {
   StreamEvent,
 } from "./types";
 
+/** Loop budget when nothing overrides it — tuned for interactive use. */
+const DEFAULT_MAX_ITERATIONS = 20;
+
+/**
+ * Raised when the loop runs out of iterations.
+ *
+ * Distinct from a generic failure because it is not one: the agent ran, it
+ * simply did not finish inside its budget. Callers that report an exit status
+ * use this to separate "produced an incomplete result" from "something broke",
+ * which matters to any harness that treats the two differently.
+ */
+export class IterationBudgetExhaustedError extends Error {
+  constructor(limit: number) {
+    super(
+      `Agent exceeded the maximum number of iterations (${limit}).\n\n` +
+        `This usually means:\n` +
+        `  • The task is too complex - try breaking it into smaller steps\n` +
+        `  • The agent is stuck in analysis - it may need clearer instructions\n` +
+        `  • More iterations are needed - raise WOOPCODE_MAX_ITERATIONS`,
+    );
+    this.name = "IterationBudgetExhaustedError";
+  }
+}
+
+/**
+ * Resolves the loop budget, allowing `WOOPCODE_MAX_ITERATIONS` to raise it.
+ *
+ * The interactive default is deliberately small: a human is watching, and a
+ * runaway loop spends their quota. Automated callers working a single hard
+ * task have the opposite tradeoff and need a far larger budget, so the limit
+ * has to be settable from outside rather than compiled in.
+ */
+function maxIterations(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.WOOPCODE_MAX_ITERATIONS?.trim();
+  if (!raw) return DEFAULT_MAX_ITERATIONS;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    process.stderr.write(
+      `⚠️  ignoring WOOPCODE_MAX_ITERATIONS=${raw} (expected a positive integer)\n`,
+    );
+    return DEFAULT_MAX_ITERATIONS;
+  }
+  return parsed;
+}
+
 export async function agentLoop(
   client: ProviderClient,
   messages: Message[],
@@ -15,7 +61,7 @@ export async function agentLoop(
   signal?: AbortSignal,
   useTools = true,
 ) {
-  const MAX_ITERATIONS = 20; // Allow complex tasks to complete
+  const MAX_ITERATIONS = maxIterations();
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
   const SAME_TOOL_THRESHOLD = 4;
   /** Tools actually run before the turn is nudged toward implementing. */
@@ -245,13 +291,7 @@ export async function agentLoop(
       }
     }
 
-    throw new Error(
-      `Agent exceeded the maximum number of iterations (${MAX_ITERATIONS}).\n\n` +
-        `This usually means:\n` +
-        `  • The task is too complex - try breaking it into smaller steps\n` +
-        `  • The agent is stuck in analysis - it may need clearer instructions\n` +
-        `  • More iterations are needed - consider increasing MAX_ITERATIONS`,
-    );
+    throw new IterationBudgetExhaustedError(MAX_ITERATIONS);
   } catch (error) {
     if (signal?.aborted) {
       callbacks.onCancel?.();

@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
+import type { IterationUsage } from "../config/types";
 
 /**
  * A newline-delimited JSON record of one headless run.
@@ -21,6 +22,18 @@ export type RunEvent =
   | { type: "tool_result"; ts: string; id: string; name: string; output: string }
   | { type: "tool_error"; ts: string; id: string; name: string; error: string }
   | { type: "status"; ts: string; text: string }
+  | {
+      type: "iteration";
+      ts: string;
+      /** 1-based index of the completed loop iteration. */
+      n: number;
+      /** Provider-reported token counts; absent when the provider reports none. */
+      usage?: IterationUsage["usage"];
+      /** Prompt segment sizes in characters — see PromptSegments. */
+      segments: IterationUsage["segments"];
+      toolCalls: number;
+      durationMs: number;
+    }
   | { type: "error"; ts: string; message: string }
   | { type: "run_end"; ts: string; ok: boolean };
 

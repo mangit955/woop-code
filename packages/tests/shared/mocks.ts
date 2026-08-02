@@ -124,6 +124,10 @@ export class CallbackSpy {
     this.calls.push({ name: "onStatus", args: [status] });
   };
 
+  onUsage = (usage: any) => {
+    this.calls.push({ name: "onUsage", args: [usage] });
+  };
+
   onText = (text: string) => {
     this.calls.push({ name: "onText", args: [text] });
   };

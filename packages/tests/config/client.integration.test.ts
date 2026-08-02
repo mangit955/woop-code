@@ -44,4 +44,71 @@ describe("Gemini provider adapter", () => {
       items: { type: Type.STRING },
     });
   });
+
+  /**
+   * Usage accumulates across chunks, and only the last report is complete: an
+   * early chunk carries the token count of a partial response. Taking the first
+   * one would under-report every streamed turn.
+   */
+  test("reports the final chunk's token usage on the done event", async () => {
+    const ai = {
+      models: {
+        async generateContentStream() {
+          return (async function* () {
+            yield {
+              candidates: [{ content: { parts: [{ text: "Look" }] } }],
+              usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 2, totalTokenCount: 1202 },
+            };
+            yield {
+              candidates: [{ content: { parts: [{ text: "ing" }] } }],
+              usageMetadata: {
+                promptTokenCount: 1200,
+                candidatesTokenCount: 5,
+                cachedContentTokenCount: 900,
+                totalTokenCount: 1205,
+              },
+            };
+          })();
+        },
+      },
+    };
+    const messages: Message[] = [{ role: "user", content: "Inspect the project" }];
+    const events: StreamEvent[] = [];
+
+    for await (const event of geminiClient("test-key", "test-model", ai as any).stream(messages, "repo")) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toEqual({
+      type: "done",
+      usage: {
+        promptTokens: 1200,
+        completionTokens: 5,
+        cachedTokens: 900,
+        totalTokens: 1205,
+      },
+    });
+  });
+
+  test("omits usage entirely when the provider reports none", async () => {
+    const ai = {
+      models: {
+        async generateContentStream() {
+          return (async function* () {
+            yield { candidates: [{ content: { parts: [{ text: "hi" }] } }] };
+          })();
+        },
+      },
+    };
+    const events: StreamEvent[] = [];
+
+    for await (const event of geminiClient("test-key", "test-model", ai as any).stream(
+      [{ role: "user", content: "hi" }],
+      "",
+    )) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toEqual({ type: "done", usage: undefined });
+  });
 });

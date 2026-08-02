@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
-import type { Message, ProviderClient, StreamEvent } from "./types";
+import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
 import { unsupportedProviderMessage } from "./providerRegistry";
 
 export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
@@ -122,16 +122,7 @@ export function geminiClient(
           })),
         },
       ];
-      
-      // Log token usage for debugging (enable with DEBUG=1 environment variable)
-      if (process.env.DEBUG) {
-        console.log("Token usage estimate:");
-        console.log("  Repo Context:", repoContext.length, "chars");
-        console.log("  Messages:", JSON.stringify(contents).length, "chars");
-        console.log("  System Prompt:", SYSTEM_PROMPT.length, "chars");
-        console.log("  Total:", (repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length), "chars (~", Math.ceil((repoContext.length + JSON.stringify(contents).length + SYSTEM_PROMPT.length) / 4), "tokens)");
-      }
-      
+
       const requestController = new AbortController();
       let timedOut = false;
       const abortFromCaller = () => requestController.abort();
@@ -162,7 +153,23 @@ export function geminiClient(
           },
         });
 
+        // Gemini reports usage on chunks as the response accumulates, with the
+        // final chunk carrying the complete figures. Keep the last one seen
+        // rather than the first: an early chunk reports a partial completion
+        // count, and a stream that ends without usage at all leaves this
+        // undefined, which is reported as unknown instead of as zero.
+        let usage: TokenUsage | undefined;
+
         for await (const chunk of stream) {
+          if (chunk.usageMetadata) {
+            usage = {
+              promptTokens: chunk.usageMetadata.promptTokenCount,
+              completionTokens: chunk.usageMetadata.candidatesTokenCount,
+              cachedTokens: chunk.usageMetadata.cachedContentTokenCount,
+              totalTokens: chunk.usageMetadata.totalTokenCount,
+            };
+          }
+
           const parts = chunk.candidates?.[0]?.content?.parts ?? [];
           for (const part of parts) {
             if (part.functionCall) {
@@ -187,6 +194,7 @@ export function geminiClient(
 
         yield {
           type: "done",
+          usage,
         };
       } catch (error: any) {
         if (timedOut) {

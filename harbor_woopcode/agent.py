@@ -589,6 +589,62 @@ class WoopCode(BaseInstalledAgent):
         return events
 
     @staticmethod
+    def _aggregate_usage(events: list[dict[str, Any]]) -> dict[str, Any]:
+        """Sum the per-iteration token counts the CLI reports.
+
+        Every count is the provider's own, so summing them is exact. An
+        iteration whose provider reported nothing contributes nothing, and a
+        run where none reported leaves the totals ``None`` rather than zero --
+        Harbor's aggregates cannot tell 'free' from 'unknown', so an absent
+        measurement has to stay absent.
+
+        Prompt tokens are summed across iterations, which double-counts the
+        conversation on purpose: it is what the run actually paid, and paying
+        repeatedly for the same context is the cost the loop's context handling
+        is judged on.
+        """
+        totals: dict[str, int] = {}
+        segments: dict[str, int] = {}
+        iterations = 0
+
+        for event in events:
+            if event.get("type") != "iteration":
+                continue
+            iterations += 1
+
+            usage = event.get("usage")
+            if isinstance(usage, dict):
+                for source, target in (
+                    ("promptTokens", "prompt"),
+                    ("completionTokens", "completion"),
+                    ("cachedTokens", "cached"),
+                ):
+                    value = usage.get(source)
+                    if isinstance(value, int):
+                        totals[target] = totals.get(target, 0) + value
+
+            measured = event.get("segments")
+            if isinstance(measured, dict):
+                for name, value in measured.items():
+                    if isinstance(value, int):
+                        segments[name] = segments.get(name, 0) + value
+
+        return {
+            "iterations": iterations,
+            "prompt_tokens": totals.get("prompt"),
+            "completion_tokens": totals.get("completion"),
+            "cached_tokens": totals.get("cached"),
+            # Mean characters per iteration, which is what identifies the
+            # segment that grows; the totals above carry the absolute cost.
+            "mean_segment_chars": {
+                name: round(total / iterations)
+                for name, total in segments.items()
+            }
+            if iterations
+            else {},
+        }
+
+    @staticmethod
     def _valid_timestamp(value: Any) -> str | None:
         """Return *value* if it is an ISO 8601 instant, else None.
 
@@ -699,6 +755,8 @@ class WoopCode(BaseInstalledAgent):
         if not steps:
             return None
 
+        usage = self._aggregate_usage(events)
+
         return Trajectory(
             agent=Agent(
                 name=self.name(),
@@ -706,17 +764,26 @@ class WoopCode(BaseInstalledAgent):
                 model_name=model_name,
             ),
             steps=steps,
-            final_metrics=FinalMetrics(total_steps=len(steps)),
+            final_metrics=FinalMetrics(
+                total_steps=len(steps),
+                total_prompt_tokens=usage["prompt_tokens"],
+                total_completion_tokens=usage["completion_tokens"],
+                total_cached_tokens=usage["cached_tokens"],
+                # Cost stays unset: pricing is per-model and lives outside this
+                # repository, so deriving it here would be a guess.
+            ),
         )
 
     @override
     def populate_context_post_run(self, context: AgentContext) -> None:
         """Write the ATIF trajectory and record run metadata.
 
-        Token and cost fields are intentionally left unset: WoopCode's provider
-        client does not surface usage, and reporting a fabricated zero would be
-        worse than reporting nothing, since Harbor's cost aggregates cannot
-        distinguish 'free' from 'unknown'.
+        Token counts come from the CLI's per-iteration ``iteration`` events,
+        which carry the provider's own figures. A run whose provider reported
+        none leaves them unset rather than zero: Harbor's aggregates cannot
+        distinguish 'free' from 'unknown', so a missing measurement has to stay
+        missing. Cost is always unset -- pricing is per-model and lives outside
+        this repository.
         """
         events = self._read_events()
         if not events:
@@ -741,6 +808,13 @@ class WoopCode(BaseInstalledAgent):
             (e for e in reversed(events) if e.get("type") == "run_end"),
             None,
         )
+        usage = self._aggregate_usage(events)
+        summary = (end or {}).get("summary") or {}
+
+        context.n_input_tokens = usage["prompt_tokens"]
+        context.n_output_tokens = usage["completion_tokens"]
+        context.n_cache_tokens = usage["cached_tokens"]
+
         context.metadata = {
             **(context.metadata or {}),
             "woopcode_events": len(events),
@@ -748,4 +822,10 @@ class WoopCode(BaseInstalledAgent):
             "woopcode_tool_calls": sum(
                 1 for e in events if e.get("type") == "tool_call"
             ),
+            "woopcode_iterations": usage["iterations"],
+            "woopcode_mean_segment_chars": usage["mean_segment_chars"],
+            # Whether the run finished having changed files without running
+            # anything afterwards. Absent on a run from a CLI that predates the
+            # summary, which is not the same as False.
+            "woopcode_unverified_edits": summary.get("unverifiedEdits"),
         }

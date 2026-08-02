@@ -88,7 +88,7 @@ Only user and assistant messages are persisted, capped at the most recent messag
 
 ## Built-in tools
 
-Woopcode currently ships with 13 tools.
+Woopcode ships with a fixed set of tools, grouped by what they touch.
 
 | Area        | Tools                                      | Purpose                                                                                               |
 | ----------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |

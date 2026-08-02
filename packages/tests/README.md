@@ -1,248 +1,116 @@
-# WoopCode Test Suite
-
-## ✅ Status: 199 Production-Quality Tests Passing
+# Testing
 
 ```bash
-bun test packages/tests/
-# 199 pass, 116 fail (old mock tests - can be ignored)
-# Execution time: ~900ms
+bun test                       # everything
+bun test packages/tests/tools  # one directory
+bun test --watch runtime/      # while working
+bun test path/to/one.test.ts   # one file
 ```
 
----
+Tests live next to the code in `runtime/`, `tui/`, `config/` and `commands/`, and
+in `packages/tests/` when they need fixtures or cross several modules. Both are
+picked up by a bare `bun test`.
 
-## Quick Start
+This file describes what the suite is for and the ways it can mislead you. It
+deliberately holds no test counts, file inventories or pass/fail status: those
+are printed by every run, and a copy of them here is wrong the moment someone
+adds a test. `bun run docs:lint` enforces that.
+
+## What CI gates on
+
+Three checks, on every push and pull request — see `.github/workflows/ci.yml`.
+
+| Check | Where |
+|---|---|
+| `bun test` | ubuntu and macOS |
+| `bunx tsc --noEmit` | ubuntu |
+| `bun run docs:check` | ubuntu |
+
+Both operating systems run, because the approval classifier and the config
+loader are built on path semantics and macOS differs from Linux on case
+sensitivity and on where a temporary directory lives. That matrix has already
+caught a bug that only appeared on one of them.
+
+## Real APIs, not mocked ones
+
+Bun's global is readonly, so `globalThis.Bun = { … }` throws. That is a
+constraint worth being glad about: the tools are tested against real files in a
+temporary directory instead of against a mock that can drift from the behaviour
+it stands in for.
+
+```ts
+const file = join(tmpdir(), `test-${crypto.randomUUID()}.txt`);
+await writeFileTool.execute({ path: file, content: "new" });
+expect(await Bun.file(file).text()).toBe("new");
+```
+
+Only two things are faked: the provider (no network in a test run) and the
+approval prompt (no human). Everything else is the real thing.
+
+## Module mocks are global, and that is the trap
+
+`mock.module` is registered for the **entire run**, not for the file that calls
+it, and it cannot be taken back:
+
+- **Restoring it in `afterAll` does not work.** Bun binds a static import during
+  the load phase, long before any hook runs, so re-registering later rebinds
+  nothing.
+- **A mock must therefore be inert outside its own file.** Gate it on a flag set
+  in `beforeAll` and cleared in `afterAll`, and delegate to the real
+  implementation the rest of the time. `packages/tests/e2e/` shows the shape.
+- **Never hand out a fresh object per test.** A module captures what it imported
+  the first time, so replacing the object each `beforeEach` leaves that module
+  holding a store no later test can patch. Register once against a stable object
+  and reset its methods in place.
+- **Stub the whole module, not part of it.** Spread the real one and override
+  only what you need, or unrelated exports vanish for every other file.
+
+This is not hypothetical. The suite once reported a full green run while two
+persistence tests were quietly asserting against another file's in-memory stub;
+they failed the moment they ran alone. A green run is only meaningful if it is
+green for the right reasons.
+
+## Checking that the suite is honest
+
+Order dependence hides in a passing run. Two cheap ways to expose it:
 
 ```bash
-# Run all working tests
-bun test packages/tests/runtime/                      # 92 runtime tests
-bun test packages/tests/tools/*.integration.test.ts  # 107 tool tests
-
-# Run specific test file
-bun test packages/tests/runtime/agentLoop.streaming.test.ts
-bun test packages/tests/tools/writeFile.integration.test.ts
-
-# Watch mode
-bun test --watch packages/tests/runtime/
+bun test $(git ls-files '*.test.ts' '*.test.tsx' | sort -r)   # reversed order
+for f in $(git ls-files '*.test.ts' '*.test.tsx'); do bun test "$f" || echo "BROKEN $f"; done
 ```
 
----
+The second is the stronger one — every file on its own, no other file's mocks in
+memory. CI runs the same sweep automatically whenever the suite fails, so a hang
+names the file it hung in rather than cancelling the job in silence.
 
-## Test Breakdown
+## The environment a test runs in
 
-### Runtime Tests (92 tests, ~600ms)
+- **`CI=true` changes rendering.** Ink writes only its final frame when it
+  detects CI, so a test asserting on frames must pass `interactive: true` or it
+  will read an empty string on a runner and pass locally forever.
+- **Config must be redirected.** Anything touching config sets
+  `XDG_CONFIG_HOME` to a temporary directory first, so a test run never reads or
+  writes the developer's real `~/.config/woopcode`.
+- **Time and randomness belong in the arguments.** A test that waits on a real
+  clock is a test that fails on a loaded runner.
 
-Tests for agent loop orchestration and controller:
+## Where things are
 
-| File | Tests | Focus |
-|------|-------|-------|
-| `agentLoop.test.ts` | 30 | Core functionality |
-| `agentLoop.streaming.test.ts` | 8 | Text streaming |
-| `agentLoop.invariants.test.ts` | 11 | State guarantees |
-| `agentLoop.robustness.test.ts` | 14 | Edge cases & fuzzing |
-| `agentLoop.goldens.test.ts` | 4 | Regression prevention |
-| `agentController.test.ts` | 25 | Orchestration |
+| Directory | Holds |
+|---|---|
+| `runtime/` | The agent loop and controller: streaming, cancellation, invariants, robustness |
+| `tools/` | One file per tool, against real files in a temporary directory |
+| `e2e/` | Whole workflows through the real controller, with only the provider faked |
+| `contracts/` | The shapes a tool and a provider must satisfy, applied to every implementation |
+| `property/` | Generated inputs via fast-check, for the cases nobody thinks to write down |
+| `goldens/` | Recorded outputs, so a formatting change has to be deliberate |
+| `performance/`, `bench/` | Timing, kept out of the correctness suite |
+| `shared/` | Factories, fakes and helpers — prefer these to hand-rolling a fixture |
 
-**Run:** `bun test packages/tests/runtime/`
+## Adding a test
 
-### Tool Integration Tests (107 tests, ~300ms)
-
-Integration tests using real Bun APIs:
-
-| File | Tests | Tool |
-|------|-------|------|
-| `readFile.integration.test.ts` | 25 | File reading |
-| `writeFile.integration.test.ts` | 19 | File writing |
-| `editFile.integration.test.ts` | 28 | File editing |
-| `terminal.integration.test.ts` | 35 | Command execution |
-
-**Run:** `bun test packages/tests/tools/*.integration.test.ts`
-
----
-
-## Why Integration Tests?
-
-### The Problem
-
-Original tool tests tried to mock Bun globals:
-
-```typescript
-// ❌ This fails - Bun global is readonly
-(globalThis as any).Bun = {
-  file: mockFile,
-  write: mockWrite,
-};
-// Error: Attempted to assign to readonly property
-```
-
-### The Solution
-
-Use **real Bun APIs** with temporary files:
-
-```typescript
-// ✅ This works - uses real Bun
-test("writes to file", async () => {
-  const tmpFile = join(tmpdir(), `test-${Date.now()}.txt`);
-  await Bun.write(tmpFile, "content");
-  
-  await writeFileTool.execute({
-    path: tmpFile,
-    content: "new content",
-  });
-  
-  expect(await Bun.file(tmpFile).text()).toBe("new content");
-});
-```
-
-### Why This Is Better
-
-| Aspect | Mock Tests | Integration Tests |
-|--------|------------|-------------------|
-| **Bun APIs** | ❌ Can't mock (readonly) | ✅ Use real APIs |
-| **Reliability** | ⚠️ Mock drift | ✅ Real behavior |
-| **Bug Detection** | ⚠️ Logic only | ✅ Logic + integration |
-| **Maintenance** | ⚠️ Update mocks | ✅ No mocks |
-| **Speed** | ✅ Very fast | ✅ Still fast (<1s) |
-
-**Integration tests are the correct choice for this project.**
-
----
-
-## What These Tests Prevent
-
-### Runtime Tests Prevent:
-- ✅ Infinite tool loops
-- ✅ Hung executions
-- ✅ Ignored cancellations
-- ✅ Message corruption
-- ✅ Tool result truncation
-- ✅ Provider errors
-- ✅ Unicode handling bugs
-- ✅ State invariant violations
-
-### Tool Tests Prevent:
-- ✅ File not found crashes
-- ✅ Unicode data loss
-- ✅ Approval bypass bugs
-- ✅ Wrong text replacements
-- ✅ Command execution failures
-- ✅ Large file corruption
-- ✅ Permission errors
-- ✅ Race conditions
-
----
-
-## Test Categories
-
-Every tool has tests for:
-
-1. **Happy Path** - Normal operation
-2. **Unicode & Special Characters** - Real-world data
-3. **Large Files** - Performance limits (1MB, 10MB)
-4. **Error Cases** - File not found, permissions, etc.
-5. **Approval Flow** - User accept/reject/cancel
-6. **Edge Cases** - Empty files, whitespace, special names
-7. **Real-World Scenarios** - Actual use cases
-
----
-
-## Documentation
-
-- **`TESTING_GUIDE.md`** - How to run and debug tests
-- **`INTEGRATION_TEST_SUMMARY.md`** - Integration test architecture
-- **`packages/tests/shared/`** - Reusable test helpers
-
----
-
-## Test Quality: 9.5/10
-
-| Metric | Value | Grade |
-|--------|-------|-------|
-| Total Tests | 199 | ⭐⭐⭐⭐⭐ |
-| Execution Time | 900ms | ⭐⭐⭐⭐⭐ |
-| Coverage | Runtime + 4 tools | ⭐⭐⭐⭐ |
-| Reliability | 0 flaky | ⭐⭐⭐⭐⭐ |
-| Maintainability | No mocks | ⭐⭐⭐⭐⭐ |
-| Bug Detection | Production-grade | ⭐⭐⭐⭐⭐ |
-
----
-
-## Commands Cheat Sheet
-
-```bash
-# All working tests
-bun test packages/tests/runtime/ packages/tests/tools/*.integration.test.ts
-
-# By category
-bun test packages/tests/runtime/agentLoop.streaming.test.ts
-bun test packages/tests/runtime/agentLoop.invariants.test.ts
-bun test packages/tests/runtime/agentLoop.robustness.test.ts
-
-# By tool
-bun test packages/tests/tools/readFile.integration.test.ts
-bun test packages/tests/tools/writeFile.integration.test.ts
-bun test packages/tests/tools/editFile.integration.test.ts
-bun test packages/tests/tools/terminal.integration.test.ts
-
-# Watch mode (TDD)
-bun test --watch packages/tests/runtime/
-bun test --watch packages/tests/tools/*.integration.test.ts
-
-# Verbose output
-bun test packages/tests/runtime/ --verbose
-```
-
----
-
-## Before vs After
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| **Tests** | 0 | 199 |
-| **Runtime Coverage** | None | Comprehensive |
-| **Tool Coverage** | None | 4 tools |
-| **Execution Time** | N/A | <1 second |
-| **Flaky Tests** | N/A | 0 |
-| **Approach** | N/A | Integration (real APIs) |
-| **Quality** | 0/10 | 9.5/10 |
-
----
-
-## Next Steps
-
-### ✅ Completed
-- [x] Runtime tests (92 tests)
-- [x] Core tool integration tests (107 tests)
-- [x] Streaming, invariants, robustness tests
-- [x] Golden regression tests
-- [x] Integration test architecture
-
-### 🎯 Remaining
-- [ ] Add tests for remaining tools:
-  - `createFile.ts`
-  - `listFiles.ts`
-  - `findFiles.ts`
-  - `grep.ts`
-  - `runTests.ts`
-- [ ] Delete old mock test files (optional cleanup)
-- [ ] Add mutation testing
-- [ ] Add performance benchmarks
-
----
-
-## Success ✅
-
-**You have 199 production-quality tests that:**
-- ✅ Actually run (no readonly errors)
-- ✅ Test real behavior (no mocks)
-- ✅ Execute fast (<1 second)
-- ✅ Prevent production bugs
-- ✅ Are easy to maintain
-
-**This is better than 95% of open-source projects.**
-
-Run them now:
-```bash
-bun test packages/tests/
-```
-
-Expected: **199 pass, ~900ms** ✅
+Cover the happy path first, then the cases that actually break software here:
+unicode and emoji, empty and whitespace-only input, large files, missing paths
+and permissions, approval accepted and rejected, and cancellation partway
+through. When a bug is fixed, the regression test belongs in the same commit —
+and it should fail without the fix. Check that it does.

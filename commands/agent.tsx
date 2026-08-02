@@ -102,6 +102,17 @@ async function runHeadless(
       // Efficiency notices are the only statuses worth surfacing headlessly.
       if (status.startsWith("⚠️")) process.stderr.write(`${status}\n`);
     },
+    onUsage(iteration) {
+      log.write({
+        type: "iteration",
+        ts: now(),
+        n: iteration.iteration,
+        usage: iteration.usage,
+        segments: iteration.segments,
+        toolCalls: iteration.toolCalls,
+        durationMs: iteration.durationMs,
+      });
+    },
     onToolStart(tool) {
       log.write({
         type: "tool_call",

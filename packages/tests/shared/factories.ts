@@ -1,4 +1,9 @@
-import type { Message, StreamEvent, ToolCall } from "../../../config/types";
+import type {
+  Message,
+  StreamEvent,
+  TokenUsage,
+  ToolCall,
+} from "../../../config/types";
 
 /**
  * Factory for creating test messages
@@ -58,8 +63,9 @@ export const createToolCallEvent = (
   thoughtSignature,
 });
 
-export const createDoneEvent = (): StreamEvent => ({
+export const createDoneEvent = (usage?: TokenUsage): StreamEvent => ({
   type: "done",
+  usage,
 });
 
 /**

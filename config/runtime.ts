@@ -1,11 +1,55 @@
 import { getTool } from "../tools";
 import { recentMessages } from "./config";
+import { SYSTEM_PROMPT } from "./systemPrompt";
 import type {
   AgentCallbacks,
   Message,
+  PromptSegments,
   ProviderClient,
   StreamEvent,
+  TokenUsage,
 } from "./types";
+
+/**
+ * Measures the pieces of the prompt about to be sent.
+ *
+ * Deliberately measures the messages that are actually sent — the result of
+ * `recentMessages`, not the full transcript — so the numbers describe the
+ * request rather than what the session happens to be holding in memory.
+ */
+export function measureSegments(
+  messages: Message[],
+  repoContext: string,
+): PromptSegments {
+  let conversation = 0;
+  let toolResults = 0;
+
+  for (const message of messages) {
+    switch (message.role) {
+      case "user":
+      case "assistant":
+        conversation += message.content.length;
+        break;
+
+      case "assistant_tool_call":
+        // The arguments are what is serialised into the request, so they are
+        // what counts here; the tool's name is negligible beside them.
+        toolResults += JSON.stringify(message.arguments).length;
+        break;
+
+      case "tool":
+        toolResults += message.content.length;
+        break;
+    }
+  }
+
+  return {
+    systemPrompt: SYSTEM_PROMPT.length,
+    repoContext: repoContext.length,
+    conversation,
+    toolResults,
+  };
+}
 
 /** Loop budget when nothing overrides it — tuned for interactive use. */
 const DEFAULT_MAX_ITERATIONS = 20;
@@ -91,8 +135,15 @@ export async function agentLoop(
       let assistantText = "";
       const toolCalls: Extract<StreamEvent, { type: "tool_call" }>[] = [];
 
+      // Measured from the same array that is sent, so the segment sizes and
+      // the provider's token count describe one and the same request.
+      const sentMessages = recentMessages(messages, MAX_TURNS);
+      const segments = measureSegments(sentMessages, repoContext);
+      const iterationStartedAt = Date.now();
+      let usage: TokenUsage | undefined;
+
       for await (const event of client.stream(
-        recentMessages(messages, MAX_TURNS),
+        sentMessages,
         repoContext,
         signal,
         useTools,
@@ -108,6 +159,7 @@ export async function agentLoop(
             break;
 
           case "done":
+            usage = event.usage;
             break;
         }
       }
@@ -116,6 +168,17 @@ export async function agentLoop(
         callbacks.onCancel?.();
         return "";
       }
+
+      // After the cancellation check: a turn the user interrupted did not
+      // complete an iteration, and reporting one would put a half-measured
+      // request into the log.
+      callbacks.onUsage?.({
+        iteration: iterations,
+        usage,
+        segments,
+        toolCalls: toolCalls.length,
+        durationMs: Date.now() - iterationStartedAt,
+      });
 
       if (toolCalls.length === 0) {
         messages.push({

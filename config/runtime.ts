@@ -1,5 +1,5 @@
 import { getTool } from "../tools";
-import { toolEffect } from "../runtime/toolEffects";
+import { classifyCommand, commandOf, toolEffect } from "../runtime/toolEffects";
 import { isRetryableError } from "../runtime/retry";
 import { recentMessages } from "./config";
 import { SYSTEM_PROMPT } from "./systemPrompt";
@@ -454,9 +454,23 @@ export async function agentLoop(
           case "write":
             lastWriteStep = toolStep;
             break;
-          case "shell":
-            lastShellStep = toolStep;
+
+          case "shell": {
+            // Judged from the command, not the tool name. A benchmark run
+            // showed the agent doing its real editing through run_terminal —
+            // `sed -i`, `cat >> file` — which name-only classification recorded
+            // as verification, the opposite of what it is.
+            const { writes, verifies } = classifyCommand(
+              commandOf(toolCall.arguments),
+            );
+
+            // Order matters when a command does both: `sed -i f.c && make`
+            // edited and then checked, and the check has to land afterwards for
+            // the edit to count as verified.
+            if (writes) lastWriteStep = toolStep;
+            if (verifies) lastShellStep = writes ? ++toolStep : toolStep;
             break;
+          }
         }
 
         callbacks.onToolFinish?.({

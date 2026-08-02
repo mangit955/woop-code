@@ -181,3 +181,90 @@ describe("agentLoop - turn summary", () => {
     expect(summaryOf(callbacks).unverifiedEdits).toBe(false);
   });
 });
+
+describe("agentLoop - edits made through the shell", () => {
+  test("a sed -i counts as a workspace change, not as verification", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "");
+
+    const provider = createStreamingProvider([
+      [
+        createToolCallEvent(
+          "run_terminal",
+          { command: "sed -i 's/CC =.*/CC = gcc/' unix.mak" },
+          "c1",
+        ),
+        createDoneEvent(),
+      ],
+      [createTextEvent("Patched the makefile."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    // Before commands were classified by content, this recorded a shell step
+    // and reported the turn as verified — the exact opposite of the truth.
+    const summary = summaryOf(callbacks);
+    expect(summary.lastWriteStep).toBeDefined();
+    expect(summary.unverifiedEdits).toBe(true);
+  });
+
+  test("a build after a shell edit clears the flag", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "ok");
+
+    const provider = createStreamingProvider([
+      [
+        createToolCallEvent("run_terminal", { command: "sed -i 's/a/b/' f.c" }, "c1"),
+        createDoneEvent(),
+      ],
+      [createToolCallEvent("run_terminal", { command: "make -j4" }, "c2"), createDoneEvent()],
+      [createTextEvent("Built."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    expect(summaryOf(callbacks).unverifiedEdits).toBe(false);
+  });
+
+  test("one command that edits then builds is verified", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "ok");
+
+    const provider = createStreamingProvider([
+      [
+        createToolCallEvent(
+          "run_terminal",
+          { command: "sed -i 's/-O/-O2/' unix.mak && make" },
+          "c1",
+        ),
+        createDoneEvent(),
+      ],
+      [createTextEvent("Done."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    // The build ran after the edit within the same command, so the ordering
+    // has to place the check second.
+    const summary = summaryOf(callbacks);
+    expect(summary.lastShellStep!).toBeGreaterThan(summary.lastWriteStep!);
+    expect(summary.unverifiedEdits).toBe(false);
+  });
+
+  test("a read-only command is neither an edit nor a verification", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "a.ts\nb.ts");
+
+    const provider = createStreamingProvider([
+      [createToolCallEvent("run_terminal", { command: "ls -la src" }, "c1"), createDoneEvent()],
+      [createTextEvent("Listed."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    const summary = summaryOf(callbacks);
+    expect(summary.lastWriteStep).toBeUndefined();
+    expect(summary.lastShellStep).toBeUndefined();
+    expect(summary.unverifiedEdits).toBe(false);
+  });
+});

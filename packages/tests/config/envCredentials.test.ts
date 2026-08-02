@@ -47,17 +47,52 @@ describe("environment credentials", () => {
     expect(resolveEnvCredentials({ GEMINI_API_KEY: " k4\n" })?.apiKey).toBe("k4");
   });
 
-  // A key for a provider with no runtime client must be refused up front
-  // rather than stored and failed on the first turn.
-  test("a provider with no runtime client is rejected", () => {
-    expect(() => resolveEnvCredentials({ OPENAI_API_KEY: "k5" })).toThrow(
-      /no runtime client/,
-    );
+  // WOOPCODE_PROVIDER is an instruction to this program, so naming a provider
+  // it cannot run is a mistake worth reporting at startup rather than failing
+  // on the first turn.
+  test("WOOPCODE_PROVIDER naming an unrunnable provider is rejected", () => {
+    expect(() =>
+      resolveEnvCredentials({
+        WOOPCODE_API_KEY: "k5",
+        WOOPCODE_PROVIDER: "anthropic",
+      }),
+    ).toThrow(/no runtime client/);
   });
 
   test("the rejection names the variable and the fix", () => {
-    expect(() => resolveEnvCredentials({ ANTHROPIC_API_KEY: "k6" })).toThrow(
-      /ANTHROPIC_API_KEY.*WOOPCODE_PROVIDER/s,
-    );
+    expect(() =>
+      resolveEnvCredentials({
+        WOOPCODE_API_KEY: "k6",
+        WOOPCODE_PROVIDER: "openai",
+      }),
+    ).toThrow(/WOOPCODE_API_KEY.*WOOPCODE_PROVIDER/s);
+  });
+
+  // A vendor variable is not an instruction to Woopcode. It is almost always
+  // exported for another tool that shares the shell, and refusing to start
+  // over it stranded users whose own key was already in providers.json.
+  test("a vendor key for an unrunnable provider does not stop startup", () => {
+    expect(resolveEnvCredentials({ ANTHROPIC_API_KEY: "k7" })).toBeNull();
+    expect(resolveEnvCredentials({ OPENAI_API_KEY: "k8" })).toBeNull();
+  });
+
+  test("an unrunnable vendor key does not shadow a usable one", () => {
+    expect(
+      resolveEnvCredentials({
+        ANTHROPIC_API_KEY: "other-tool",
+        GEMINI_API_KEY: "mine",
+      }),
+    ).toEqual({ provider: "google", apiKey: "mine", source: "GEMINI_API_KEY" });
+  });
+
+  test("WOOPCODE_PROVIDER does not redirect a vendor key to another provider", () => {
+    // The variable names its own provider; WOOPCODE_PROVIDER applies only to
+    // WOOPCODE_API_KEY, so a Gemini key is never sent to Anthropic.
+    expect(
+      resolveEnvCredentials({
+        GEMINI_API_KEY: "mine",
+        WOOPCODE_PROVIDER: "anthropic",
+      }),
+    ).toEqual({ provider: "google", apiKey: "mine", source: "GEMINI_API_KEY" });
   });
 });

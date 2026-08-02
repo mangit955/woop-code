@@ -165,6 +165,7 @@ describe("event log", () => {
       ok: true,
       summary: {
         iterations: 2,
+        retries: 0,
         toolCalls: 1,
         lastWriteStep: 1,
         lastShellStep: undefined,
@@ -179,9 +180,34 @@ describe("event log", () => {
     expect(Object.keys(summary).sort()).toEqual([
       "iterations",
       "lastWriteStep",
+      "retries",
       "toolCalls",
       "toolCounts",
       "unverifiedEdits",
+    ]);
+  });
+
+  test("a retry record keeps the field names Harbor reads", () => {
+    const path = join(dir, "events.jsonl");
+    const log = createEventLog(path);
+
+    log.write({
+      type: "retry",
+      ts: now(),
+      attempt: 1,
+      delayMs: 750,
+      reason: "transient failure",
+      error: "The socket connection was closed unexpectedly",
+    });
+
+    const [record] = readEvents(path);
+    expect(Object.keys(record!).sort()).toEqual([
+      "attempt",
+      "delayMs",
+      "error",
+      "reason",
+      "ts",
+      "type",
     ]);
   });
 });

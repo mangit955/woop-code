@@ -23,6 +23,15 @@ export type RunEvent =
   | { type: "tool_error"; ts: string; id: string; name: string; error: string }
   | { type: "status"; ts: string; text: string }
   | {
+      type: "retry";
+      ts: string;
+      /** 1-based count of attempts already made when this one failed. */
+      attempt: number;
+      delayMs: number;
+      reason: string;
+      error: string;
+    }
+  | {
       type: "iteration";
       ts: string;
       /** 1-based index of the completed loop iteration. */

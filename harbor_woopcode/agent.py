@@ -823,6 +823,10 @@ class WoopCode(BaseInstalledAgent):
                 1 for e in events if e.get("type") == "tool_call"
             ),
             "woopcode_iterations": usage["iterations"],
+            # Separates a slow run from a flaky one. A trial that retried its
+            # way to an answer scored the same as one that never stumbled, and
+            # the difference only shows up here.
+            "woopcode_retries": sum(1 for e in events if e.get("type") == "retry"),
             "woopcode_mean_segment_chars": usage["mean_segment_chars"],
             # Whether the run finished having changed files without running
             # anything afterwards. Absent on a run from a CLI that predates the

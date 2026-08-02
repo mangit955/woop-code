@@ -110,6 +110,7 @@ RUN_WITH_USAGE = [
         "ok": True,
         "summary": {
             "iterations": 2,
+            "retries": 1,
             "toolCalls": 1,
             "lastWriteStep": 1,
             "toolCounts": {"create_file": 1},
@@ -117,6 +118,18 @@ RUN_WITH_USAGE = [
         },
     },
 ]
+
+RUN_WITH_USAGE.insert(
+    2,
+    {
+        "type": "retry",
+        "ts": TS,
+        "attempt": 1,
+        "delayMs": 750,
+        "reason": "transient failure",
+        "error": "The socket connection was closed unexpectedly",
+    },
+)
 
 
 # --------------------------------------------------------------------------
@@ -444,6 +457,17 @@ def test_mean_segment_chars_are_averaged_over_iterations(tmp_path: Path) -> None
     assert context.metadata["woopcode_iterations"] == 2
     # (0 + 900) / 2 -- the segment that grew between the two iterations.
     assert context.metadata["woopcode_mean_segment_chars"]["toolResults"] == 450
+
+
+def test_retries_are_counted_for_the_trial(tmp_path: Path) -> None:
+    """A trial that retried its way to an answer scores the same as one that
+    never stumbled; the difference only shows up here."""
+    write_events(tmp_path, RUN_WITH_USAGE)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_retries"] == 1
 
 
 def test_unverified_edits_is_read_from_the_run_summary(tmp_path: Path) -> None:

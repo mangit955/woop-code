@@ -52,51 +52,7 @@ export function geminiClient(
       signal?: AbortSignal,
       useTools = true,
     ): AsyncGenerator<StreamEvent> {
-      const contents = messages.map((message) => {
-        switch (message.role) {
-          case "user":
-            return {
-              role: "user",
-              parts: [{ text: message.content }],
-            };
-
-          case "assistant":
-            return {
-              role: "model",
-              parts: [{ text: message.content }],
-            };
-
-          case "assistant_tool_call":
-            return {
-              role: "model",
-              parts: [
-                {
-                  functionCall: {
-                    id: message.toolCallId,
-                    name: message.toolName,
-                    args: message.arguments,
-                  },
-                  thoughtSignature: message.thoughtSignature,
-                },
-              ],
-            };
-
-          case "tool":
-            return {
-              role: "user",
-              parts: [
-                {
-                  functionResponse: {
-                    name: message.toolName,
-                    response: {
-                      result: message.content,
-                    },
-                  },
-                },
-              ],
-            };
-        }
-      });
+      const contents = buildContents(messages);
       const tools = [
         {
           functionDeclarations: toolRegistery.map((tool) => ({
@@ -266,6 +222,115 @@ export function geminiClient(
       }
     },
   };
+}
+
+type ToolCallMessage = Extract<Message, { role: "assistant_tool_call" }>;
+
+function functionCallPart(message: ToolCallMessage) {
+  return {
+    functionCall: {
+      id: message.toolCallId,
+      name: message.toolName,
+      args: message.arguments,
+    },
+    thoughtSignature: message.thoughtSignature,
+  };
+}
+
+function functionResponseContent(message: Extract<Message, { role: "tool" }>) {
+  return {
+    role: "user",
+    parts: [
+      {
+        functionResponse: {
+          name: message.toolName,
+          response: { result: message.content },
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Renders the conversation into Gemini's `contents`, restoring batched calls.
+ *
+ * A model that requests several tools at once returns them as parts of a single
+ * turn, and signs only the first part. The loop stores each call as its own
+ * message and interleaves the results, so replaying that list directly sends
+ * one turn per call — and every part after the first then has no signature.
+ * Gemini rejects exactly that:
+ *
+ *   Function call is missing a thought_signature in functionCall parts.
+ *
+ * Probing the API with the three candidate shapes settled it: separate turns
+ * are refused, while one turn carrying every call of the batch is accepted,
+ * with or without the results merged. So a batch is emitted as it arrived — one
+ * model turn, signature on the part that carries it — followed by its results.
+ *
+ * Calls without a batchId keep the old one-turn-each shape. They come from a
+ * response that requested a single tool, where the question does not arise.
+ */
+export function buildContents(messages: Message[]) {
+  const contents: unknown[] = [];
+  const emitted = new Set<number>();
+
+  for (let i = 0; i < messages.length; i++) {
+    if (emitted.has(i)) continue;
+    const message = messages[i]!;
+
+    switch (message.role) {
+      case "user":
+        contents.push({ role: "user", parts: [{ text: message.content }] });
+        break;
+
+      case "assistant":
+        contents.push({ role: "model", parts: [{ text: message.content }] });
+        break;
+
+      case "tool":
+        // Reached only when a result has no matching call in this window; its
+        // batch would otherwise have emitted it already.
+        contents.push(functionResponseContent(message));
+        break;
+
+      case "assistant_tool_call": {
+        const batch = [i];
+        if (message.batchId) {
+          for (let j = i + 1; j < messages.length; j++) {
+            const other = messages[j]!;
+            if (
+              other.role === "assistant_tool_call" &&
+              other.batchId === message.batchId
+            ) {
+              batch.push(j);
+            }
+          }
+        }
+
+        const calls = batch.map((index) => messages[index] as ToolCallMessage);
+        for (const index of batch) emitted.add(index);
+
+        contents.push({ role: "model", parts: calls.map(functionCallPart) });
+
+        // The batch's results follow it, in the order the calls were made.
+        const ids = new Set(calls.map((call) => call.toolCallId));
+        for (let j = i + 1; j < messages.length; j++) {
+          const other = messages[j]!;
+          if (emitted.has(j)) continue;
+          if (other.role !== "tool" || !ids.has(other.toolCallId)) continue;
+          emitted.add(j);
+          contents.push(functionResponseContent(other));
+        }
+        break;
+      }
+    }
+
+    emitted.add(i);
+  }
+
+  return contents as Parameters<
+    GoogleGenAI["models"]["generateContentStream"]
+  >[0]["contents"];
 }
 
 function toolParameterType(type: string | undefined) {

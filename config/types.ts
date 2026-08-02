@@ -110,6 +110,16 @@ export type Message =
       toolCallId: string;
       arguments: Record<string, unknown>;
       thoughtSignature?: string;
+      /**
+       * Identifies the provider response this call arrived in.
+       *
+       * A model may return several calls in one response, and Gemini attaches a
+       * thought signature only to the first of them. Sending them back as
+       * separate model turns is rejected — the signature has to sit on the
+       * first part of the turn that produced them — so the response they shared
+       * has to survive being flattened into a message list.
+       */
+      batchId?: string;
     }
   | {
       role: "tool";

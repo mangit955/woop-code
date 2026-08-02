@@ -383,6 +383,12 @@ export async function agentLoop(
 
       // A provider can request several independent tools in one response. Run
       // every requested call before asking the model for its next turn.
+      //
+      // They are tagged with the response they arrived in: a model that batches
+      // calls signs only the first of them, and the provider rejects history
+      // that splits such a batch across separate turns.
+      const batchId = crypto.randomUUID();
+
       for (const toolCall of toolCalls) {
         const tool = getTool(toolCall.name);
 
@@ -421,6 +427,7 @@ export async function agentLoop(
             toolCallId: toolCall.id,
             arguments: toolCall.arguments,
             thoughtSignature: toolCall.thoughtSignature,
+            batchId,
           });
           callbacks.onToolFinish?.({
             id: toolCall.id,
@@ -451,6 +458,7 @@ export async function agentLoop(
           toolCallId: toolCall.id,
           arguments: toolCall.arguments,
           thoughtSignature: toolCall.thoughtSignature,
+          batchId,
         });
 
         let result: string;

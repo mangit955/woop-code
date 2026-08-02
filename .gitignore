@@ -17,3 +17,13 @@ node_modules
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Harbor benchmark output. `harbor run` writes a directory per job here holding
+# trial logs, trajectories and rewards — regenerable artifacts of a specific
+# run, not source. They also carry the full task instructions and agent
+# transcripts, which do not belong in version control.
+jobs/
+
+# Python caches from the Harbor agent's test suite.
+__pycache__/
+.pytest_cache/

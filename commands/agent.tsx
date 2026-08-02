@@ -10,6 +10,9 @@ import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
 import { isCommandTool, summarizeToolOutput } from "../tui/src/tool-display";
 import { parseApprovalMode } from "../runtime/approval";
+import { createEventLog, now } from "../runtime/eventLog";
+import { IterationBudgetExhaustedError } from "../config/runtime";
+import { VERSION } from "../config/version";
 import { PassThrough } from "stream";
 
 /** How long a terminal notice stays on the status bar before reverting to Ready. */
@@ -21,12 +24,18 @@ export interface RunAgentOptions {
   prompt?: string;
   /** Headless only: approve tool edits/commands automatically (default true). */
   autoApprove?: boolean;
+  /** Overrides the stored model for this run only. */
+  model?: string;
+  /** Headless only: path to write a JSONL record of the run to. */
+  events?: string;
 }
 
 export const agentCommand = new Command("agent")
   .description("Runs the agent")
   .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
   .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
+  .option("-m, --model <model>", "model id to use for this run")
+  .option("--events <path>", "with --prompt, write a JSONL record of the run to this path")
   .action(runAgent);
 
 /**
@@ -40,42 +49,96 @@ export async function runAgent(options: RunAgentOptions = {}, command?: Command)
   const prompt = (options.prompt || globals?.prompt || "").trim();
   const autoApprove =
     options.autoApprove !== false && globals?.autoApprove !== false;
+  const model = options.model || globals?.model;
+  const events = options.events || globals?.events;
 
   if (prompt) {
-    return runHeadless(prompt, autoApprove);
+    return runHeadless(prompt, autoApprove, { model, events });
   }
 
-  return runInteractive();
+  return runInteractive(model);
+}
+
+/**
+ * Resolves the model for a run: an explicit flag wins, then the stored
+ * selection, then the built-in default. The flag is deliberately not written
+ * back to the config — a one-off override, including one from a benchmark
+ * harness, must not mutate the user's saved preference.
+ */
+async function resolveModel(override: string | undefined): Promise<string> {
+  if (override?.trim()) return override.trim();
+  const config = await getConfig();
+  return config.selectedModel ?? DEFAULT_MODEL_ID;
 }
 
 /** Runs a single turn without the TUI, streaming the answer to stdout. */
-async function runHeadless(prompt: string, autoApprove: boolean) {
+async function runHeadless(
+  prompt: string,
+  autoApprove: boolean,
+  options: { model?: string; events?: string } = {},
+) {
   registerCommands();
   const { provider, apiKey } = await ensureProviderConfigured();
 
-  const config = await getConfig();
-  const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
+  const selectedModel = await resolveModel(options.model);
   store.setSelectedModel(selectedModel);
   store.setNonInteractive({ autoApprove });
 
+  const log = createEventLog(options.events);
+  log.write({
+    type: "run_start",
+    ts: now(),
+    model: selectedModel,
+    version: VERSION,
+    prompt,
+  });
+
   let failed = false;
+  let budgetExhausted = false;
 
   const callbacks: AgentCallbacks = {
     onStatus(status) {
+      log.write({ type: "status", ts: now(), text: status });
       // Efficiency notices are the only statuses worth surfacing headlessly.
       if (status.startsWith("⚠️")) process.stderr.write(`${status}\n`);
     },
     onToolStart(tool) {
+      log.write({
+        type: "tool_call",
+        ts: now(),
+        id: tool.id,
+        name: tool.name,
+        arguments: tool.arguments,
+      });
       process.stderr.write(`• ${tool.name}\n`);
     },
+    onToolFinish(tool) {
+      log.write({
+        type: "tool_result",
+        ts: now(),
+        id: tool.id,
+        name: tool.name,
+        output: tool.output,
+      });
+    },
     onToolError(tool) {
+      log.write({
+        type: "tool_error",
+        ts: now(),
+        id: tool.id,
+        name: tool.name,
+        error: tool.error,
+      });
       process.stderr.write(`✖ ${tool.name} failed: ${tool.error}\n`);
     },
     onText(text) {
+      log.write({ type: "text", ts: now(), text });
       process.stdout.write(text);
     },
     onError(error) {
       failed = true;
+      if (error instanceof IterationBudgetExhaustedError) budgetExhausted = true;
+      log.write({ type: "error", ts: now(), message: error.message });
       process.stderr.write(`✖ ${error.message}\n`);
     },
   };
@@ -92,20 +155,30 @@ async function runHeadless(prompt: string, autoApprove: boolean) {
     await controller.run(prompt);
   } catch (error) {
     failed = true;
-    process.stderr.write(
-      `✖ ${error instanceof Error ? error.message : String(error)}\n`
-    );
+    if (error instanceof IterationBudgetExhaustedError) budgetExhausted = true;
+    const message = error instanceof Error ? error.message : String(error);
+    log.write({ type: "error", ts: now(), message });
+    process.stderr.write(`✖ ${message}\n`);
   } finally {
     process.off("SIGINT", onSigint);
     await controller.dispose();
   }
 
+  log.write({ type: "run_end", ts: now(), ok: !failed });
   process.stdout.write("\n");
-  process.exit(failed ? 1 : 0);
+  // Exit codes are a contract with automated callers:
+  //   0 - the turn completed
+  //   2 - the loop ran out of iterations; work may be partially done, and the
+  //       caller should judge the result rather than treat this as a crash
+  //   1 - anything else went wrong
+  process.exit(failed ? (budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0);
 }
 
+/** See the exit-code contract in `runHeadless`. */
+export const EXIT_BUDGET_EXHAUSTED = 2;
+
 /** Runs the interactive TUI agent. */
-async function runInteractive() {
+async function runInteractive(modelOverride?: string) {
   // Register slash commands
   registerCommands();
 
@@ -113,7 +186,7 @@ async function runInteractive() {
   const { provider, apiKey } = await ensureProviderConfigured();
 
   const config = await getConfig();
-  const selectedModel = config.selectedModel ?? DEFAULT_MODEL_ID;
+  const selectedModel = await resolveModel(modelOverride);
   store.setSelectedModel(selectedModel);
   store.setApprovalMode(parseApprovalMode(config.approvalMode));
 

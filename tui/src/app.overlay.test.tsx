@@ -94,6 +94,12 @@ function mount() {
       stdin: stdin as never,
       patchConsole: false,
       exitOnCtrlC: false,
+      // Ink writes only the final frame when it detects CI, which leaves
+      // `frames` empty and every assertion below with nothing to read. These
+      // tests are about what a terminal draws, so they ask for the terminal's
+      // behaviour explicitly rather than depending on where they run — the same
+      // reason chalk's colour level is forced above.
+      interactive: true,
     },
   );
   return { stdout, stdin, unmount: () => instance.unmount() };

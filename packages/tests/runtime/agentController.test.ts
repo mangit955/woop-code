@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test";
 import { AgentController } from "../../../commands/agentController";
 import type { Message } from "../../../config/types";
 import {
@@ -32,12 +32,26 @@ const saveConversation = mock(async (messages: Message[]) => {
 });
 const buildRepositoryContext = mock(async () => mockRepoContext);
 
+// The real module is kept alongside the stub for two reasons: the stub would
+// otherwise drop every other export (MAX_PERSISTED_MESSAGES, getConfig, ...),
+// and the file restores it when it is done. A module mock lasts for the whole
+// run, and this stub persists conversations verbatim — so while it is installed,
+// any later test asserting on real persistence is silently testing this instead.
+const actualConfig = await import("../../../config/config");
+
 mock.module("../../../config/config", () => ({
+  ...actualConfig,
   getConversation,
   saveConversation,
   buildRepositoryContext,
   recentMessages: (messages: Message[], maxTurns: number) => messages,
 }));
+
+afterAll(() => {
+  mock.module("../../../config/config", () => actualConfig);
+  mock.module("../../../config/client", () => actualClient);
+  mock.module("../../../tools", () => actualTools);
+});
 
 // Mock provider client creation
 let globalMockClient: MockProviderClient;
@@ -46,7 +60,10 @@ const createProviderClient = mock((provider: string, apiKey: string, model?: str
   return globalMockClient;
 });
 
+const actualClient = await import("../../../config/client");
+
 mock.module("../../../config/client", () => ({
+  ...actualClient,
   createProviderClient,
 }));
 

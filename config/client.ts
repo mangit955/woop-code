@@ -33,8 +33,16 @@ const GEMINI_REQUEST_TIMEOUT_MS = 60_000;
 export function geminiClient(
   apiKey: string,
   model = DEFAULT_MODEL_ID,
-  ai: Pick<GoogleGenAI, "models"> = new GoogleGenAI({ apiKey }),
+  injected?: Pick<GoogleGenAI, "models">,
 ): ProviderClient {
+  // Built on the first request rather than here. As a default argument this ran
+  // whenever a client was constructed, which made merely naming a provider do
+  // the SDK's setup work — and that is not free: it reads the environment and
+  // can reach for credentials, so a caller that only wanted to know a provider
+  // is available paid for a network client and could block waiting for one.
+  // Constructing a client should cost nothing until it is used.
+  let ai = injected;
+  const sdk = () => (ai ??= new GoogleGenAI({ apiKey }));
 
   return {
     async *stream(
@@ -141,7 +149,7 @@ export function geminiClient(
       }
 
       try {
-        const stream = await ai.models.generateContentStream({
+        const stream = await sdk().models.generateContentStream({
           model,
           contents,
 

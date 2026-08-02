@@ -270,6 +270,21 @@ describe("terminal Tool - Integration Tests", () => {
       expect(Date.now() - start).toBeLessThan(1000);
     });
 
+    test("returns promptly even when the command ignores SIGTERM", async () => {
+      // The failure this guards against: a signal that does not stop the command
+      // used to leave the caller waiting for it to finish on its own, so the
+      // timeout was not a timeout. Trapping TERM reproduces that on any platform
+      // — SIGKILL and the bounded wait are what have to save it.
+      const start = Date.now();
+      const result = await terminalTool.execute({
+        command: "trap '' TERM; sleep 5",
+        timeout: 0.05,
+      });
+
+      expect(result).toContain("Command timed out after 0.05 seconds");
+      expect(Date.now() - start).toBeLessThan(2000);
+    });
+
     test("stops a running command when its agent signal is aborted", async () => {
       const controller = new AbortController();
       const start = Date.now();

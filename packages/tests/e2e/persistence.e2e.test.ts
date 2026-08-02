@@ -1,7 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll, mock } from "bun:test";
 import { AgentController } from "../../../commands/agentController";
 import {
   getConversation,
+  MAX_PERSISTED_MESSAGES,
+  prepareConversationForDisk,
   saveConversation,
 } from "../../../config/config";
 import { MockProviderClient, CallbackSpy } from "../shared/mocks";
@@ -31,10 +33,39 @@ import type { Message } from "../../../config/types";
 
 let mockClient: MockProviderClient;
 
+// Captured before the mock is registered, so the stub can keep the module's
+// other exports (DEFAULT_MODEL_ID and friends, which unrelated modules import)
+// and can hand back to the real implementation when this file is not running.
+const actualClient = await import("../../../config/client");
+// Held as a direct reference rather than read off the namespace at call time,
+// so the delegation below cannot resolve back to the mock and recurse.
+const realCreateProviderClient = actualClient.createProviderClient;
+
+// Only answers while this file's own tests are running. A module mock is
+// registered for the whole run and restoring it afterwards does not work — Bun
+// binds a static import during the load phase, long before any afterAll — so the
+// override delegates to the real implementation the rest of the time. Otherwise
+// a later suite asserting that createProviderClient refuses an unsupported
+// provider gets this stub and sees no error at all.
+let usingMockClient = false;
+
+beforeAll(() => {
+  usingMockClient = true;
+});
+
+afterAll(() => {
+  usingMockClient = false;
+});
+
 mock.module("../../../config/client", () => ({
-  createProviderClient: () => mockClient,
-  ACTIVE_PROVIDER_MODELS: { test: "Test Model" },
+  ...actualClient,
+  createProviderClient: (provider: string, apiKey: string, model?: string) =>
+    usingMockClient ? mockClient : realCreateProviderClient(provider, apiKey, model),
+  get ACTIVE_PROVIDER_MODELS() {
+    return usingMockClient ? { test: "Test Model" } : actualClient.ACTIVE_PROVIDER_MODELS;
+  },
 }));
+
 
 describe("E2E Persistence - Save and Load", () => {
   let originalConversation: Message[];
@@ -271,19 +302,24 @@ describe("E2E Persistence - Large Conversations", () => {
     await saveConversation(originalConversation);
   });
 
-  test("large conversation history persists correctly", async () => {
+  test("a long conversation is capped at the most recent messages", () => {
     const largeConversation: Message[] = [];
     for (let i = 0; i < 100; i++) {
       largeConversation.push(createUserMessage(`User message ${i}`));
       largeConversation.push({ role: "assistant", content: `Response ${i}` });
     }
-    
-    await saveConversation(largeConversation);
-    const loaded = await getConversation();
-    
-    expect(loaded).toHaveLength(200);
-    expect(loaded[0]?.role).toBe("user");
-    expect(loaded[199]?.role).toBe("assistant");
+
+    // Asserted on the trimming rule itself rather than through save/load: those
+    // two are replaced by an in-memory stub in another suite, and a module mock
+    // lasts for the whole run, so a round-trip here would quietly measure the
+    // stub whenever that suite happens to load first.
+    const persisted = prepareConversationForDisk(largeConversation);
+
+    // History exists to give a new session context, not to archive everything.
+    expect(persisted).toHaveLength(MAX_PERSISTED_MESSAGES);
+    // The tail survives, so the oldest are gone and the newest stay in order.
+    expect(persisted[0]).toMatchObject({ role: "user", content: "User message 50" });
+    expect(persisted.at(-1)).toMatchObject({ role: "assistant", content: "Response 99" });
   });
 
   test("conversation with long messages persists", async () => {
@@ -316,7 +352,7 @@ describe("E2E Persistence - Data Integrity", () => {
     await saveConversation(originalConversation);
   });
 
-  test("all message types persist correctly", async () => {
+  test("only the conversational message types are persisted", () => {
     const allTypes: Message[] = [
       { role: "user", content: "User" },
       { role: "assistant", content: "Assistant" },
@@ -328,15 +364,14 @@ describe("E2E Persistence - Data Integrity", () => {
       },
       { role: "tool", toolName: "test", toolCallId: "123", content: "Result" },
     ];
-    
-    await saveConversation(allTypes);
-    const loaded = await getConversation();
-    
-    expect(loaded).toHaveLength(4);
-    expect(loaded[0]?.role).toBe("user");
-    expect(loaded[1]?.role).toBe("assistant");
-    expect(loaded[2]?.role).toBe("assistant_tool_call");
-    expect(loaded[3]?.role).toBe("tool");
+
+    // A call and its result are only meaningful to the turn that produced them,
+    // and persisting one half of a pair would restore a history the provider
+    // cannot accept. Both halves are dropped on purpose.
+    expect(prepareConversationForDisk(allTypes).map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
   });
 
   test("unicode characters persist correctly", async () => {

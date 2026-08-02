@@ -30,7 +30,7 @@ jobs:
   test:
     name: test
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       # One OS failing should not hide the result on the other.
       fail-fast: false
@@ -41,14 +41,14 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
@@ -58,23 +58,54 @@ jobs:
       # resolving a tree no one has tested.
       - run: bun install --frozen-lockfile
 
-      - run: bun test
+      # Bounded by the step rather than by a `timeout` command: that is GNU
+      # coreutils and the macOS runner does not ship it. A run that stops making
+      # progress should fail in minutes, not be cancelled after ten with no
+      # output at all.
+      - name: Run tests
+        timeout-minutes: 5
+        run: bun test
+
+      # A hung suite names no file: the runner cancels the job and the log ends
+      # mid-run, which cost three rounds of guessing to learn once. Running each
+      # file on its own, with its own bound, turns that into the one line worth
+      # having. Only on failure, so it costs nothing when the suite is healthy.
+      - name: Locate the failing or hanging file
+        if: failure()
+        timeout-minutes: 8
+        run: |
+          # perl's alarm is the portable bound: present on both runners, unlike
+          # `timeout`. It reports a killed command as 142 (SIGALRM).
+          status=0
+          files=$(find . -path ./node_modules -prune -o \
+            \( -name '*.test.ts' -o -name '*.test.tsx' \) -print | sort)
+          for file in $files; do
+            if perl -e 'alarm shift; exec @ARGV' 60 bun test "$file" >/tmp/file.log 2>&1; then
+              echo "ok       $file"
+            else
+              code=$?
+              if [ $code -eq 142 ]; then echo "HUNG     $file"; else echo "FAILED   $file"; fi
+              tail -30 /tmp/file.log
+              status=1
+            fi
+          done
+          exit $status
 
   static:
     name: static
     # Neither check depends on the operating system.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}

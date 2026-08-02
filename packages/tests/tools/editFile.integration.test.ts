@@ -9,25 +9,30 @@ import { mkdirSync, rmSync } from "fs";
  * Uses real Bun APIs with temporary files.
  */
 
+// Registered once, against one object that never changes identity. A module
+// mock is global to the whole run, and a tool captures `store` the first time it
+// is imported — so handing out a fresh object each test leaves that tool holding
+// a store nobody can patch afterwards. Test methods are reset in place instead.
+const mockStore: any = {};
+
+mock.module("../../../tui/src/store/ui-store", () => ({
+  store: mockStore,
+}));
+
 describe("editFile Tool - Integration Tests", () => {
   let testDir: string;
-  let mockStore: any;
 
   beforeEach(() => {
     testDir = join(process.cwd(), `.woop-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
-    mockStore = {
+    Object.assign(mockStore, {
       setPendingEdit: mock(async () => true), // Auto-approve
       setPendingCommand: mock(async () => true),
       setPendingQuestion: mock(async () => []),
       addSystemMessage: mock(() => {}),
       setSelectedModel: mock(() => {}),
-    };
-
-    mock.module("../../../tui/src/store/ui-store", () => ({
-      store: mockStore,
-    }));
+    });
   });
 
   afterEach(() => {

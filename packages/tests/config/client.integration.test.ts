@@ -90,6 +90,163 @@ describe("Gemini provider adapter", () => {
     });
   });
 
+  /**
+   * Tier 1: a request that fails before yielding anything is safe to repeat,
+   * because nothing has been observed. This is the case that lost three
+   * benchmark trials to one four-second network event.
+   */
+  test("a transient failure before any output is retried", async () => {
+    let calls = 0;
+    const ai = {
+      models: {
+        async generateContentStream() {
+          calls++;
+          if (calls < 3) {
+            throw new Error("The socket connection was closed unexpectedly.");
+          }
+          return (async function* () {
+            yield { candidates: [{ content: { parts: [{ text: "recovered" }] } }] };
+          })();
+        },
+      },
+    };
+
+    const events: StreamEvent[] = [];
+    for await (const event of geminiClient("k", "m", ai as any).stream(
+      [{ role: "user", content: "hi" }],
+      "",
+    )) {
+      events.push(event);
+    }
+
+    expect(calls).toBe(3);
+    expect(events.filter((e) => e.type === "retry")).toHaveLength(2);
+    expect(events.filter((e) => e.type === "text")).toEqual([
+      { type: "text", content: "recovered" },
+    ]);
+    expect(events.at(-1)!.type).toBe("done");
+  });
+
+  test("retry events carry what failed and how long the wait is", async () => {
+    const ai = {
+      models: {
+        async generateContentStream() {
+          throw new Error("The socket connection was closed unexpectedly.");
+        },
+      },
+    };
+
+    const events: StreamEvent[] = [];
+    await expect(
+      (async () => {
+        for await (const event of geminiClient("k", "m", ai as any).stream(
+          [{ role: "user", content: "hi" }],
+          "",
+        )) {
+          events.push(event);
+        }
+      })(),
+    ).rejects.toThrow(/socket connection/);
+
+    // Exhausting the attempts still surfaces the failure; it is not swallowed.
+    const retries = events.filter((e) => e.type === "retry");
+    expect(retries.length).toBeGreaterThan(0);
+    expect(retries[0]).toMatchObject({
+      attempt: 1,
+      reason: "transient failure",
+      error: expect.stringContaining("socket connection"),
+    });
+  });
+
+  test("a fatal failure is not retried", async () => {
+    let calls = 0;
+    const ai = {
+      models: {
+        async generateContentStream() {
+          calls++;
+          throw Object.assign(new Error("API key not valid"), { status: 400 });
+        },
+      },
+    };
+
+    await expect(
+      (async () => {
+        for await (const _ of geminiClient("k", "m", ai as any).stream(
+          [{ role: "user", content: "hi" }],
+          "",
+        )) {
+          // drain
+        }
+      })(),
+    ).rejects.toThrow(/API key not valid/);
+
+    expect(calls).toBe(1);
+  });
+
+  /**
+   * Tier 1 stops at the first chunk. After that the caller has already appended
+   * the text and printed it, so repeating the request would duplicate output the
+   * user watched arrive. Salvaging a partial stream is the loop's job.
+   */
+  test("a failure after output has streamed is not retried", async () => {
+    let calls = 0;
+    const ai = {
+      models: {
+        async generateContentStream() {
+          calls++;
+          return (async function* () {
+            yield { candidates: [{ content: { parts: [{ text: "partial" }] } }] };
+            throw new Error("The socket connection was closed unexpectedly.");
+          })();
+        },
+      },
+    };
+
+    const events: StreamEvent[] = [];
+    await expect(
+      (async () => {
+        for await (const event of geminiClient("k", "m", ai as any).stream(
+          [{ role: "user", content: "hi" }],
+          "",
+        )) {
+          events.push(event);
+        }
+      })(),
+    ).rejects.toThrow(/socket connection/);
+
+    expect(calls).toBe(1);
+    expect(events.filter((e) => e.type === "retry")).toHaveLength(0);
+    expect(events.filter((e) => e.type === "text")).toHaveLength(1);
+  });
+
+  test("a cancelled turn is never retried", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const ai = {
+      models: {
+        async generateContentStream() {
+          calls++;
+          controller.abort();
+          throw new Error("The socket connection was closed unexpectedly.");
+        },
+      },
+    };
+
+    await expect(
+      (async () => {
+        for await (const _ of geminiClient("k", "m", ai as any).stream(
+          [{ role: "user", content: "hi" }],
+          "",
+          controller.signal,
+        )) {
+          // drain
+        }
+      })(),
+    ).rejects.toThrow();
+
+    expect(calls).toBe(1);
+  });
+
   test("omits usage entirely when the provider reports none", async () => {
     const ai = {
       models: {

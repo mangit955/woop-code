@@ -114,6 +114,16 @@ async function runHeadless(
         durationMs: iteration.durationMs,
       });
     },
+    onRetry(retry) {
+      log.write({
+        type: "retry",
+        ts: now(),
+        attempt: retry.attempt,
+        delayMs: retry.delayMs,
+        reason: retry.reason,
+        error: retry.error,
+      });
+    },
     onTurnSummary(turn) {
       // Held rather than written here: it belongs on run_end, which is written
       // after the controller has finished and the exit status is known.

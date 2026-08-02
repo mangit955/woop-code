@@ -64,6 +64,8 @@ export interface PromptSegments {
  */
 export interface TurnSummary {
   iterations: number;
+  /** Provider requests retried after a transient failure. */
+  retries: number;
   toolCalls: number;
   /**
    * Index of the last tool execution that changed the workspace, counting from
@@ -139,6 +141,13 @@ export interface AgentCallbacks {
   onUsage?(usage: IterationUsage): void;
   /** Reported exactly once when the turn ends, however it ends. */
   onTurnSummary?(summary: TurnSummary): void;
+  /** A provider request failed transiently and is being tried again. */
+  onRetry?(retry: {
+    attempt: number;
+    delayMs: number;
+    reason: string;
+    error: string;
+  }): void;
   onText?(text: string): void;
   onToolStart?(tool: ToolCall): void;
   onToolFinish?(tool: ToolResult): void;
@@ -169,4 +178,15 @@ export type StreamEvent =
   // Usage rides on the terminal event rather than arriving as a variant of its
   // own: every exhaustive switch over StreamEvent already handles `done`, and a
   // provider that reports nothing simply omits the field.
-  | { type: "done"; usage?: TokenUsage };
+  | { type: "done"; usage?: TokenUsage }
+  // A request failed transiently and is being tried again. Carried on the same
+  // channel as everything else the provider says so the loop can surface it
+  // without the client needing a callback of its own.
+  | {
+      type: "retry";
+      /** 1-based count of attempts already made. */
+      attempt: number;
+      delayMs: number;
+      reason: string;
+      error: string;
+    };

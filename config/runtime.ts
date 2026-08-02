@@ -129,6 +129,9 @@ export async function agentLoop(
   let toolStep = 0;
   let lastWriteStep: number | undefined;
   let lastShellStep: number | undefined;
+  // Counted for the turn, not the iteration: a benchmark reading the summary
+  // needs to tell a slow run from a flaky one.
+  let retries = 0;
 
   try {
     while (iterations < MAX_ITERATIONS) {
@@ -166,6 +169,21 @@ export async function agentLoop(
 
           case "tool_call":
             toolCalls.push(event);
+            break;
+
+          case "retry":
+            retries++;
+            callbacks.onRetry?.({
+              attempt: event.attempt,
+              delayMs: event.delayMs,
+              reason: event.reason,
+              error: event.error,
+            });
+            // The ⚠️ prefix keeps this in the transcript as a notice rather
+            // than replacing the activity indicator: the turn is still running.
+            callbacks.onStatus?.(
+              `⚠️  provider request failed (${event.reason}), retrying in ${Math.round(event.delayMs / 100) / 10}s`,
+            );
             break;
 
           case "done":
@@ -397,6 +415,7 @@ export async function agentLoop(
     // call regardless of which path got here.
     callbacks.onTurnSummary?.({
       iterations,
+      retries,
       toolCalls: toolCallsExecuted,
       lastWriteStep,
       lastShellStep,

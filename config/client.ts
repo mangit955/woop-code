@@ -3,6 +3,7 @@ import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
 import { unsupportedProviderMessage } from "./providerRegistry";
+import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
@@ -123,104 +124,145 @@ export function geminiClient(
         },
       ];
 
-      const requestController = new AbortController();
-      let timedOut = false;
-      const abortFromCaller = () => requestController.abort();
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        requestController.abort();
-      }, GEMINI_REQUEST_TIMEOUT_MS);
+      const limit = maxAttempts();
 
-      if (signal) {
-        if (signal.aborted) {
-          abortFromCaller();
-        } else {
-          signal.addEventListener("abort", abortFromCaller, { once: true });
-        }
-      }
+      // Retrying is only safe while nothing has been observed. Once a chunk has
+      // been yielded the caller has already appended it to the assistant's text
+      // and streamed it to the terminal, so starting the request again would
+      // duplicate output that the user has watched arrive. A failure after that
+      // point is re-thrown for the loop to salvage.
+      for (let attempt = 1; ; attempt++) {
+        let emittedModelOutput = false;
 
-      try {
-        const stream = await sdk().models.generateContentStream({
-          model,
-          contents,
+        const requestController = new AbortController();
+        let timedOut = false;
+        const abortFromCaller = () => requestController.abort();
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          requestController.abort();
+        }, GEMINI_REQUEST_TIMEOUT_MS);
 
-          config: {
-            systemInstruction: repoContext
-              ? `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`
-              : SYSTEM_PROMPT,
-            tools: useTools ? tools : undefined,
-            abortSignal: requestController.signal,
-          },
-        });
-
-        // Gemini reports usage on chunks as the response accumulates, with the
-        // final chunk carrying the complete figures. Keep the last one seen
-        // rather than the first: an early chunk reports a partial completion
-        // count, and a stream that ends without usage at all leaves this
-        // undefined, which is reported as unknown instead of as zero.
-        let usage: TokenUsage | undefined;
-
-        for await (const chunk of stream) {
-          if (chunk.usageMetadata) {
-            usage = {
-              promptTokens: chunk.usageMetadata.promptTokenCount,
-              completionTokens: chunk.usageMetadata.candidatesTokenCount,
-              cachedTokens: chunk.usageMetadata.cachedContentTokenCount,
-              totalTokens: chunk.usageMetadata.totalTokenCount,
-            };
+        if (signal) {
+          if (signal.aborted) {
+            abortFromCaller();
+          } else {
+            signal.addEventListener("abort", abortFromCaller, { once: true });
           }
+        }
 
-          const parts = chunk.candidates?.[0]?.content?.parts ?? [];
-          for (const part of parts) {
-            if (part.functionCall) {
-              yield {
-                type: "tool_call",
-                id: part.functionCall.id ?? crypto.randomUUID(),
-                name: part.functionCall.name!,
-                arguments: part.functionCall.args ?? {},
-                thoughtSignature: part.thoughtSignature,
+        try {
+          const stream = await sdk().models.generateContentStream({
+            model,
+            contents,
+
+            config: {
+              systemInstruction: repoContext
+                ? `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`
+                : SYSTEM_PROMPT,
+              tools: useTools ? tools : undefined,
+              abortSignal: requestController.signal,
+            },
+          });
+
+          // Gemini reports usage on chunks as the response accumulates, with the
+          // final chunk carrying the complete figures. Keep the last one seen
+          // rather than the first: an early chunk reports a partial completion
+          // count, and a stream that ends without usage at all leaves this
+          // undefined, which is reported as unknown instead of as zero.
+          let usage: TokenUsage | undefined;
+
+          for await (const chunk of stream) {
+            if (chunk.usageMetadata) {
+              usage = {
+                promptTokens: chunk.usageMetadata.promptTokenCount,
+                completionTokens: chunk.usageMetadata.candidatesTokenCount,
+                cachedTokens: chunk.usageMetadata.cachedContentTokenCount,
+                totalTokens: chunk.usageMetadata.totalTokenCount,
               };
-            } else if (part.text) {
-              yield { type: "text", content: part.text };
+            }
+
+            const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+            for (const part of parts) {
+              if (part.functionCall) {
+                emittedModelOutput = true;
+                yield {
+                  type: "tool_call",
+                  id: part.functionCall.id ?? crypto.randomUUID(),
+                  name: part.functionCall.name!,
+                  arguments: part.functionCall.args ?? {},
+                  thoughtSignature: part.thoughtSignature,
+                };
+              } else if (part.text) {
+                emittedModelOutput = true;
+                yield { type: "text", content: part.text };
+              }
+            }
+
+            // Some provider chunks expose text only through the convenience
+            // property rather than a content part.
+            if (parts.length === 0 && chunk.text) {
+              emittedModelOutput = true;
+              yield { type: "text", content: chunk.text };
             }
           }
 
-          // Some provider chunks expose text only through the convenience
-          // property rather than a content part.
-          if (parts.length === 0 && chunk.text) {
-            yield { type: "text", content: chunk.text };
+          yield {
+            type: "done",
+            usage,
+          };
+          return;
+        } catch (error: any) {
+          // The caller cancelled the turn. Not a failure, and never retried.
+          if (signal?.aborted) throw error;
+
+          const failure = timedOut
+            ? new Error(
+                "Gemini did not respond within 60 seconds. Check your network connection and API quota, then try again.",
+              )
+            : error;
+
+          if (!emittedModelOutput) {
+            const decision = classifyFailure(failure, attempt, limit);
+
+            if (decision.retry) {
+              yield {
+                type: "retry",
+                attempt,
+                delayMs: decision.delayMs,
+                reason: decision.reason,
+                error: failure instanceof Error ? failure.message : String(failure),
+              };
+
+              clearTimeout(timeout);
+              signal?.removeEventListener("abort", abortFromCaller);
+              await delay(decision.delayMs, signal);
+              continue;
+            }
           }
+
+          if (timedOut) {
+            throw failure;
+          }
+
+          // Handle rate limit errors gracefully
+          if (error?.status === 429 || error?.code === 429) {
+            const errorData = error?.error || error;
+            const retryAfter = errorData?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay || 'a few moments';
+
+            throw new Error(
+              `⚠️  Rate limit exceeded for Google Gemini API.\n\n` +
+              `Please wait ${retryAfter} before trying again.\n\n` +
+              `You can:\n` +
+              `  • Wait and retry your request\n` +
+              `  • Check your quota at: https://ai.dev/rate-limit`,
+            );
+          }
+
+          throw error;
+        } finally {
+          clearTimeout(timeout);
+          signal?.removeEventListener("abort", abortFromCaller);
         }
-
-        yield {
-          type: "done",
-          usage,
-        };
-      } catch (error: any) {
-        if (timedOut) {
-          throw new Error(
-            "Gemini did not respond within 60 seconds. Check your network connection and API quota, then try again.",
-          );
-        }
-
-        // Handle rate limit errors gracefully
-        if (error?.status === 429 || error?.code === 429) {
-          const errorData = error?.error || error;
-          const retryAfter = errorData?.details?.find((d: any) => d['@type']?.includes('RetryInfo'))?.retryDelay || 'a few moments';
-
-          throw new Error(
-            `⚠️  Rate limit exceeded for Google Gemini API.\n\n` +
-            `Please wait ${retryAfter} before trying again.\n\n` +
-            `You can:\n` +
-            `  • Wait and retry your request\n` +
-            `  • Check your quota at: https://ai.dev/rate-limit`,
-          );
-        }
-
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-        signal?.removeEventListener("abort", abortFromCaller);
       }
     },
   };

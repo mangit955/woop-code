@@ -19,31 +19,12 @@ import { toolRegistery } from "../../tools";
 import { registry, registerCommands } from "../../commands/slash";
 import { APPROVAL_MODES, DEFAULT_APPROVAL_MODE } from "../../runtime/approval/approval-mode";
 import { VERSION } from "../../config/version";
+import { toolEffect } from "../../runtime/toolEffects";
 
-/**
- * Which tools change the workspace, and which merely read it. The registry does
- * not carry this — approval is enforced in the tool implementations and in the
- * approval policy, not declared as tool metadata — so it is stated here, in one
- * place, rather than repeated in prose on every page.
- *
- * Keyed by tool name so an added tool shows up as `unclassified` in the output
- * instead of being silently documented as safe.
- */
-const EFFECT: Record<string, "read" | "write" | "shell" | "ask"> = {
-  list_files: "read",
-  read_file: "read",
-  grep: "read",
-  glob: "read",
-  find_files: "read",
-  web_search: "read",
-  web_fetch: "read",
-  create_file: "write",
-  write_file: "write",
-  edit_file: "write",
-  run_terminal: "shell",
-  run_tests: "shell",
-  ask_user: "ask",
-};
+// Which tools change the workspace and which merely read it now lives in
+// runtime/toolEffects.ts: the runtime needs the same classification to tell a
+// turn that edited files from one that only read them, and this file is about
+// not keeping a second copy of a list.
 
 /** How each effect class is gated. One sentence, reused wherever it is shown. */
 const GATE: Record<string, string> = {
@@ -57,7 +38,7 @@ const GATE: Record<string, string> = {
 registerCommands();
 
 const tools = toolRegistery.map((tool) => {
-  const effect = EFFECT[tool.name] ?? "unclassified";
+  const effect = toolEffect(tool.name);
 
   return {
     name: tool.name,

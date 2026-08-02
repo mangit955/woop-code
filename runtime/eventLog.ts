@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
-import type { IterationUsage } from "../config/types";
+import type { IterationUsage, TurnSummary } from "../config/types";
 
 /**
  * A newline-delimited JSON record of one headless run.
@@ -35,7 +35,16 @@ export type RunEvent =
       durationMs: number;
     }
   | { type: "error"; ts: string; message: string }
-  | { type: "run_end"; ts: string; ok: boolean };
+  | {
+      type: "run_end";
+      ts: string;
+      ok: boolean;
+      /**
+       * What the turn did. Absent only if the loop never started — a headless
+       * run is one turn, so there is otherwise exactly one of these.
+       */
+      summary?: TurnSummary;
+    };
 
 /** Caps a single field so one runaway tool output cannot dominate the log. */
 const MAX_FIELD_CHARS = 200_000;

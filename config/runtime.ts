@@ -1,4 +1,5 @@
 import { getTool } from "../tools";
+import { toolEffect } from "../runtime/toolEffects";
 import { recentMessages } from "./config";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type {
@@ -8,6 +9,7 @@ import type {
   ProviderClient,
   StreamEvent,
   TokenUsage,
+  TurnSummary,
 } from "./types";
 
 /**
@@ -119,6 +121,14 @@ export async function agentLoop(
   // run rather than inferred from the loop counter.
   let toolCallsExecuted = 0;
   let efficiencyWarningSent = false;
+
+  // Verification tracking. Counted in tool executions rather than iterations
+  // because a single iteration can edit a file and then run the tests, and the
+  // order within it is the whole question.
+  const toolCounts: Record<string, number> = {};
+  let toolStep = 0;
+  let lastWriteStep: number | undefined;
+  let lastShellStep: number | undefined;
 
   try {
     while (iterations < MAX_ITERATIONS) {
@@ -322,6 +332,20 @@ export async function agentLoop(
           return outcome;
         }
 
+        // Recorded here rather than before execute: a tool that threw changed
+        // nothing, and a declined edit returned above without reaching this
+        // point, so neither is counted as a workspace change.
+        toolStep++;
+        toolCounts[toolCall.name] = (toolCounts[toolCall.name] ?? 0) + 1;
+        switch (toolEffect(toolCall.name)) {
+          case "write":
+            lastWriteStep = toolStep;
+            break;
+          case "shell":
+            lastShellStep = toolStep;
+            break;
+        }
+
         callbacks.onToolFinish?.({
           id: toolCall.id,
           name: toolCall.name,
@@ -366,5 +390,20 @@ export async function agentLoop(
 
     callbacks.onError?.(agentError);
     throw agentError;
+  } finally {
+    // Every exit is a turn that ended and is worth a record: a normal
+    // completion, a rejected edit, cancellation, an exhausted budget, a
+    // provider failure. A finally is what makes that exactly one record per
+    // call regardless of which path got here.
+    callbacks.onTurnSummary?.({
+      iterations,
+      toolCalls: toolCallsExecuted,
+      lastWriteStep,
+      lastShellStep,
+      toolCounts,
+      unverifiedEdits:
+        lastWriteStep !== undefined &&
+        (lastShellStep === undefined || lastShellStep < lastWriteStep),
+    });
   }
 }

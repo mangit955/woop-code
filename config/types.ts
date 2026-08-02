@@ -53,6 +53,31 @@ export interface PromptSegments {
   toolResults: number;
 }
 
+/**
+ * What one turn did, recorded when the loop exits by any path.
+ *
+ * This is instrumentation, not policy: it records what happened and leaves the
+ * judgement to whoever reads it. In particular `unverifiedEdits` counts any
+ * shell command as verification, including one that verified nothing, because
+ * over-counting verification under-reports the problem — the conservative
+ * direction for a measurement whose whole purpose is to size it.
+ */
+export interface TurnSummary {
+  iterations: number;
+  toolCalls: number;
+  /**
+   * Index of the last tool execution that changed the workspace, counting from
+   * 1 across the turn. Absent when the turn changed nothing.
+   */
+  lastWriteStep?: number;
+  /** Index of the last shell command — run_tests or run_terminal. */
+  lastShellStep?: number;
+  /** Executions per tool name, so analysis can separate tests from commands. */
+  toolCounts: Record<string, number>;
+  /** The turn changed files and ran no shell command afterwards. */
+  unverifiedEdits: boolean;
+}
+
 /** What one pass through the agent loop cost. */
 export interface IterationUsage {
   /** 1-based, matching the loop's own iteration counter. */
@@ -112,6 +137,8 @@ export interface AgentCallbacks {
   onStatus?(status: string): void;
   /** Reported once per completed iteration, before the next one starts. */
   onUsage?(usage: IterationUsage): void;
+  /** Reported exactly once when the turn ends, however it ends. */
+  onTurnSummary?(summary: TurnSummary): void;
   onText?(text: string): void;
   onToolStart?(tool: ToolCall): void;
   onToolFinish?(tool: ToolResult): void;

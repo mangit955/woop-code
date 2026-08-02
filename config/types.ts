@@ -66,6 +66,8 @@ export interface TurnSummary {
   iterations: number;
   /** Provider requests retried after a transient failure. */
   retries: number;
+  /** Iterations whose stream died mid-response and was recovered, not lost. */
+  salvagedIterations: number;
   toolCalls: number;
   /**
    * Index of the last tool execution that changed the workspace, counting from

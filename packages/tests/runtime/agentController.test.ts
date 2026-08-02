@@ -835,3 +835,123 @@ describe("AgentController - Persistence", () => {
     expect(errors[0]?.message).toContain("Could not save conversation history");
   });
 });
+
+describe("AgentController - execution log across turns", () => {
+  /**
+   * The root cause the runtime review found: agentLoop appends tool calls and
+   * results to a *copy* of the conversation, and on return only the final
+   * assistant text was kept — so on turn two the model saw nothing about what
+   * it had read, edited or run on turn one.
+   */
+  test("what a turn did survives into the next turn's context", async () => {
+    mockToolRegistry.register(new MockTool("read_file", "alpha\nbeta\ngamma"));
+
+    let turn = 0;
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        if (turn++ === 0) {
+          yield createToolCallEvent("read_file", { path: "parser.ts" }, "c1");
+          yield createDoneEvent();
+        }
+        yield createTextEvent("done");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const seenContexts: string[] = [];
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+
+    await controller.run("read the parser");
+    await controller.run("now fix it");
+
+    // Turn one had no history to carry; turn two must know what turn one did.
+    const secondTurnContext = seenContexts.at(-1)!;
+    expect(secondTurnContext).toContain("read_file parser.ts");
+    expect(secondTurnContext).toContain("do not repeat it");
+  });
+
+  test("the log carries the outcome, not the raw tool output", async () => {
+    mockToolRegistry.register(
+      new MockTool("read_file", "SECRET-CONTENT\n".repeat(200)),
+    );
+
+    const seenContexts: string[] = [];
+    let turn = 0;
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        if (turn++ === 0) {
+          yield createToolCallEvent("read_file", { path: "big.ts" }, "c1");
+          yield createDoneEvent();
+        }
+        yield createTextEvent("done");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+    await controller.run("read it");
+    await controller.run("again");
+
+    const secondTurnContext = seenContexts.at(-1)!;
+    // Tool output was the whole of the measured context growth; carrying it
+    // verbatim would reintroduce exactly what compaction exists to prevent.
+    expect(secondTurnContext).not.toContain("SECRET-CONTENT");
+    expect(secondTurnContext).toContain("200 lines");
+  });
+
+  test("work done before a failure is still remembered", async () => {
+    mockToolRegistry.register(new MockTool("read_file", "one\ntwo"));
+
+    const seenContexts: string[] = [];
+    let iteration = 0;
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        const n = iteration++;
+        if (n === 0) seenContexts.push(repoContext);
+        if (n === 0) {
+          // First iteration completes a tool call, so the work really happened.
+          yield createToolCallEvent("read_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        if (n === 1) {
+          // The turn then dies fatally, after that work is already done.
+          throw Object.assign(new Error("Bad request"), { status: 400 });
+        }
+        seenContexts.push(repoContext);
+        yield createTextEvent("done");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+
+    await expect(controller.run("read it")).rejects.toThrow();
+    await controller.run("try again");
+
+    // A failed turn still did work, and redoing it is the waste this prevents.
+    expect(seenContexts.at(-1)!).toContain("read_file a.ts");
+  });
+
+  test("a conversational prompt gets no execution log", async () => {
+    const seenContexts: string[] = [];
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        yield createTextEvent("hello");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+    await controller.run("hi");
+
+    expect(seenContexts.at(-1)).toBe("");
+  });
+});

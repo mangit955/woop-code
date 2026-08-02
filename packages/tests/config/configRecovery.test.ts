@@ -17,11 +17,15 @@ const {
   prepareConversationForDisk,
   saveConfig,
   saveConversation,
+  getExecutionLog,
+  saveExecutionLog,
+  MAX_PERSISTED_RECORDS,
 } = await import("../../../config/config");
 
 const configDir = join(configHome, "woopcode");
 const providersPath = join(configDir, "providers.json");
 const conversationPath = join(configDir, "conversation.json");
+const executionLogPath = join(configDir, "execution-log.json");
 
 afterAll(() => {
   if (previousConfigHome === undefined) {
@@ -180,5 +184,58 @@ describe("conversation persistence", () => {
 
     expect(readdirSync(configDir).filter((name) => name.endsWith(".tmp"))).toHaveLength(0);
     expect(await getConversation()).toEqual([{ role: "user", content: "hi" }]);
+  });
+});
+
+describe("execution log persistence", () => {
+  beforeEach(() => {
+    rmSync(executionLogPath, { force: true });
+  });
+
+  test("records survive a restart", async () => {
+    // Without this the log would survive a turn but not a restart, which is
+    // the same forgetting one level up.
+    await saveExecutionLog([
+      { iteration: 1, tool: "read_file", subject: "a.ts", outcome: "12 lines" },
+    ]);
+
+    expect(await getExecutionLog()).toEqual([
+      { iteration: 1, tool: "read_file", subject: "a.ts", outcome: "12 lines" },
+    ]);
+  });
+
+  test("a fresh install starts with an empty log", async () => {
+    expect(await getExecutionLog()).toEqual([]);
+  });
+
+  test("the log is capped so a long-lived session cannot grow it forever", async () => {
+    const many = Array.from({ length: MAX_PERSISTED_RECORDS + 50 }, (_, i) => ({
+      iteration: i,
+      tool: "read_file",
+      subject: `f${i}.ts`,
+      outcome: "1 line",
+    }));
+    await saveExecutionLog(many);
+
+    const loaded = await getExecutionLog();
+    expect(loaded).toHaveLength(MAX_PERSISTED_RECORDS);
+    // The most recent survive: what was done last is what must not be redone.
+    expect(loaded.at(-1)!.subject).toBe(`f${many.length - 1}.ts`);
+  });
+
+  test("a corrupt log is quarantined rather than crashing startup", async () => {
+    writeFileSync(executionLogPath, "{not json");
+
+    expect(await getExecutionLog()).toEqual([]);
+    expect(corruptFiles("execution-log.json.corrupt-").length).toBeGreaterThan(0);
+  });
+
+  test("entries that are not records are discarded", async () => {
+    writeFileSync(
+      executionLogPath,
+      JSON.stringify([null, 42, { tool: "read_file", outcome: "3 lines" }]),
+    );
+
+    expect(await getExecutionLog()).toHaveLength(1);
   });
 });

@@ -1,6 +1,12 @@
 import { renameSync } from "fs";
 import type { Message } from "./types";
-import { getProvidersConfigPath, getConversationPath, initializeConfig } from "./paths";
+import {
+  getProvidersConfigPath,
+  getConversationPath,
+  getExecutionLogPath,
+  initializeConfig,
+} from "./paths";
+import type { ExecutionRecord } from "../runtime/executionLog";
 import { type ApprovalMode, parseApprovalMode } from "../runtime/approval";
 
 export interface ProviderEntry {
@@ -176,6 +182,49 @@ export async function saveConversation(messages: Message[]) {
   const temporaryPath = `${conversationPath}.tmp`;
   await Bun.write(temporaryPath, payload);
   renameSync(temporaryPath, conversationPath);
+}
+
+/**
+ * How many execution records are kept on disk.
+ *
+ * Generous compared with what is actually sent: the render budget decides that,
+ * and these are one short line each, so keeping more costs disk rather than
+ * tokens.
+ */
+export const MAX_PERSISTED_RECORDS = 200;
+
+/**
+ * Loads what previous sessions did.
+ *
+ * Without this the execution log would survive a turn but not a restart, which
+ * is the same forgetting one level up — reopening Woopcode in a repository
+ * would discard everything it had learned there.
+ */
+export async function getExecutionLog(): Promise<ExecutionRecord[]> {
+  await initializeConfig();
+
+  const parsed = await readJsonFile(getExecutionLogPath(), "execution log");
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.filter(
+    (record): record is ExecutionRecord =>
+      !!record &&
+      typeof record === "object" &&
+      typeof (record as ExecutionRecord).tool === "string" &&
+      typeof (record as ExecutionRecord).outcome === "string",
+  );
+}
+
+export async function saveExecutionLog(records: ExecutionRecord[]) {
+  await initializeConfig();
+  const path = getExecutionLogPath();
+  const payload = JSON.stringify(records.slice(-MAX_PERSISTED_RECORDS), null, 2);
+
+  // Same write-then-rename as the conversation: a crash mid-write must leave
+  // either the old file or the new one, never half of either.
+  const temporaryPath = `${path}.tmp`;
+  await Bun.write(temporaryPath, payload);
+  renameSync(temporaryPath, path);
 }
 
 export async function appendMessage(message: any) {

@@ -48,6 +48,17 @@ export function getConversationPath(): string {
 }
 
 /**
+ * Get the path to execution-log.json
+ *
+ * Kept beside the conversation rather than inside it: conversation.json is an
+ * array of messages that older versions read directly, so widening it would
+ * make a downgrade fail on its own history.
+ */
+export function getExecutionLogPath(): string {
+  return join(getConfigDir(), "execution-log.json");
+}
+
+/**
  * Get the path to models.json
  */
 export function getModelsPath(): string {

@@ -221,3 +221,42 @@ export async function runCommand(
 export function formatCommandResult(result: CommandResult) {
   return `Exit code: ${result.exitCode}\n\nSTDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr}`;
 }
+
+const STDOUT_MARKER = "\n\nSTDOUT:\n";
+const STDERR_MARKER = "\n\nSTDERR:\n";
+
+/**
+ * Reads back what `formatCommandResult` wrote.
+ *
+ * Lives beside the formatter on purpose. Anything wanting the exit code or a
+ * stream out of a tool result previously had to re-derive the layout, and one
+ * caller got it wrong in a way nothing caught: taking "the last non-empty line"
+ * of a successful command yields the literal string "STDERR:", because that is
+ * the trailing label when the stream is empty. 71% of the recorded execution
+ * log was that label rather than an outcome.
+ *
+ * Returns null for text this did not produce, so callers can fall back rather
+ * than pretend a parse succeeded.
+ */
+export function parseCommandResult(text: string): CommandResult | null {
+  if (!text.startsWith("Exit code: ")) return null;
+
+  const stdoutAt = text.indexOf(STDOUT_MARKER);
+  if (stdoutAt === -1) return null;
+
+  const exitCode = Number.parseInt(text.slice("Exit code: ".length, stdoutAt), 10);
+  if (!Number.isFinite(exitCode)) return null;
+
+  // stderr is written last, so the final marker is the real separator. A
+  // command whose own output contains the marker can still split wrongly;
+  // the result is only ever used to build a short summary, so a rare
+  // mis-split degrades the summary rather than the run.
+  const stderrAt = text.lastIndexOf(STDERR_MARKER);
+  if (stderrAt === -1 || stderrAt < stdoutAt) return null;
+
+  return {
+    exitCode,
+    stdout: text.slice(stdoutAt + STDOUT_MARKER.length, stderrAt),
+    stderr: text.slice(stderrAt + STDERR_MARKER.length),
+  };
+}

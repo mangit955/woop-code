@@ -1,4 +1,5 @@
 import type { Message } from "../config/types";
+import { parseCommandResult } from "../tools/command";
 import { toolEffect } from "./toolEffects";
 
 /**
@@ -40,6 +41,16 @@ function subjectOf(args: Record<string, unknown>): string {
 /** Characters of a compacted outcome. One line, not a summary of the output. */
 const MAX_OUTCOME_CHARS = 120;
 
+/** The last line carrying anything, or "" when the stream is blank. */
+function lastMeaningfulLine(stream: string): string {
+  const lines = stream.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!.trim();
+    if (line) return line;
+  }
+  return "";
+}
+
 /**
  * Reduces a tool result to its outcome.
  *
@@ -67,10 +78,25 @@ export function compactOutcome(tool: string, output: string): string {
       return text.slice(0, MAX_OUTCOME_CHARS);
 
     case "shell": {
-      // The last non-empty line is where a test summary, a build error and a
-      // stack trace's root cause all land.
-      const last = [...lines].reverse().find((line) => line.trim());
-      return (last ?? text).trim().slice(0, MAX_OUTCOME_CHARS);
+      const result = parseCommandResult(output);
+
+      if (!result) {
+        // Not a formatted command result — a tool error string, or a tool that
+        // returns plain text. Fall back to the last meaningful line.
+        const last = [...lines].reverse().find((line) => line.trim());
+        return (last ?? text).trim().slice(0, MAX_OUTCOME_CHARS);
+      }
+
+      // Whether it worked comes first, because that is the part the next turn
+      // acts on. The stream is then the evidence: a test summary, a build error
+      // and a stack trace's root cause all land in its last meaningful line.
+      const failed = result.exitCode !== 0;
+      const detail =
+        lastMeaningfulLine(failed ? result.stderr : result.stdout) ||
+        lastMeaningfulLine(failed ? result.stdout : result.stderr);
+
+      const status = failed ? `exit ${result.exitCode}` : "ok";
+      return (detail ? `${status}: ${detail}` : status).slice(0, MAX_OUTCOME_CHARS);
     }
 
     default:

@@ -18,13 +18,56 @@ describe("compacting an outcome", () => {
     expect(outcome).toBe("4 lines");
   });
 
-  test("a shell result keeps its last meaningful line", () => {
+  /** Exactly what formatCommandResult writes. */
+  function commandResult(exitCode: number, stdout: string, stderr = "") {
+    return `Exit code: ${exitCode}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`;
+  }
+
+  test("a successful command reports ok and its last stdout line", () => {
     const outcome = compactOutcome(
       "run_tests",
-      ["running...", "pass 41", "", " 2 fail, 41 pass", ""].join("\n"),
+      commandResult(0, "running...\npass 41\n\n 2 fail, 41 pass\n"),
     );
     // Where a test summary, a build error and a stack trace's root cause land.
-    expect(outcome).toBe("2 fail, 41 pass");
+    expect(outcome).toBe("ok: 2 fail, 41 pass");
+  });
+
+  /**
+   * The defect this rule exists for. A successful command with empty stderr
+   * ends in the literal label "STDERR:", and taking the last non-empty line
+   * recorded that as the outcome — 71% of a real execution log.
+   */
+  test("an empty stderr never becomes the outcome", () => {
+    const outcome = compactOutcome("run_terminal", commandResult(0, "Created file\n"));
+    expect(outcome).toBe("ok: Created file");
+    expect(outcome).not.toContain("STDERR");
+  });
+
+  test("a silent success still says it succeeded", () => {
+    expect(compactOutcome("run_terminal", commandResult(0, "", ""))).toBe("ok");
+  });
+
+  test("a failure reports the exit code and the error", () => {
+    const outcome = compactOutcome(
+      "run_terminal",
+      commandResult(1, "", "sh: 1: git: not found"),
+    );
+    expect(outcome).toBe("exit 1: sh: 1: git: not found");
+  });
+
+  test("a failure with output only on stdout still reports it", () => {
+    const outcome = compactOutcome(
+      "run_tests",
+      commandResult(1, "FAILED tests/test_outputs.py::test_vm_execution", ""),
+    );
+    expect(outcome).toBe("exit 1: FAILED tests/test_outputs.py::test_vm_execution");
+  });
+
+  test("plain text that is not a command result still compacts", () => {
+    // Tool errors and non-command tools do not use the structured format.
+    expect(compactOutcome("run_terminal", "Tool failed: timed out")).toContain(
+      "Tool failed",
+    );
   });
 
   test("a failure is kept as a failure", () => {

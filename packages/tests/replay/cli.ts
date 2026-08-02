@@ -14,6 +14,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { measureSegments } from "../../../config/runtime";
 import { recentMessages } from "../../../config/config";
+import { compactToolHistory, toolHistoryBudget } from "../../../runtime/compaction";
 import { parseEvents, replaySteps, type ReplayStep } from "./reconstruct";
 import {
   buildReport,
@@ -27,15 +28,26 @@ import {
 const MAX_TURNS = 6;
 const FIXTURE_DIR = join(import.meta.dir, "../fixtures/replay");
 
-const current = (step: ReplayStep) =>
+/** Assembly as the recordings were made: the windowed transcript, uncompacted. */
+const baseline = (step: ReplayStep) =>
   measureSegments(
     recentMessages(step.messages, MAX_TURNS),
     "x".repeat(step.repoContextChars),
   );
 
+/** Assembly as the runtime performs it now, compaction included. */
+const current = (step: ReplayStep) =>
+  measureSegments(
+    compactToolHistory(recentMessages(step.messages, MAX_TURNS), toolHistoryBudget()),
+    "x".repeat(step.repoContextChars),
+  );
+
 interface Measured {
   name: string;
+  /** As recorded. */
   report: AssemblyReport;
+  /** As the current runtime would assemble the same trajectory. */
+  now: AssemblyReport;
   calibration: Calibration;
   cache: ObservedCache | null;
 }
@@ -49,7 +61,8 @@ function measureFixture(name: string): Measured | null {
 
   return {
     name: name.replace(/\.jsonl$/, ""),
-    report: buildReport(replaySteps(events), current, calibration),
+    report: buildReport(replaySteps(events), baseline, calibration),
+    now: buildReport(replaySteps(events), current, calibration),
     calibration,
     cache: observedCache(events),
   };
@@ -77,7 +90,8 @@ function printDetail(m: Measured) {
     );
   }
 
-  console.log(`  total chars sent        ${n(report.totalChars)}`);
+  console.log(`  total chars (recorded)  ${n(report.totalChars)}`);
+  console.log(`  total chars (now)       ${n(m.now.totalChars)}`);
   console.log(`  total est. tokens       ${n(report.estimatedTotalTokens)}`);
   console.log(
     cache
@@ -109,8 +123,8 @@ if (only && measured.length === 1) {
 
 console.log(`\nreplay baseline — ${measured.length} fixture(s)\n`);
 const head =
-  `${"fixture".padEnd(30)}${"iters".padStart(6)}${"peak chars".padStart(12)}` +
-  `${"mean chars".padStart(12)}${"p95 chars".padStart(11)}${"ch/tok".padStart(8)}${"cache".padStart(7)}`;
+  `${"fixture".padEnd(30)}${"iters".padStart(6)}${"peak base".padStart(12)}` +
+  `${"peak now".padStart(11)}${"delta".padStart(8)}${"ch/tok".padStart(8)}${"cache".padStart(7)}`;
 console.log(head);
 console.log("-".repeat(head.length));
 
@@ -119,8 +133,8 @@ for (const m of measured) {
     m.name.padEnd(30) +
       String(m.report.iterations).padStart(6) +
       n(m.report.perIterationChars.max).padStart(12) +
-      n(m.report.perIterationChars.mean).padStart(12) +
-      n(m.report.perIterationChars.p95).padStart(11) +
+      n(m.now.perIterationChars.max).padStart(11) +
+      `${(((m.now.perIterationChars.max - m.report.perIterationChars.max) / m.report.perIterationChars.max) * 100).toFixed(0)}%`.padStart(8) +
       m.calibration.charsPerToken.toFixed(2).padStart(8) +
       (m.cache ? `${(m.cache.hitRate * 100).toFixed(0)}%` : "n/a").padStart(7),
   );
@@ -144,9 +158,11 @@ console.log(`  median  ${n(mid(peaks)).padStart(12)}`);
 console.log(`  min     ${n(peaks[0]!).padStart(12)}`);
 console.log(`  max     ${n(peaks.at(-1)!).padStart(12)}`);
 
+const baseChars = measured.reduce((s, m) => s + m.report.totalChars, 0);
+const nowChars = measured.reduce((s, m) => s + m.now.totalChars, 0);
 console.log(
-  `\ntotals   ${n(measured.reduce((s, m) => s + m.report.totalChars, 0))} chars sent, ` +
-    `${n(measured.reduce((s, m) => s + m.report.estimatedTotalTokens, 0))} estimated tokens ` +
+  `\ntotals   ${n(baseChars)} chars as recorded -> ${n(nowChars)} as assembled now ` +
+    `(${(((nowChars - baseChars) / baseChars) * 100).toFixed(1)}%) ` +
     `over ${measured.reduce((s, m) => s + m.report.iterations, 0)} iterations`,
 );
 

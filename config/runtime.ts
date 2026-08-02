@@ -1,6 +1,7 @@
 import { getTool } from "../tools";
 import { classifyCommand, commandOf, toolEffect } from "../runtime/toolEffects";
 import { isRetryableError } from "../runtime/retry";
+import { compactToolHistory, toolHistoryBudget } from "../runtime/compaction";
 import { recentMessages } from "./config";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import type {
@@ -157,6 +158,9 @@ export async function agentLoop(
   useTools = true,
 ) {
   const MAX_ITERATIONS = maxIterations();
+  // Read once per turn so a mid-turn environment change cannot make two
+  // iterations of the same turn assemble to different rules.
+  const historyBudget = toolHistoryBudget();
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
   const SAME_TOOL_THRESHOLD = 4;
   /** Tools actually run before the turn is nudged toward implementing. */
@@ -218,7 +222,13 @@ export async function agentLoop(
 
       // Measured from the same array that is sent, so the segment sizes and
       // the provider's token count describe one and the same request.
-      const sentMessages = recentMessages(messages, MAX_TURNS);
+      // Compacted for the request only. `messages` keeps the full results,
+      // because the execution log is built from them after the turn and
+      // shrinking what is sent is not the same as forgetting what happened.
+      const sentMessages = compactToolHistory(
+        recentMessages(messages, MAX_TURNS),
+        historyBudget,
+      );
       const segments = measureSegments(sentMessages, repoContext);
       const iterationStartedAt = Date.now();
       let usage: TokenUsage | undefined;

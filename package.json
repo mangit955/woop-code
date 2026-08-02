@@ -57,6 +57,8 @@
     "docs:check": "bun ./site/scripts/extract.ts --check && bun ./site/scripts/check-docs.ts",
     "test": "bun test && bunx --no-install tsc --noEmit",
     "test:watch": "bun test --watch",
+    "replay:baseline": "bun ./packages/tests/replay/cli.ts",
+    "replay:generate": "bun ./packages/tests/replay/generate.ts",
     "prepublishOnly": "bun test"
   },
   "dependencies": {

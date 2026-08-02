@@ -13,6 +13,9 @@
  */
 
 import surface from "./surface.json";
+// Read live rather than from surface.json: VERSION derives from package.json,
+// so a release bump reaches the docs without regenerating anything.
+import { VERSION } from "../../../config/version";
 import {
   renderMarkdown,
   escapeHtml as escape,
@@ -171,7 +174,7 @@ export function substitute(body: string): string {
   return body.replace(/\{\{([^}]+)\}\}/g, (whole, expression: string) => {
     const key = expression.trim();
 
-    if (key === "version") return surface.version;
+    if (key === "version") return VERSION;
     if (key === "counts.tools") return String(surface.counts.tools);
     if (key === "counts.commands") return String(surface.counts.commands);
     if (key === "counts.approvalModes") {
@@ -378,7 +381,7 @@ function shell({
           <span>Search</span>
           <kbd class="search-trigger__key">⌘K</kbd>
         </button>
-        <span class="topbar__version">v${surface.version}</span>
+        <span class="topbar__version">v${VERSION}</span>
         <button class="topbar__theme" type="button" data-theme-toggle
           aria-label="Switch between light and dark">Theme</button>
         <a class="topbar__cta" href="https://github.com/mangit955/woop-code"

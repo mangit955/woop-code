@@ -128,6 +128,10 @@ export class CallbackSpy {
     this.calls.push({ name: "onUsage", args: [usage] });
   };
 
+  onTurnSummary = (summary: any) => {
+    this.calls.push({ name: "onTurnSummary", args: [summary] });
+  };
+
   onText = (text: string) => {
     this.calls.push({ name: "onText", args: [text] });
   };

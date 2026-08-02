@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { getConfig } from "../config/config";
-import type { AgentCallbacks } from "../config/types";
+import type { AgentCallbacks, TurnSummary } from "../config/types";
 import { App, store } from "../tui/src";
 import { render } from "ink";
 import { AgentController } from "./agentController";
@@ -95,6 +95,7 @@ async function runHeadless(
 
   let failed = false;
   let budgetExhausted = false;
+  let summary: TurnSummary | undefined;
 
   const callbacks: AgentCallbacks = {
     onStatus(status) {
@@ -112,6 +113,11 @@ async function runHeadless(
         toolCalls: iteration.toolCalls,
         durationMs: iteration.durationMs,
       });
+    },
+    onTurnSummary(turn) {
+      // Held rather than written here: it belongs on run_end, which is written
+      // after the controller has finished and the exit status is known.
+      summary = turn;
     },
     onToolStart(tool) {
       log.write({
@@ -175,7 +181,7 @@ async function runHeadless(
     await controller.dispose();
   }
 
-  log.write({ type: "run_end", ts: now(), ok: !failed });
+  log.write({ type: "run_end", ts: now(), ok: !failed, summary });
   process.stdout.write("\n");
   // Exit codes are a contract with automated callers:
   //   0 - the turn completed

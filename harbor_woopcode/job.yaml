@@ -1,0 +1,37 @@
+# Harbor job configuration for benchmarking WoopCode.
+#
+# Implements harbor.models.job.config:JobConfig. Use with:
+#
+#     PYTHONPATH=. harbor run -c harbor_woopcode/job.yaml
+#
+# A config file is preferred over long command lines for real benchmark runs:
+# it is checked in alongside the code, so a published number can be traced back
+# to the exact agent, model, and dataset that produced it.
+
+job_name: woopcode-terminal-bench-2
+
+# Trials are independent; raise this to whatever the host and the provider's
+# rate limits will tolerate.
+n_concurrent_trials: 4
+
+agents:
+  # Registered by import path rather than by a built-in name -- WoopCode is not
+  # part of Harbor's AgentName enum, and custom agents are resolved through
+  # importlib. This requires the repository root on PYTHONPATH.
+  - name: harbor_woopcode:WoopCode
+    model_name: google/gemini-3.5-flash-lite
+    kwargs:
+      # Install from this checkout instead of npm. Drop this key to benchmark
+      # the published package, and set `version` to pin it.
+      source_dir: .
+      # version: 0.6.1
+      max_iterations: 200
+
+datasets:
+  - name: terminal-bench/terminal-bench-2
+    # Pin the dataset digest so the score is reproducible; `harbor run` records
+    # the resolved ref in the job's config.json if you omit it.
+    # ref: sha256:...
+    #
+    # Remove n_tasks to run the full benchmark.
+    n_tasks: 5

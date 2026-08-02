@@ -32,6 +32,17 @@ describe("version reporting", () => {
     }
   });
 
+  test("the generated docs surface does not snapshot the version", () => {
+    // It did, and every release bump then invalidated surface.json — so
+    // `docs:check` failed on main until someone reran the extractor. A
+    // generated file must not embed a value that changes independently of
+    // what generates it.
+    const surface = JSON.parse(sourceOf("site/src/docs/surface.json"));
+
+    expect(surface.version).toBeUndefined();
+    expect(sourceOf("site/src/docs/render.ts")).not.toContain("surface.version");
+  });
+
   test("every reporter uses the shared constant", () => {
     expect(sourceOf("cli.ts")).toContain(".version(VERSION)");
     expect(sourceOf("commands/slash/commands.ts")).toContain("Woopcode v${VERSION}");

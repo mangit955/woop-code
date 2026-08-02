@@ -75,7 +75,12 @@ const approvalModes = APPROVAL_MODES.map((mode) => ({
 
 const surface = {
   // Generated, not authored. Regenerate with `bun run docs:extract`.
-  version: VERSION,
+  //
+  // The version is deliberately not here. Snapshotting it made every release
+  // bump invalidate this file, so `docs:check` failed on main until someone
+  // remembered to rerun the extractor — which is the drift this file exists to
+  // prevent, reintroduced by the file itself. Renderers read VERSION, which
+  // derives from package.json.
   counts: {
     tools: tools.length,
     commands: commands.length,

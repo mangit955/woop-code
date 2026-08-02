@@ -37,6 +37,9 @@ let mockClient: MockProviderClient;
 // other exports (DEFAULT_MODEL_ID and friends, which unrelated modules import)
 // and can hand back to the real implementation when this file is not running.
 const actualClient = await import("../../../config/client");
+// Held as a direct reference rather than read off the namespace at call time,
+// so the delegation below cannot resolve back to the mock and recurse.
+const realCreateProviderClient = actualClient.createProviderClient;
 
 // Only answers while this file's own tests are running. A module mock is
 // registered for the whole run and restoring it afterwards does not work — Bun
@@ -57,7 +60,7 @@ afterAll(() => {
 mock.module("../../../config/client", () => ({
   ...actualClient,
   createProviderClient: (provider: string, apiKey: string, model?: string) =>
-    usingMockClient ? mockClient : actualClient.createProviderClient(provider, apiKey, model),
+    usingMockClient ? mockClient : realCreateProviderClient(provider, apiKey, model),
   get ACTIVE_PROVIDER_MODELS() {
     return usingMockClient ? { test: "Test Model" } : actualClient.ACTIVE_PROVIDER_MODELS;
   },

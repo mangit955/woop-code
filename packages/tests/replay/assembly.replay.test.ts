@@ -20,7 +20,15 @@ const fixtures = readdirSync(FIXTURE_DIR)
   .filter((name) => name.endsWith(".jsonl"))
   .sort();
 
-/** Assembles a step exactly as the loop would, and measures it. */
+/**
+ * Assembles a step the way the recordings were made: windowed, uncompacted.
+ *
+ * Deliberately not the current runtime path. These fixtures were recorded
+ * before compaction existed, so reproducing them proves the *reconstruction*
+ * faithful — which is what makes the corpus usable as a baseline. What the
+ * runtime assembles today is reported by `bun run replay:baseline`, which
+ * measures both and shows the difference.
+ */
 function assemble(step: ReplayStep) {
   // Only the length of the repository context reaches measurement, and the
   // recording preserves it; the text itself is not needed to reproduce a byte

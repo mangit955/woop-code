@@ -13,7 +13,12 @@ import { toolRegistery } from "../../tools";
 import { VERSION } from "../../config/version";
 // The catalog owns the shape of models.json and the join with providerRegistry,
 // so the CLI command and this slash command cannot describe a model differently.
-import { allModels, providerLabel } from "../../config/modelCatalog";
+import {
+  allModels,
+  defaultModelForProvider,
+  modelBelongsToProvider,
+  providerLabel,
+} from "../../config/modelCatalog";
 
 const models = allModels();
 
@@ -35,14 +40,13 @@ function activeModel(
  * when the user's choice is still valid (or the provider lists no models).
  */
 function modelForProvider(provider: string, currentModel: string | undefined) {
-  const providerModels = models.filter((model) => model.provider === provider);
+  if (modelBelongsToProvider(currentModel, provider)) return undefined;
 
-  if (providerModels.length === 0) return undefined;
-  if (currentModel && providerModels.some((model) => model.id === currentModel)) {
-    return undefined;
-  }
-
-  return providerModels[0]?.id;
+  // The catalog decides which model a provider starts on — the same answer
+  // createProviderClient reaches for when a stored selection turns out to
+  // belong elsewhere, so switching provider here and running a turn cannot
+  // disagree about the model.
+  return defaultModelForProvider(provider);
 }
 
 // ==================== SESSION COMMANDS ====================

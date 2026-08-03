@@ -2,7 +2,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useEffect, useMemo, useState } from "react";
 import { getConfig, saveConfig } from "../../../config/config";
-import { GOOGLE_MODELS } from "../../../config/client";
+import { allModels, isRunnable, providerLabel } from "../../../config/modelCatalog";
 import type { AgentController } from "../../../commands/agentController";
 import { store } from "../store/ui-store";
 import { colors } from "../styles/theme";
@@ -20,13 +20,23 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
   const [showCursor, setShowCursor] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Every model whose provider has a client. A model listed as coming soon is
+  // shown in `woopcode models`, where the point is the roadmap, but choosing one
+  // here would set a selection that cannot run.
+  const choices = useMemo(() => allModels().filter(isRunnable), []);
   const [selectedIndex, setSelectedIndex] = useState(() =>
-    Math.max(0, GOOGLE_MODELS.findIndex((model) => model.id === selectedModel)),
+    Math.max(0, choices.findIndex((model) => model.id === selectedModel)),
   );
-  const matches = useMemo(
-    () => GOOGLE_MODELS.filter((model) => model.name.toLowerCase().includes(query.toLowerCase())),
-    [query],
-  );
+  // Matched on the id as well as the name: "claude-opus-5" is a reasonable
+  // thing to type, and with two providers listed the id is often what the user
+  // has in hand.
+  const matches = useMemo(() => {
+    const needle = query.toLowerCase();
+    return choices.filter(
+      (model) =>
+        model.name.toLowerCase().includes(needle) || model.id.toLowerCase().includes(needle),
+    );
+  }, [choices, query]);
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
   // A message needs a row. Where the hints are on screen it takes their slot;
@@ -145,8 +155,10 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
                       </Text>
                     </Box>
                     <Box flexGrow={1} />
-                    {layout.dialogWidth >= 34 && (
-                      <Text color={selected ? "#000000" : colors.textFaint}>Google</Text>
+                    {layout.dialogWidth >= 40 && (
+                      <Text color={selected ? "#000000" : colors.textFaint}>
+                        {providerLabel(model.provider)}
+                      </Text>
                     )}
                   </Box>
                 );

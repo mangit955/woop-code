@@ -1,6 +1,8 @@
 import { describe, test, expect } from "bun:test";
 import type { ProviderClient, StreamEvent, Message } from "../../../config/types";
 import { MockProviderClient } from "../shared/mocks";
+import { anthropicClient } from "../../../config/anthropicClient";
+import { fakeAnthropic, textBlock } from "../shared/anthropicStream";
 import {
   createTextEvent,
   createToolCallEvent,
@@ -273,3 +275,17 @@ testProviderContract("MockProviderClient", () => {
     createDoneEvent(),
   ]);
 });
+
+/**
+ * The real clients are held to the same contract, with only the network faked.
+ * A provider that satisfies it is interchangeable in the runtime, which is the
+ * claim the agent loop rests on: it switches on StreamEvent and knows nothing
+ * about who produced them.
+ */
+testProviderContract("anthropicClient", () =>
+  anthropicClient(
+    "test-key",
+    "claude-opus-5",
+    fakeAnthropic(() => ({ events: [...textBlock(0, "Contract test response")] })).api as any,
+  ),
+);

@@ -411,7 +411,10 @@ async function buildHomeScreen(provider: string, model: string): Promise<HomeScr
     repository,
     branch,
     providerName: providerLabel,
-    provider: provider === "google" ? getModelDisplayName(model) ?? providerLabel : ACTIVE_PROVIDER_MODELS[provider] ?? providerLabel,
+    // getModelDisplayName resolves through the whole catalog now, so every
+    // provider's models name themselves; the Google-only branch this replaced
+    // fell back to a hardcoded label for anything else.
+    provider: getModelDisplayName(model) ?? providerLabel,
   };
 }
 

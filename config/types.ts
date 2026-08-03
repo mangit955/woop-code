@@ -47,11 +47,34 @@ export interface TokenUsage {
 export interface PromptSegments {
   systemPrompt: number;
   repoContext: number;
+  /**
+   * The record of what this session already did; see runtime/executionLog.
+   *
+   * Measured apart from the repository context it is sent alongside, because
+   * the two answer different questions: one is what the project is, the other
+   * is what has been done to it, and only the second grows. Reported as 0 on a
+   * headless run, where a process is a single turn and the log is always empty.
+   */
+  executionLog: number;
   /** Conversation messages: user and assistant text. */
   conversation: number;
   /** Tool calls and their results. */
   toolResults: number;
 }
+
+/**
+ * The non-conversational context a turn carries.
+ *
+ * A plain string is still accepted and means "repository context, no execution
+ * log" — that is what every caller passed before the log existed, and what the
+ * replay corpus reconstructs from recordings that predate it.
+ */
+export type TurnContext =
+  | string
+  | {
+      repository: string;
+      executionLog?: string;
+    };
 
 /**
  * What one turn did, recorded when the loop exits by any path.

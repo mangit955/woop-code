@@ -79,6 +79,7 @@ RUN_WITH_USAGE = [
         "segments": {
             "systemPrompt": 2400,
             "repoContext": 800,
+            "executionLog": 0,
             "conversation": 40,
             "toolResults": 0,
         },
@@ -98,6 +99,7 @@ RUN_WITH_USAGE = [
         "segments": {
             "systemPrompt": 2400,
             "repoContext": 800,
+            "executionLog": 0,
             "conversation": 40,
             "toolResults": 900,
         },

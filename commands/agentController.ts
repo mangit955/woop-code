@@ -14,7 +14,7 @@ import {
   renderExecutionLog,
   type ExecutionRecord,
 } from "../runtime/executionLog";
-import type { AgentCallbacks, Message } from "../config/types";
+import type { AgentCallbacks, Message, TurnContext } from "../config/types";
 import { store } from "../tui/src";
 
 /**
@@ -236,20 +236,22 @@ export class AgentController {
   }
 
   /**
-   * The repository context plus what this session has already done.
+   * The repository context and what this session has already done, kept apart.
    *
-   * Appended to the context string rather than threaded through as a new
-   * parameter, so the change stays inside 1.1: the loop and the provider
-   * interface are untouched. Splitting it into its own measured segment
-   * belongs with budgeted assembly in 2.0.
+   * They were previously joined here and sent as one string, which made them
+   * indistinguishable to the meter: the log was reported as repository context,
+   * so nothing could say how much of a request was which. The loop joins them
+   * now, and measures them separately.
    */
-  private contextForTurn(): string {
+  private contextForTurn(): TurnContext {
     const budget = Math.floor(
       MAX_REPO_CONTEXT_CHARS * EXECUTION_LOG_BUDGET_RATIO,
     );
-    const log = renderExecutionLog(this.executionRecords, budget);
 
-    return log ? `${this.repoContext}\n\n${log}` : this.repoContext;
+    return {
+      repository: this.repoContext,
+      executionLog: renderExecutionLog(this.executionRecords, budget),
+    };
   }
 
   async dispose() {

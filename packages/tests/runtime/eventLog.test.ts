@@ -124,6 +124,7 @@ describe("event log", () => {
       segments: {
         systemPrompt: 2400,
         repoContext: 800,
+        executionLog: 120,
         conversation: 40,
         toolResults: 0,
       },
@@ -149,6 +150,7 @@ describe("event log", () => {
     ]);
     expect(Object.keys(record!.segments as object).sort()).toEqual([
       "conversation",
+      "executionLog",
       "repoContext",
       "systemPrompt",
       "toolResults",

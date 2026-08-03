@@ -9,6 +9,7 @@ import type {
   Message,
   PromptSegments,
   ProviderClient,
+  TurnContext,
   StreamEvent,
   TokenUsage,
   TurnSummary,
@@ -71,8 +72,9 @@ export function truncateToolResult(
  */
 export function measureSegments(
   messages: Message[],
-  repoContext: string,
+  context: TurnContext,
 ): PromptSegments {
+  const { repository, executionLog } = normalizeContext(context);
   let conversation = 0;
   let toolResults = 0;
 
@@ -97,10 +99,34 @@ export function measureSegments(
 
   return {
     systemPrompt: SYSTEM_PROMPT.length,
-    repoContext: repoContext.length,
+    repoContext: repository.length,
+    executionLog: executionLog.length,
     conversation,
     toolResults,
   };
+}
+
+/** Accepts the older string form and the split form as one shape. */
+function normalizeContext(context: TurnContext): {
+  repository: string;
+  executionLog: string;
+} {
+  return typeof context === "string"
+    ? { repository: context, executionLog: "" }
+    : { repository: context.repository, executionLog: context.executionLog ?? "" };
+}
+
+/**
+ * Renders the turn context into the single string the provider receives.
+ *
+ * The join lives here rather than in the caller so that one place decides how
+ * the pieces are ordered and separated, and the measurement above cannot drift
+ * from what is actually sent.
+ */
+export function renderContext(context: TurnContext): string {
+  const { repository, executionLog } = normalizeContext(context);
+  if (!executionLog) return repository;
+  return repository ? `${repository}\n\n${executionLog}` : executionLog;
 }
 
 /** Loop budget when nothing overrides it — tuned for interactive use. */
@@ -152,12 +178,15 @@ function maxIterations(env: Record<string, string | undefined> = process.env): n
 export async function agentLoop(
   client: ProviderClient,
   messages: Message[],
-  repoContext: string,
+  context: TurnContext,
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
   useTools = true,
 ) {
   const MAX_ITERATIONS = maxIterations();
+  // Rendered once: the provider receives one string, while the measurement
+  // above keeps the pieces apart.
+  const renderedContext = renderContext(context);
   // Read once per turn so a mid-turn environment change cannot make two
   // iterations of the same turn assemble to different rules.
   const historyBudget = toolHistoryBudget();
@@ -231,7 +260,7 @@ export async function agentLoop(
         historyBudget === null
           ? windowed
           : compactToolHistory(windowed, historyBudget);
-      const segments = measureSegments(sentMessages, repoContext);
+      const segments = measureSegments(sentMessages, context);
       const iterationStartedAt = Date.now();
       let usage: TokenUsage | undefined;
 
@@ -244,7 +273,7 @@ export async function agentLoop(
       try {
         for await (const event of client.stream(
           sentMessages,
-          repoContext,
+          renderedContext,
           signal,
           useTools,
         )) {

@@ -56,7 +56,9 @@ Two structural facts to know before editing:
 
 A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `config/runtime.ts` (stream, collect tool calls, execute, feed results back; 20 iterations by default) → tools resolved via `toolRegistery` in `tools/index.ts`.
 
-Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Only the Google entry is enabled in `config/providerRegistry.ts`; `openai` and `anthropic` are listed with `enabled: false` deliberately.
+Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Google and Anthropic are enabled in `config/providerRegistry.ts`; `openai` is listed with `enabled: false` deliberately. The Gemini client lives in `config/client.ts`, the Anthropic one in `config/anthropicClient.ts`; `createProviderClient` picks between them.
+
+**Anthropic requires the reasoning that preceded a tool call to be replayed with that call's result.** The model pauses mid-response to await the tool and resumes the same response, so its thinking blocks have to come back complete and unmodified — a modified one is a 400, and an omitted one is worse, because the API silently runs that request without thinking. `Message` has nowhere to put them, so `anthropicClient` keeps them for the length of a turn (one client is constructed per turn) and prepends them when rendering. That is why the agent loop, the message type and persistence stay provider-agnostic.
 
 ### Invariants that are easy to break
 
@@ -112,6 +114,8 @@ Reading a trajectory, `run_end`'s `ok: true` means the loop finished, not that t
 `WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`. Bun loads `.env` automatically — no `dotenv`.
 
 `WOOPCODE_THINKING_BUDGET` takes `off`, `-1` (the default, meaning automatic), or a token count. `off` omits `thinkingConfig` from the request entirely, and exists because `gemini-3.5-flash-lite` rejects a budget of `0` with a 400 — so "disable" cannot be expressed as a number. Budgets below roughly a thousand are ignored rather than honoured: measured, 128 and 512 return zero thinking tokens while 1024 and -1 return 54–202.
+
+That variable is Gemini-shaped, and Anthropic reads it differently because it has to: current Claude models reject `budget_tokens` outright, so a token count has no equivalent there. `off` sends `thinking: {type: "disabled"}`; every other value sends `{type: "adaptive", display: "omitted"}` — the model decides depth, which is what `-1` already meant. The number is not faked into a budget that was never applied.
 
 User state (config, conversation, execution log) lives in `~/.config/woopcode/` (`%LOCALAPPDATA%\woopcode\` on Windows), never in the repo.
 

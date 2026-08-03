@@ -32,8 +32,63 @@ export type ModelStatus = "default" | "ready" | "coming-soon";
 
 const models = catalog as Model[];
 
+/**
+ * The model a turn uses when nothing has been selected.
+ *
+ * Defined here rather than in client.ts, and re-exported from there, so that
+ * "which model does this provider start on" has one answer in the module that
+ * already owns the catalog. The alternative put the Google default beside the
+ * Gemini client and left every other provider's default to be invented at the
+ * call site.
+ */
+export const DEFAULT_MODEL_ID = "gemini-3.5-flash-lite";
+
+/**
+ * Each provider's starting model, where that is a judgement rather than a fact
+ * about the catalog.
+ *
+ * Not simply "the provider's first row": the rows are ordered for reading, most
+ * capable first, and the default is a different question — cost and latency
+ * matter as much as capability for a model that runs on every turn until
+ * someone chooses otherwise.
+ */
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  google: DEFAULT_MODEL_ID,
+  gemini: DEFAULT_MODEL_ID,
+  anthropic: "claude-opus-5",
+};
+
 export function allModels(): Model[] {
   return models;
+}
+
+/**
+ * The model to run for a provider when the current selection is not its own.
+ *
+ * A config written before a provider existed — or by hand — can pair a provider
+ * with another provider's model, and sending a Gemini id to Anthropic is a 404
+ * on the first turn. Falls back to any row belonging to the provider, then to
+ * the global default, so this always answers.
+ */
+export function defaultModelForProvider(provider: string): string {
+  const preferred = PROVIDER_DEFAULT_MODELS[provider];
+  if (preferred && findModel(preferred)) return preferred;
+
+  return models.find((model) => model.provider === provider)?.id ?? DEFAULT_MODEL_ID;
+}
+
+/**
+ * Whether this model can be run by this provider.
+ *
+ * "gemini" is accepted as an alias for "google" the same way the registry
+ * accepts it, so an aliased provider does not look like a mismatch.
+ */
+export function modelBelongsToProvider(modelId: string | undefined, provider: string): boolean {
+  const model = modelId ? findModel(modelId) : undefined;
+  if (!model) return false;
+
+  const canonical = provider === "gemini" ? "google" : provider;
+  return model.provider === canonical;
 }
 
 /** Exact id, for resolving a selection. */

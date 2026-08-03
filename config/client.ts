@@ -4,12 +4,21 @@ import { SYSTEM_PROMPT } from "./systemPrompt";
 import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
 import { unsupportedProviderMessage } from "./providerRegistry";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
+import {
+  DEFAULT_MODEL_ID,
+  defaultModelForProvider,
+  findModel,
+  modelBelongsToProvider,
+} from "./modelCatalog";
+import { anthropicClient } from "./anthropicClient";
 
 export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
 };
 
-export const DEFAULT_MODEL_ID = "gemini-3.5-flash-lite";
+// Owned by the catalog now — re-exported because much of the codebase imports
+// it from here, and the module it lives in is an implementation detail.
+export { DEFAULT_MODEL_ID };
 
 export const GOOGLE_MODELS = [
   { id: "gemini-3.6-pro", name: "Gemini 3.6 Pro" },
@@ -25,8 +34,15 @@ export const GOOGLE_MODELS = [
   { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash Lite" },
 ] as const;
 
+/**
+ * A model's name as a user should read it.
+ *
+ * Resolved through the catalog rather than the Gemini list above, which named
+ * only Google's models: with a second provider enabled, that list answered
+ * "Claude Opus 5" with the raw id in every status line and footer.
+ */
 export function getModelDisplayName(modelId: string | undefined) {
-  return GOOGLE_MODELS.find((model) => model.id === modelId)?.name ?? modelId ?? ACTIVE_PROVIDER_MODELS.google;
+  return findModel(modelId ?? "")?.name ?? modelId ?? ACTIVE_PROVIDER_MODELS.google;
 }
 
 /**
@@ -442,10 +458,26 @@ export function createProviderClient(
   apiKey: string,
   model?: string,
 ): ProviderClient {
+  // A config written before a provider existed can pair it with another
+  // provider's model — providers.json stores the two independently. Sending a
+  // Gemini id to Anthropic is a 404 on the first turn, so a known mismatch
+  // resolves to the provider's own default.
+  //
+  // Only a *known* mismatch. A model absent from the catalog is passed through
+  // untouched: the catalog is a convenience list, not an allowlist, and a
+  // caller naming a model released after this build should reach the provider
+  // and get the provider's own answer.
+  const mismatched =
+    model !== undefined && findModel(model) !== undefined && !modelBelongsToProvider(model, provider);
+  const runnable = mismatched ? undefined : model;
+
   switch (provider) {
     case "google":
     case "gemini":
-      return geminiClient(apiKey, model);
+      return geminiClient(apiKey, runnable ?? defaultModelForProvider("google"));
+
+    case "anthropic":
+      return anthropicClient(apiKey, runnable ?? defaultModelForProvider("anthropic"));
 
     default:
       // Providers listed as disabled in the registry are refused at login and

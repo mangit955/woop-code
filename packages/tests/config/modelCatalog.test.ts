@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_MODEL_ID } from "../../../config/client";
 import {
   allModels,
+  defaultModelForProvider,
   describeStatus,
   findModel,
   findModels,
   formatContextWindow,
   isRunnable,
+  modelBelongsToProvider,
   modelStatus,
   providerLabel,
 } from "../../../config/modelCatalog";
@@ -122,7 +124,10 @@ describe("finding models", () => {
   });
 
   test("matching is case-insensitive and covers display names", () => {
-    expect(findModels("Claude Sonnet").map((model) => model.id)).toEqual(["claude-sonnet-4"]);
+    expect(findModels("Claude Sonnet").map((model) => model.id)).toEqual([
+      "claude-sonnet-5",
+      "claude-sonnet-4-6",
+    ]);
   });
 
   test("an empty query is everything", () => {
@@ -161,6 +166,49 @@ describe("status comes from the provider registry", () => {
     expect(providerLabel("openai")).toBe("OpenAI");
     // An unknown id is shown as itself rather than hidden.
     expect(providerLabel("mystery")).toBe("mystery");
+  });
+});
+
+/**
+ * providers.json stores the provider and the model independently, so the two
+ * can disagree — a config written before Anthropic existed pairs it with a
+ * Gemini id. Sending that to Anthropic is a 404 on the first turn, so both the
+ * client factory and the /provider command resolve it through here.
+ */
+describe("a provider's own model", () => {
+  test("every enabled provider has a default that exists and is its own", () => {
+    for (const provider of PROVIDERS.filter((provider) => provider.enabled)) {
+      const id = defaultModelForProvider(provider.id);
+
+      expect({ provider: provider.id, model: findModel(id)?.provider }).toEqual({
+        provider: provider.id,
+        model: provider.id,
+      });
+    }
+  });
+
+  test("the Google default is the same one the rest of the code starts on", () => {
+    expect(defaultModelForProvider("google")).toBe(DEFAULT_MODEL_ID);
+    // The alias the registry and the client factory both accept.
+    expect(defaultModelForProvider("gemini")).toBe(DEFAULT_MODEL_ID);
+  });
+
+  test("an unknown provider still answers rather than returning nothing", () => {
+    expect(defaultModelForProvider("mystery")).toBe(DEFAULT_MODEL_ID);
+  });
+
+  test("ownership is what decides whether a selection survives a provider switch", () => {
+    expect(modelBelongsToProvider("claude-opus-5", "anthropic")).toBe(true);
+    expect(modelBelongsToProvider("claude-opus-5", "google")).toBe(false);
+    expect(modelBelongsToProvider(DEFAULT_MODEL_ID, "gemini")).toBe(true);
+  });
+
+  test("a model the catalog has never heard of belongs to nobody", () => {
+    // It is not claimed for the provider being asked about: the caller decides
+    // what to do with an unknown id, and createProviderClient passes it
+    // through rather than overriding a model newer than this build.
+    expect(modelBelongsToProvider("claude-opus-99", "anthropic")).toBe(false);
+    expect(modelBelongsToProvider(undefined, "anthropic")).toBe(false);
   });
 });
 

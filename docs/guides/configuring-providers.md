@@ -94,9 +94,8 @@ woopcode providers set --provider google
 Only useful once there is more than one implemented provider.
 
 :::note
-Google Gemini is the only provider that runs. `openai` and `anthropic` are
-listed so you can see they are planned; selecting one does not produce a
-working session.
+Google Gemini and Anthropic Claude both run. `openai` is listed so you can see
+it is planned; selecting it does not produce a working session.
 :::
 
 ## Where this is written

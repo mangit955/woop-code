@@ -32,9 +32,9 @@ export const PROVIDERS: ProviderInfo[] = [
   {
     id: "anthropic",
     name: "Anthropic Claude",
-    enabled: false,
+    enabled: true,
     keyUrl: "https://console.anthropic.com/settings/keys",
-    description: "Claude models (not supported yet)",
+    description: "Claude models, strongest on long agentic work",
   },
 ];
 

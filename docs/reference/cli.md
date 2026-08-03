@@ -104,9 +104,13 @@ woopcode providers login --provider google --api-key "$GOOGLE_API_KEY"
 | `-p, --provider <name>` | all four | Which provider to act on |
 | `-a, --api-key <key>` | `login` | The key to store |
 
-Google Gemini is the only implemented provider. `openai` and `anthropic` appear
-in `providers list` so you can see they are planned, but selecting one will not
-give you a working session.
+Google Gemini and Anthropic Claude are both implemented. `openai` appears in
+`providers list` so you can see it is planned, but selecting it will not give
+you a working session.
+
+Switching provider also moves the model: a selection belonging to another
+provider is replaced with that provider's default, because the two are stored
+independently and a Gemini model id sent to Anthropic fails on the first turn.
 
 ## Exit codes
 

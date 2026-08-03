@@ -83,9 +83,16 @@ escape.
 `done`. Adding a provider means implementing that interface and enabling the
 entry in `config/providerRegistry.ts`; the loop above does not change.
 
-Today only the Google entry is enabled. `openai` and `anthropic` are listed
-with `enabled: false` so the interface can show them as planned rather than
-pretending they work.
+Google and Anthropic are enabled. `openai` is listed with `enabled: false` so
+the interface can show it as planned rather than pretending it works.
+
+The two clients differ in more than their request shape. Anthropic requires the
+reasoning that preceded a tool call to come back with that call's result — the
+model pauses mid-response to await the tool, and resumes the same response — so
+`config/anthropicClient.ts` keeps those blocks for the length of a turn and
+replays them. Omitting them is not an error: the API runs that request without
+thinking instead, which costs quality with nothing in the response to show for
+it.
 
 ## Tests
 

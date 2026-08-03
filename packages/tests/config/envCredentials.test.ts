@@ -54,9 +54,18 @@ describe("environment credentials", () => {
     expect(() =>
       resolveEnvCredentials({
         WOOPCODE_API_KEY: "k5",
-        WOOPCODE_PROVIDER: "anthropic",
+        WOOPCODE_PROVIDER: "openai",
       }),
     ).toThrow(/no runtime client/);
+  });
+
+  test("WOOPCODE_PROVIDER naming a provider that does run is honoured", () => {
+    expect(
+      resolveEnvCredentials({
+        WOOPCODE_API_KEY: "k5b",
+        WOOPCODE_PROVIDER: "anthropic",
+      }),
+    ).toEqual({ provider: "anthropic", apiKey: "k5b", source: "WOOPCODE_API_KEY" });
   });
 
   test("the rejection names the variable and the fix", () => {
@@ -72,14 +81,24 @@ describe("environment credentials", () => {
   // exported for another tool that shares the shell, and refusing to start
   // over it stranded users whose own key was already in providers.json.
   test("a vendor key for an unrunnable provider does not stop startup", () => {
-    expect(resolveEnvCredentials({ ANTHROPIC_API_KEY: "k7" })).toBeNull();
     expect(resolveEnvCredentials({ OPENAI_API_KEY: "k8" })).toBeNull();
+  });
+
+  // The other half of that rule: a vendor variable for a provider that *does*
+  // run is a usable credential, and enabling the provider is what turns the
+  // same variable from skipped into honoured.
+  test("a vendor key for a runnable provider is used", () => {
+    expect(resolveEnvCredentials({ ANTHROPIC_API_KEY: "k7" })).toEqual({
+      provider: "anthropic",
+      apiKey: "k7",
+      source: "ANTHROPIC_API_KEY",
+    });
   });
 
   test("an unrunnable vendor key does not shadow a usable one", () => {
     expect(
       resolveEnvCredentials({
-        ANTHROPIC_API_KEY: "other-tool",
+        OPENAI_API_KEY: "other-tool",
         GEMINI_API_KEY: "mine",
       }),
     ).toEqual({ provider: "google", apiKey: "mine", source: "GEMINI_API_KEY" });
@@ -87,7 +106,8 @@ describe("environment credentials", () => {
 
   test("WOOPCODE_PROVIDER does not redirect a vendor key to another provider", () => {
     // The variable names its own provider; WOOPCODE_PROVIDER applies only to
-    // WOOPCODE_API_KEY, so a Gemini key is never sent to Anthropic.
+    // WOOPCODE_API_KEY, so a Gemini key is never sent to Anthropic — which
+    // matters more now that Anthropic is a provider a key could reach.
     expect(
       resolveEnvCredentials({
         GEMINI_API_KEY: "mine",

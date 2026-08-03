@@ -17,11 +17,11 @@ describe("provider registry", () => {
   });
 
   test("only providers with a runtime client are enabled", () => {
-    expect(enabledProviderIds()).toEqual(["google"]);
+    expect(enabledProviderIds()).toEqual(["google", "anthropic"]);
     expect(isProviderEnabled("google")).toBe(true);
     expect(isProviderEnabled("gemini")).toBe(true);
+    expect(isProviderEnabled("anthropic")).toBe(true);
     expect(isProviderEnabled("openai")).toBe(false);
-    expect(isProviderEnabled("anthropic")).toBe(false);
   });
 
   test("every enabled provider can build a client", () => {
@@ -32,10 +32,7 @@ describe("provider registry", () => {
 
   test("planned providers are still listed so users know they are coming", () => {
     const planned = PROVIDERS.filter((provider) => !provider.enabled);
-    expect(planned.map((provider) => provider.id)).toEqual([
-      "openai",
-      "anthropic",
-    ]);
+    expect(planned.map((provider) => provider.id)).toEqual(["openai"]);
   });
 
   test("the refusal message names the provider and what does work", () => {
@@ -59,9 +56,6 @@ describe("gating", () => {
     // No network call is made: the registry check happens first, so this
     // resolves instantly rather than hitting the provider's API.
     await expect(loginProvider("openai", "sk-test")).rejects.toThrow(
-      /not supported yet/,
-    );
-    await expect(loginProvider("anthropic", "sk-test")).rejects.toThrow(
       /not supported yet/,
     );
     await expect(loginProvider("groq", "gsk-test")).rejects.toThrow(

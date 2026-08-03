@@ -23,8 +23,41 @@ import { compactOutcome } from "./executionLog";
  * removing both failure modes.
  */
 
-/** Characters of tool history kept verbatim, newest first. */
-export const DEFAULT_TOOL_HISTORY_BUDGET = 40_000;
+/**
+ * Compaction is off unless `WOOPCODE_TOOL_HISTORY_BUDGET` asks for it.
+ *
+ * It does what it claims to: replayed against the recorded corpus it cut peak
+ * prompt characters by 36-43% at matched depth, and a live benchmark confirmed
+ * the reduction. It was still turned off, because the same benchmark cost a
+ * task that had been passing.
+ *
+ * Against the previous run of the same five tasks:
+ *
+ *   circuit-fibsqrt   1.0 at 165 iterations  ->  0.0, budget exhausted at 200
+ *   build-pov-ray     1.0 at  79 iterations  ->  finished at 121, +53%
+ *   make-mips         0.0 at 200 iterations  ->  0.0, finished at 183
+ *
+ * One regression, no improvement, and two trajectories that needed materially
+ * more iterations to reach the same place. Fewer characters per request bought
+ * more requests.
+ *
+ * The likeliest explanation is that compacting call arguments removes content
+ * the agent authored: circuit-fibsqrt builds a 28,017-line file through tool
+ * arguments, which are 86% of its tool history, and it is the task that
+ * regressed. That is a hypothesis, not a finding — at n=1 it cannot be
+ * separated from ordinary variance, and there was no budget left to try.
+ *
+ * So the code, its tests and the measurements stay, and the default does not.
+ * Enabling it is one environment variable, and the replay harness will report
+ * what any budget would do without spending anything:
+ *
+ *     WOOPCODE_TOOL_HISTORY_BUDGET=40000
+ *
+ * Before enabling it again, the thing worth testing is compacting results only
+ * and leaving authored arguments intact — measured at -21% across the corpus,
+ * and it cannot remove anything the agent wrote.
+ */
+export const SUGGESTED_TOOL_HISTORY_BUDGET = 40_000;
 
 /**
  * Characters of each argument value kept when an old call is compacted.
@@ -37,23 +70,24 @@ export const DEFAULT_TOOL_HISTORY_BUDGET = 40_000;
 const ARGUMENT_HEAD_CHARS = 200;
 
 /**
- * Resolves the budget, allowing `WOOPCODE_TOOL_HISTORY_BUDGET` to change it.
+ * The configured budget, or null when compaction is disabled.
  *
- * Same reasoning as the iteration and attempt limits: an automated caller
- * working one long task has different tolerances from a human at a prompt.
+ * Null rather than a very large number: "off" is a decision backed by a
+ * benchmark, and it should read that way at the call site instead of being
+ * hidden behind a threshold nothing ever crosses.
  */
 export function toolHistoryBudget(
   env: Record<string, string | undefined> = process.env,
-): number {
+): number | null {
   const raw = env.WOOPCODE_TOOL_HISTORY_BUDGET?.trim();
-  if (!raw) return DEFAULT_TOOL_HISTORY_BUDGET;
+  if (!raw) return null;
 
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     process.stderr.write(
       `⚠️  ignoring WOOPCODE_TOOL_HISTORY_BUDGET=${raw} (expected a non-negative integer)\n`,
     );
-    return DEFAULT_TOOL_HISTORY_BUDGET;
+    return null;
   }
   return parsed;
 }
@@ -98,7 +132,7 @@ function historySize(message: Message): number {
  */
 export function compactToolHistory(
   messages: Message[],
-  budgetChars: number = toolHistoryBudget(),
+  budgetChars: number,
 ): Message[] {
   const compacted = messages.slice();
   let used = 0;

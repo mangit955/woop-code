@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import {
-  DEFAULT_TOOL_HISTORY_BUDGET,
+  SUGGESTED_TOOL_HISTORY_BUDGET,
   compactToolHistory,
   toolHistoryBudget,
 } from "../../../runtime/compaction";
@@ -151,11 +151,16 @@ describe("what compaction does", () => {
 });
 
 describe("budget configuration", () => {
-  test("defaults when unset", () => {
-    expect(toolHistoryBudget({})).toBe(DEFAULT_TOOL_HISTORY_BUDGET);
+  /**
+   * Off unless asked for. A benchmark run with compaction enabled turned a
+   * passing task into a budget-exhausted failure and made two trajectories
+   * materially longer, with no measured gain; see runtime/compaction.ts.
+   */
+  test("compaction is disabled when nothing asks for it", () => {
+    expect(toolHistoryBudget({})).toBeNull();
   });
 
-  test("WOOPCODE_TOOL_HISTORY_BUDGET overrides it", () => {
+  test("WOOPCODE_TOOL_HISTORY_BUDGET enables it", () => {
     expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "5000" })).toBe(5_000);
   });
 
@@ -163,12 +168,12 @@ describe("budget configuration", () => {
     expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "0" })).toBe(0);
   });
 
-  test("a nonsense value falls back rather than disabling the prompt", () => {
-    expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "soon" })).toBe(
-      DEFAULT_TOOL_HISTORY_BUDGET,
-    );
-    expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "-5" })).toBe(
-      DEFAULT_TOOL_HISTORY_BUDGET,
-    );
+  test("a nonsense value leaves it disabled rather than guessing a budget", () => {
+    expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "soon" })).toBeNull();
+    expect(toolHistoryBudget({ WOOPCODE_TOOL_HISTORY_BUDGET: "-5" })).toBeNull();
+  });
+
+  test("the suggested budget is kept for whoever enables it", () => {
+    expect(SUGGESTED_TOOL_HISTORY_BUDGET).toBeGreaterThan(0);
   });
 });

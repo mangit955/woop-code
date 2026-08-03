@@ -1,5 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import type { Tool } from "../../../config/types";
+import { toolRegistery } from "../../../tools";
+import { toolEffect } from "../../../runtime/toolEffects";
 import { readFileTool } from "../../../tools/readFile";
 import { listFilesTool } from "../../../tools/listFiles";
 import { join } from "node:path";
@@ -56,29 +58,69 @@ export function testToolContract(toolName: string, tool: Tool) {
       expect(typeof tool.execute).toBe("function");
     });
 
-    test("execute method signature accepts Record<string, unknown>", () => {
-      // This is a compile-time check, but we verify runtime behavior
-      expect(tool.execute.length).toBe(1);
+    test("execute takes arguments, and at most an abort signal besides", () => {
+      // The signature is execute(args, signal), and the signal is optional: a
+      // tool with nothing to interrupt declares one parameter, a tool that
+      // passes it to a fetch or a subprocess declares two. Pinning this to
+      // exactly one would fail every tool that honours cancellation, which is
+      // the behaviour the runtime asks for. The shape of `args` itself is tsc's
+      // job, not an arity check's.
+      expect(tool.execute.length).toBeGreaterThanOrEqual(1);
+      expect(tool.execute.length).toBeLessThanOrEqual(2);
     });
 
-    test("execute throws error for invalid arguments", async () => {
-      // Most tools should throw when required params are missing
+    test("execute rejects missing required arguments before doing any work", async () => {
+      const required = tool.parameters.filter((parameter) => parameter.required);
+
+      if (required.length === 0) {
+        // Nothing is required, so an empty call is a legitimate invocation
+        // rather than an error — but only a reading tool can be invoked to
+        // prove it. Calling run_tests with no arguments defaults to `bun test`
+        // and blocks on an approval prompt no test can answer, having already
+        // spawned the suite inside itself; a shell or writing tool belongs to
+        // its own integration test, where the approval prompt is faked.
+        // Reading the effect from TOOL_EFFECTS rather than from the tool name
+        // means an unclassified new tool is left alone too, which is the same
+        // direction everything else here fails in.
+        if (toolEffect(tool.name) === "read") {
+          expect(typeof (await tool.execute({}))).toBe("string");
+        }
+        return;
+      }
+
+      // A tool with a required parameter must refuse an empty call, and refuse
+      // it before it touches the network, the filesystem or the approval store.
+      // The message is what the model reads and corrects itself from, so an
+      // empty one fails the contract as surely as no error at all.
+      let thrown: unknown;
       try {
         await tool.execute({});
-        // If it doesn't throw, it means the tool has no required params (valid)
       } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBeDefined();
+        thrown = error;
       }
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message.length).toBeGreaterThan(0);
     });
   });
 }
 
-// Test real tools against the contract
-describe("Real Tool Contract Compliance", () => {
-  testToolContract("read_file", readFileTool);
-  testToolContract("list_files", listFilesTool);
+// Every registered tool, not a hand-kept list of two.
+//
+// The list was `read_file` and `list_files`, and the other eleven entries in the
+// registry were covered only by the shallow sweep below — unique names, non-empty
+// descriptions. A tool could ship with an unvalidated required parameter or a
+// signature the runtime cannot call and pass CI, while packages/tests/README.md
+// said contracts were "applied to every implementation". Driving this off the
+// registry is what makes that sentence true, and means a new tool inherits the
+// contract by being registered rather than by someone remembering this file.
+for (const tool of toolRegistery) {
+  testToolContract(tool.name, tool);
+}
 
+// Behaviour, rather than shape: these assert what a particular tool does, so
+// they stay named.
+describe("Real Tool Contract Compliance", () => {
   test("readFileTool - validates required path parameter", async () => {
     await expect(readFileTool.execute({})).rejects.toThrow(
       "File path is required",

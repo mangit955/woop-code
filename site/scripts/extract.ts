@@ -32,7 +32,7 @@ const GATE: Record<string, string> = {
   write: "Pauses on a unified diff. Nothing is written until you approve it.",
   shell: "Gated by the approval mode.",
   ask: "Stops the turn and waits for your answer.",
-  unclassified: "Not yet classified — see site/scripts/extract.ts.",
+  unclassified: "Not yet classified — see runtime/toolEffects.ts.",
 };
 
 registerCommands();
@@ -121,7 +121,7 @@ if (process.argv.includes("--check")) {
     console.warn(
       `\n${unclassified.length} unclassified tool(s): ${unclassified
         .map((tool) => tool.name)
-        .join(", ")}\nAdd them to EFFECT in site/scripts/extract.ts.`,
+        .join(", ")}\nAdd them to TOOL_EFFECTS in runtime/toolEffects.ts.`,
     );
   }
 }

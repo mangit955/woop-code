@@ -531,13 +531,31 @@ describe("agentLoop - Cancellation", () => {
 
   test("cancellation during tool execution", async () => {
     let receivedSignal: AbortSignal | undefined;
+    // Set only if the tool ran to its natural end, which is what a loop that
+    // ignored the signal would have waited for. Asserting on it rather than on
+    // elapsed time keeps the test off the clock: a wall-clock budget tight
+    // enough to be meaningful here is also tight enough to flake on CI.
+    let completedNaturally = false;
     const slowTool = {
       name: "slow_tool",
       description: "Waits until cancelled",
       parameters: [],
       async execute(_args: Record<string, unknown>, signal?: AbortSignal) {
         receivedSignal = signal;
-        await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }));
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => {
+            completedNaturally = true;
+            resolve();
+          }, 5_000);
+          signal?.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
         return "Result";
       },
     };
@@ -551,7 +569,6 @@ describe("agentLoop - Cancellation", () => {
     // Abort during tool execution
     setTimeout(() => abortController.abort(), 10);
 
-    const start = Date.now();
     const result = await agentLoop(
       mockClient,
       messages,
@@ -562,7 +579,7 @@ describe("agentLoop - Cancellation", () => {
 
     expect(result).toBe("");
     expect(receivedSignal).toBe(abortController.signal);
-    expect(Date.now() - start).toBeLessThan(40);
+    expect(completedNaturally).toBe(false);
     expect(callbackSpy.getCallsByName("onCancel")).toHaveLength(1);
   });
 });

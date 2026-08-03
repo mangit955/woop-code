@@ -87,6 +87,13 @@ User state (config, conversation, execution log) lives in `~/.config/woopcode/` 
 
 ## Conventions
 
+Skills for the procedures that are multi-step and easy to half-do live in
+`.claude/skills/` — adding a tool, changing what the prompt carries, writing a
+test, and touching approval. Each ends in the command that checks it. Read the
+matching one before starting that kind of work.
+
+Before you do any work, mention how you could verify that work — the test, command, or observation that would show it actually worked. If a change can't be verified, say so before making it.
+
 Conventional commits (`feat(tools):`, `fix(runtime):`, …), TypeScript strict mode, small focused functions.
 
 Bun over Node throughout — the full rule is in `AGENTS.md` and `.cursor/rules/use-bun-instead-of-node-vite-npm-pnpm.mdc`:

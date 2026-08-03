@@ -30,6 +30,9 @@ bun install
 git checkout -b feature/my-feature-name
 ```
 
+   `bun install` also points git at `.githooks`, so the validation gate runs
+   before your commits. If it did not, run `bun run hooks:install`.
+
 5. Configure a provider (for testing):
 ```bash
 bun cli.ts
@@ -52,6 +55,37 @@ bun onboarding/test-reset.ts  # Clear config
 bun cli.ts                     # Test onboarding
 bun onboarding/test-reset.ts restore  # Restore config
 ```
+
+### Validation
+
+One command runs whatever your change owes:
+
+```bash
+bun run verify          # the working tree
+bun run verify --staged # only what is staged; this is what the hook runs
+bun run verify --all    # everything, whatever changed
+```
+
+The rules, and why each one is there, live in `verify.ts`'s header. In short:
+
+| what you changed | what has to pass |
+|---|---|
+| a `.ts` or `.tsx` file | `tsc --noEmit`, then `bun test` |
+| `tools/`, `commands/slash/`, `runtime/`, `config/version.ts` | the docs surface is still current |
+| a `.md` file | the docs lint |
+
+On top of those, the gate reads the lines your change *adds* and rejects a
+conflict marker, a credential, a `.only` or `.skip` that would quietly stop a
+test running, and Node where Bun has its own (`readFile`/`writeFile`,
+`child_process`, and the packages `AGENTS.md` rules out). Existing files are
+never re-judged — only what you are adding.
+
+The commit message has to be conventional too; see below.
+
+`.githooks/pre-commit` runs the gate over the staged change and
+`.githooks/commit-msg` checks the subject. Both are skipped mid-merge and
+mid-rebase, where the tree is half-repaired by definition — CI still has the
+last word.
 
 ### Type Checking
 
@@ -157,12 +191,15 @@ Place tests in `packages/tests/` following the existing structure.
 
 ### Before Submitting
 
-- [ ] Code follows project style guidelines
+- [ ] `bun run verify --all` passes — tests, types and docs, the three CI gates
 - [ ] Tests added for new functionality
-- [ ] All tests pass (`bun test`)
-- [ ] TypeScript compiles without errors
 - [ ] Documentation updated if needed
 - [ ] Commits are clean and well-described
+
+The first line used to be three separate honour-system bullets. They were
+honoured right up until they were not: `main` went red because a line in a
+Markdown file named a directory that had been renamed, and nothing between the
+edit and the push ever ran the check that says so. Hence the gate.
 
 ### PR Guidelines
 
@@ -196,7 +233,8 @@ Expected review time: 2-5 days for most PRs.
 
 ## Commit Message Guidelines
 
-We use conventional commit messages:
+We use conventional commit messages, and `.githooks/commit-msg` enforces the
+subject line. Merges, reverts and `fixup!`/`squash!` are exempt.
 
 ```
 <type>(<scope>): <description>

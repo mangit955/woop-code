@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# The subject has to say what the commit did, in the form CONTRIBUTING.md
+# documents. Merges, reverts and fixups are exempt; verify.ts knows which.
+
+exec bun ./verify.ts --commit-msg "$1"

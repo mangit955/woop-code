@@ -18,9 +18,13 @@ bun test --test-name-pattern "streaming"            # by test name
 bun run test                                        # bun test + tsc --noEmit (what CI runs)
 bunx --no-install tsc --noEmit                      # type check alone
 
+bun run verify                # the gate: the checks this change owes, and nothing else
+bun run verify --all          # every check, whatever changed
+bun run hooks:install         # point git at .githooks (bun install does this too)
+
 bun run docs:extract          # regenerate site/src/docs/surface.json from the code
 bun run docs:check            # extract --check + docs lint; CI gate
-bun run site                  # docs/marketing site with hot reload
+bun run site                  # documentation and marketing site, with hot reload
 
 bun run-benchmarks.ts         # benchmarks
 bun run replay:baseline       # replay harness over packages/tests/fixtures/replay
@@ -28,6 +32,8 @@ bun onboarding/test-reset.ts  # clear local config to test onboarding (`restore`
 ```
 
 CI (`.github/workflows/ci.yml`) gates on three things: `bun test` on ubuntu **and** macOS, `tsc --noEmit`, and `docs:check`. Both OSes run because the approval classifier and the config loader depend on path semantics that differ between them.
+
+Those same three run before a commit rather than after a push. `verify.ts` holds the rules — which of the checks a change owes, read from the paths it touched, plus a handful the diff can answer on its own (conflict markers, a staged key, a silenced test, Node where Bun has its own). `.githooks/pre-commit` runs it over what is staged, `.githooks/commit-msg` checks the subject is conventional, and a `PreToolUse` hook in `.claude/settings.json` runs it again for the agent, because `--no-verify` walks past a git hook. Every rule and its reasoning is in `verify.ts`'s header.
 
 ## Architecture
 

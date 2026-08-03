@@ -222,13 +222,15 @@ export async function agentLoop(
 
       // Measured from the same array that is sent, so the segment sizes and
       // the provider's token count describe one and the same request.
-      // Compacted for the request only. `messages` keeps the full results,
-      // because the execution log is built from them after the turn and
-      // shrinking what is sent is not the same as forgetting what happened.
-      const sentMessages = compactToolHistory(
-        recentMessages(messages, MAX_TURNS),
-        historyBudget,
-      );
+      // Compaction is opt-in; see runtime/compaction.ts for the benchmark that
+      // turned it off. When enabled it applies to the request only, because the
+      // execution log is built from `messages` after the turn and shrinking
+      // what is sent is not the same as forgetting what happened.
+      const windowed = recentMessages(messages, MAX_TURNS);
+      const sentMessages =
+        historyBudget === null
+          ? windowed
+          : compactToolHistory(windowed, historyBudget);
       const segments = measureSegments(sentMessages, repoContext);
       const iterationStartedAt = Date.now();
       let usage: TokenUsage | undefined;

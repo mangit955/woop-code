@@ -14,7 +14,11 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { measureSegments } from "../../../config/runtime";
 import { recentMessages } from "../../../config/config";
-import { compactToolHistory, toolHistoryBudget } from "../../../runtime/compaction";
+import {
+  SUGGESTED_TOOL_HISTORY_BUDGET,
+  compactToolHistory,
+  toolHistoryBudget,
+} from "../../../runtime/compaction";
 import { parseEvents, replaySteps, type ReplayStep } from "./reconstruct";
 import {
   buildReport,
@@ -35,10 +39,19 @@ const baseline = (step: ReplayStep) =>
     "x".repeat(step.repoContextChars),
   );
 
-/** Assembly as the runtime performs it now, compaction included. */
+/**
+ * Assembly with compaction applied.
+ *
+ * Compaction is disabled by default in the runtime, so this reports what a
+ * budget *would* do rather than what today's requests look like. That is the
+ * point of having it here: the effect of any budget can be measured without
+ * enabling it and without an API call.
+ */
+const COMPACTION_BUDGET = toolHistoryBudget() ?? SUGGESTED_TOOL_HISTORY_BUDGET;
+
 const current = (step: ReplayStep) =>
   measureSegments(
-    compactToolHistory(recentMessages(step.messages, MAX_TURNS), toolHistoryBudget()),
+    compactToolHistory(recentMessages(step.messages, MAX_TURNS), COMPACTION_BUDGET),
     "x".repeat(step.repoContextChars),
   );
 
@@ -91,7 +104,7 @@ function printDetail(m: Measured) {
   }
 
   console.log(`  total chars (recorded)  ${n(report.totalChars)}`);
-  console.log(`  total chars (now)       ${n(m.now.totalChars)}`);
+  console.log(`  total chars (compacted) ${n(m.now.totalChars)}`);
   console.log(`  total est. tokens       ${n(report.estimatedTotalTokens)}`);
   console.log(
     cache
@@ -124,7 +137,7 @@ if (only && measured.length === 1) {
 console.log(`\nreplay baseline — ${measured.length} fixture(s)\n`);
 const head =
   `${"fixture".padEnd(30)}${"iters".padStart(6)}${"peak base".padStart(12)}` +
-  `${"peak now".padStart(11)}${"delta".padStart(8)}${"ch/tok".padStart(8)}${"cache".padStart(7)}`;
+  `${"if compact".padStart(11)}${"delta".padStart(8)}${"ch/tok".padStart(8)}${"cache".padStart(7)}`;
 console.log(head);
 console.log("-".repeat(head.length));
 
@@ -161,7 +174,8 @@ console.log(`  max     ${n(peaks.at(-1)!).padStart(12)}`);
 const baseChars = measured.reduce((s, m) => s + m.report.totalChars, 0);
 const nowChars = measured.reduce((s, m) => s + m.now.totalChars, 0);
 console.log(
-  `\ntotals   ${n(baseChars)} chars as recorded -> ${n(nowChars)} as assembled now ` +
+  `\ntotals   ${n(baseChars)} chars as recorded -> ${n(nowChars)} with compaction at ` +
+    `${n(COMPACTION_BUDGET)} chars ` +
     `(${(((nowChars - baseChars) / baseChars) * 100).toFixed(1)}%) ` +
     `over ${measured.reduce((s, m) => s + m.report.iterations, 0)} iterations`,
 );

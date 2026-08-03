@@ -21,7 +21,7 @@
     },
     {
       "name": "read_file",
-      "description": "Reads the contents of a file.",
+      "description": "Reads the contents of a file. Pass startLine and endLine to read only part of a large file; both are 1-indexed and inclusive. Reading a range is preferable to reading a whole large file when the relevant location is already known, for example from a grep match or an error message.",
       "effect": "read",
       "gate": "Runs without asking. Reads only; never changes the workspace.",
       "parameters": [
@@ -30,6 +30,18 @@
           "type": "string",
           "required": true,
           "description": "Path to the file"
+        },
+        {
+          "name": "startLine",
+          "type": "number",
+          "required": false,
+          "description": "First line to read, 1-indexed and inclusive. Defaults to the start of the file."
+        },
+        {
+          "name": "endLine",
+          "type": "number",
+          "required": false,
+          "description": "Last line to read, 1-indexed and inclusive. Defaults to the end of the file."
         }
       ]
     },

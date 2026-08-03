@@ -1,5 +1,35 @@
 import type { Tool } from "../config/types";
 
+/**
+ * Consecutive fruitless searches before the tool reports itself unavailable.
+ *
+ * A benchmark trial spent 37 of its 78 tool calls on web_search, and every one
+ * returned "No search results found"; the rerun did it again 27 times. The
+ * search is an HTML scrape of DuckDuckGo, which a sandboxed container either
+ * blocks or serves a bot page — so the tool cannot work there at all, and the
+ * agent has no way to learn that from one empty result.
+ *
+ * The loop's duplicate guard cannot catch this: it keys on exact arguments, and
+ * all 37 queries differed. Only the tool knows that the last several attempts
+ * were barren regardless of what was asked.
+ *
+ * Three rather than one, because an empty result for a genuinely obscure query
+ * is ordinary and should not disable a working search.
+ */
+const BARREN_SEARCHES_BEFORE_UNAVAILABLE = 3;
+
+const UNAVAILABLE =
+  "Web search is unavailable in this environment: the last " +
+  `${BARREN_SEARCHES_BEFORE_UNAVAILABLE} searches all returned nothing. ` +
+  "Do not search again. Work from the files and tools available locally.";
+
+let barrenSearches = 0;
+
+/** Clears the barren-search count. For tests; the count is per process. */
+export function resetWebSearchAvailability() {
+  barrenSearches = 0;
+}
+
 export const webSearchTool: Tool = {
   name: "web_search",
   description: `Search the web for current information, documentation, or answers to questions.
@@ -36,6 +66,12 @@ Current year: ${new Date().getFullYear()}`,
       throw new Error("Search query is required");
     }
 
+    // Checked before the request, so a search that cannot work stops costing a
+    // round trip as well as an iteration.
+    if (barrenSearches >= BARREN_SEARCHES_BEFORE_UNAVAILABLE) {
+      return UNAVAILABLE;
+    }
+
     // Use DuckDuckGo Instant Answer API (free, no API key needed)
     try {
       const encodedQuery = encodeURIComponent(query);
@@ -60,8 +96,13 @@ Current year: ${new Date().getFullYear()}`,
       const results = parseSearchResults(html, numResults);
 
       if (results.length === 0) {
+        barrenSearches++;
         return `No search results found for: "${query}"\n\nTry:\n- Using different keywords\n- Being more specific\n- Checking spelling`;
       }
+
+      // A search that returned something proves the environment can reach the
+      // index, so earlier empties were about the queries rather than the network.
+      barrenSearches = 0;
 
       // Format results
       const output: string[] = [
@@ -84,6 +125,11 @@ Current year: ${new Date().getFullYear()}`,
 
       return output.join("\n");
     } catch (error) {
+      // A failed request is as barren as an empty one, and a container with no
+      // network out fails here rather than returning zero results. Cancellation
+      // is not: the turn was interrupted, which says nothing about the search.
+      if (!signal?.aborted) barrenSearches++;
+
       throw new Error(
         `Web search failed: ${error instanceof Error ? error.message : String(error)}`
       );

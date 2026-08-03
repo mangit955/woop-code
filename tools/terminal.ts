@@ -25,9 +25,29 @@ function startsBackgroundProcess(command: string) {
   return false;
 }
 
+/**
+ * How long a command runs before it is killed, when the caller names no limit.
+ *
+ * Thirty seconds was the original figure, and a benchmark run shows what it
+ * killed:
+ *
+ *   apt-get update && apt-get install -y build-essential wget ...
+ *   cd /app/source && make -f unix.mak -j$(nproc)
+ *
+ * A dependency install and the build the task was set to perform, both cut off
+ * mid-way and reported to the agent as an error. The model has no reason to
+ * know it must pass a `timeout` argument to compile something, so the default
+ * has to fit the work rather than the fastest example of it.
+ *
+ * Five minutes, not longer: a command still running then is usually the thing
+ * this tool refuses anyway — a server, a watch process — and an agent waiting
+ * on one has stopped making progress.
+ */
+const DEFAULT_TIMEOUT_SECONDS = 300;
+
 export const terminalTool: Tool = {
   name: "run_terminal",
-  description: "Runs a terminal command in the current project. For quick commands only (tests, builds, installs). Do not use for starting servers or long-running processes.",
+  description: "Runs a terminal command in the current project. For commands that finish on their own (tests, builds, installs). Do not use for starting servers or long-running processes.",
   parameters: [
     {
       name: "command",
@@ -36,7 +56,7 @@ export const terminalTool: Tool = {
     },
     {
       name: "timeout",
-      description: "Timeout in seconds (default: 30). Command will be killed if it exceeds this time.",
+      description: `Timeout in seconds (default: ${DEFAULT_TIMEOUT_SECONDS}). Command will be killed if it exceeds this time. Raise it for a build or test run expected to take longer.`,
       required: false,
       type: "number",
     },
@@ -44,7 +64,7 @@ export const terminalTool: Tool = {
 
   async execute(args, signal) {
     const command = args.command as string;
-    const timeoutSeconds = (args.timeout as number) || 30;
+    const timeoutSeconds = (args.timeout as number) || DEFAULT_TIMEOUT_SECONDS;
 
     if (!command) {
       throw Error("command is required");

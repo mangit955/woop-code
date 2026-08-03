@@ -349,7 +349,9 @@ describe("agentLoop - Tool Loop Detection", () => {
     };
 
     await expect(agentLoop(dynamicClient, messages, "", callbackSpy)).resolves.toBe("Now editing the file");
-    expect(mockTool.executionCount).toBe(4);
+    // SAME_TOOL_THRESHOLD: the model asks five times, the loop runs it twice
+    // and answers the rest from the result already in the conversation.
+    expect(mockTool.executionCount).toBe(2);
     expect(callbackSpy.getCallsByName("onToolFinish")).toHaveLength(5);
     expect(messages.find((message) => message.role === "tool" && message.content.startsWith("Skipped duplicate"))).toBeDefined();
   });

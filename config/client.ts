@@ -29,7 +29,81 @@ export function getModelDisplayName(modelId: string | undefined) {
   return GOOGLE_MODELS.find((model) => model.id === modelId)?.name ?? modelId ?? ACTIVE_PROVIDER_MODELS.google;
 }
 
-const GEMINI_REQUEST_TIMEOUT_MS = 60_000;
+/**
+ * How long a single provider request may take.
+ *
+ * Sixty seconds was chosen against interactive use, where a request that has
+ * stopped producing output is a hang the user is sitting through. It is the
+ * wrong number for a long task: terminal-bench allows an hour per task, and a
+ * response that is still streaming at sixty seconds is progress, not a stall.
+ */
+const GEMINI_REQUEST_TIMEOUT_MS = 300_000;
+
+/** Thinking budget when nothing overrides it. -1 asks the model to decide. */
+const DEFAULT_THINKING_BUDGET = -1;
+
+/**
+ * Resolves the reasoning budget, allowing `WOOPCODE_THINKING_BUDGET` to set it.
+ *
+ * The request previously carried no thinking configuration at all, which left
+ * the decision to whatever the model defaults to. Across a five-task benchmark
+ * run that produced mean completions of 65 to 372 tokens per iteration — the
+ * model was answering reflexively, one tool call at a time, on tasks whose
+ * failure mode was arriving at the wrong number rather than running the wrong
+ * command.
+ *
+ * The default is -1 (AUTOMATIC) rather than a token count: what a useful budget
+ * is depends on the model, and inventing a number here would be a guess
+ * presented as a setting. A probe of 15 requests over this client — five budgets
+ * across three prompt sizes, unique prompts, shuffled order — backs that up:
+ *
+ *   budget    thinking tokens returned
+ *   128       0
+ *   512       0
+ *   1024      54-101
+ *   -1        64-202
+ *
+ * A budget below roughly a thousand is not honoured, it is ignored, so setting
+ * one buys the cost of looking configured and none of the reasoning.
+ *
+ * Thinking is also cheap here, which was worth knowing before assuming
+ * otherwise: 494 thinking tokens across all 15 requests, and in the warm steady
+ * state the thinking budgets were no slower than sending no config at all.
+ *
+ * Which values a model accepts is also model-dependent, and not in a way the
+ * SDK's types express. `gemini-3.5-flash-lite` — the default here — rejects a
+ * budget of 0 outright:
+ *
+ *     400 INVALID_ARGUMENT: Request contains an invalid argument.
+ *
+ * So 0 is not a portable way to ask for the old, thinking-free behaviour, and
+ * it is not offered as one. It is still accepted here rather than screened out,
+ * because a model that does support disabling thinking should be reachable
+ * through the same knob; the provider's own error is the honest answer for one
+ * that does not.
+ *
+ * `off` is the portable way, and it is why this returns `undefined` rather than
+ * only a number: the caller then sends no `thinkingConfig` at all, which is
+ * exactly the request this client made before thinking was configurable. Since
+ * the model that ships as the default refuses 0, without `off` there would be no
+ * way back to that behaviour — and no control to measure the new one against.
+ */
+export function thinkingBudget(
+  env: Record<string, string | undefined> = process.env,
+): number | undefined {
+  const raw = env.WOOPCODE_THINKING_BUDGET?.trim();
+  if (!raw) return DEFAULT_THINKING_BUDGET;
+  if (raw.toLowerCase() === "off") return undefined;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < -1) {
+    process.stderr.write(
+      `⚠️  ignoring WOOPCODE_THINKING_BUDGET=${raw} (expected off, -1, 0, or a positive integer)\n`,
+    );
+    return DEFAULT_THINKING_BUDGET;
+  }
+  return parsed;
+}
 
 export function geminiClient(
   apiKey: string,
@@ -81,6 +155,9 @@ export function geminiClient(
       ];
 
       const limit = maxAttempts();
+      // Read once per turn, for the same reason the loop reads its own budgets
+      // once: two requests of one turn should not assemble to different rules.
+      const budget = thinkingBudget();
 
       // Retrying is only safe while nothing has been observed. Once a chunk has
       // been yielded the caller has already appended it to the assistant's text
@@ -116,6 +193,10 @@ export function geminiClient(
                 ? `${SYSTEM_PROMPT}\n\nRepository Context:\n${repoContext}`
                 : SYSTEM_PROMPT,
               tools: useTools ? tools : undefined,
+              // Omitted entirely when the budget is off, rather than sent as a
+              // zero: this model rejects a zero budget, and an absent config is
+              // the request this client made before thinking existed.
+              ...(budget === undefined ? {} : { thinkingConfig: { thinkingBudget: budget } }),
               abortSignal: requestController.signal,
             },
           });
@@ -133,6 +214,12 @@ export function geminiClient(
                 promptTokens: chunk.usageMetadata.promptTokenCount,
                 completionTokens: chunk.usageMetadata.candidatesTokenCount,
                 cachedTokens: chunk.usageMetadata.cachedContentTokenCount,
+                // Reported apart from the answer, so a run with thinking
+                // enabled otherwise looks like one that barely responded: the
+                // first benchmark trial after enabling it recorded completions
+                // of 22 to 55 tokens while the model was thinking for minutes.
+                // Without this, nothing in the logs says what that cost.
+                thoughtTokens: chunk.usageMetadata.thoughtsTokenCount,
                 totalTokens: chunk.usageMetadata.totalTokenCount,
               };
             }
@@ -148,7 +235,11 @@ export function geminiClient(
                   arguments: part.functionCall.args ?? {},
                   thoughtSignature: part.thoughtSignature,
                 };
-              } else if (part.text) {
+              } else if (part.text && !part.thought) {
+                // A thought part is reasoning, not the answer. Yielding it would
+                // stream the model's scratchpad to the terminal and persist it
+                // as assistant text. Only possible since thinking was enabled,
+                // and only if a caller asks for thoughts to be included.
                 emittedModelOutput = true;
                 yield { type: "text", content: part.text };
               }

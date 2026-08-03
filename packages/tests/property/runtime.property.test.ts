@@ -166,8 +166,10 @@ describe("Runtime - Property Tests", () => {
           const callbacks = new CallbackSpy();
           const messages: Message[] = [createUserMessage("Test")];
 
-          // INVARIANT: the fifth identical call is not executed, but the
-          // model receives a result and can choose a different action.
+          // INVARIANT: identical calls past SAME_TOOL_THRESHOLD are not
+          // executed, but the model still receives a result and can choose a
+          // different action. The property is that the count is bounded however
+          // many times the model asks — not the particular bound.
           const provider = createStreamingProvider([
             [createToolCallEvent("test_tool", args), createDoneEvent()],
             [createToolCallEvent("test_tool", args), createDoneEvent()],
@@ -178,7 +180,7 @@ describe("Runtime - Property Tests", () => {
           ]);
 
           await expect(agentLoop(provider, messages, "", callbacks)).resolves.toBe("Recovered");
-          expect(tool.executionCount).toBe(4);
+          expect(tool.executionCount).toBe(2);
           expect(messages.some((message) => message.role === "tool" && message.content.startsWith("Skipped duplicate"))).toBe(true);
         }
       ),

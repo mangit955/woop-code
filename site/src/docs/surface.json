@@ -47,7 +47,7 @@
     },
     {
       "name": "run_terminal",
-      "description": "Runs a terminal command in the current project. For quick commands only (tests, builds, installs). Do not use for starting servers or long-running processes.",
+      "description": "Runs a terminal command in the current project. For commands that finish on their own (tests, builds, installs). Do not use for starting servers or long-running processes.",
       "effect": "shell",
       "gate": "Gated by the approval mode.",
       "parameters": [
@@ -61,7 +61,7 @@
           "name": "timeout",
           "type": "number",
           "required": false,
-          "description": "Timeout in seconds (default: 30). Command will be killed if it exceeds this time."
+          "description": "Timeout in seconds (default: 300). Command will be killed if it exceeds this time. Raise it for a build or test run expected to take longer."
         }
       ]
     },

@@ -1,5 +1,5 @@
 import { describe, test, expect, mock } from "bun:test";
-import { agentLoop, measureSegments } from "../../../config/runtime";
+import { agentLoop, measureSegments, renderContext } from "../../../config/runtime";
 import { SYSTEM_PROMPT } from "../../../config/systemPrompt";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
 import { createRuntimeTest, createStreamingProvider } from "../shared/testHelpers";
@@ -134,5 +134,59 @@ describe("agentLoop - usage reporting", () => {
 
     expect(usageReports(callbacks).length).toBe(0);
     expect(callbacks.getCallsByName("onCancel").length).toBe(1);
+  });
+});
+
+describe("turn context segments", () => {
+  test("a plain string is repository context with no execution log", () => {
+    // The form every caller used before the log existed, and the form the
+    // replay corpus reconstructs from recordings that predate it.
+    const segments = measureSegments([], "repo text");
+
+    expect(segments.repoContext).toBe(9);
+    expect(segments.executionLog).toBe(0);
+  });
+
+  test("the execution log is measured apart from the repository context", () => {
+    // Previously joined into one string before measurement, which reported the
+    // log as repository context and made the two indistinguishable.
+    const segments = measureSegments([], {
+      repository: "repo text",
+      executionLog: "did a thing",
+    });
+
+    expect(segments.repoContext).toBe(9);
+    expect(segments.executionLog).toBe(11);
+  });
+
+  test("an absent log measures zero rather than being omitted", () => {
+    const segments = measureSegments([], { repository: "repo" });
+    expect(segments.executionLog).toBe(0);
+  });
+
+  test("the provider still receives one string", () => {
+    expect(renderContext({ repository: "repo", executionLog: "log" })).toBe(
+      "repo\n\nlog",
+    );
+  });
+
+  test("rendering omits the separator when a piece is missing", () => {
+    // An empty repository context must not leave a leading blank line, and an
+    // empty log must not leave a trailing one.
+    expect(renderContext({ repository: "repo", executionLog: "" })).toBe("repo");
+    expect(renderContext({ repository: "", executionLog: "log" })).toBe("log");
+    expect(renderContext("repo")).toBe("repo");
+  });
+
+  test("what is measured is what is sent", () => {
+    // The join and the measurement must not drift: their sum has to equal the
+    // rendered length, or the meter is describing a different request.
+    const context = { repository: "repo text", executionLog: "did a thing" };
+    const segments = measureSegments([], context);
+    const rendered = renderContext(context);
+
+    expect(segments.repoContext + segments.executionLog).toBe(
+      rendered.length - 2, // the "\n\n" separator
+    );
   });
 });

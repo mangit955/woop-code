@@ -103,3 +103,67 @@ describe("iteration budget", () => {
     expect(error?.message).toContain("(20)");
   });
 });
+
+/**
+ * The warning has to reach the model, not just the terminal.
+ *
+ * A benchmark trial made its final write at step 198 of a 200-iteration budget:
+ * it was still starting new work at the wall, because the only notice went to
+ * stderr through onStatus. The model cannot act on something it was never sent.
+ */
+describe("running out of budget", () => {
+  /** Runs to exhaustion, keeping the transcript and the statuses. */
+  async function runKeepingMessages() {
+    const { callbacks, messages } = createRuntimeTest();
+    callbacks.onError = () => {};
+
+    try {
+      await agentLoop(neverFinishingProvider(), messages, "", callbacks);
+    } catch {
+      // Exhaustion is the expected end; the transcript is what is under test.
+    }
+    return { messages, callbacks };
+  }
+
+  const budgetNotices = (messages: Array<{ role: string; content?: string }>) =>
+    messages.filter(
+      (message) =>
+        message.role === "user" &&
+        (message.content ?? "").includes("before this turn is stopped"),
+    );
+
+  test("the model is told, not just the terminal", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "8";
+
+    const { messages, callbacks } = await runKeepingMessages();
+
+    expect(budgetNotices(messages)).toHaveLength(1);
+    // The status still fires: the TUI shows it, and removing it would trade one
+    // audience for the other.
+    const statuses = callbacks
+      .getCallsByName("onStatus")
+      .map((call: { args: any[] }) => String(call.args[0]));
+    expect(statuses.some((text) => text.includes("iterations remaining"))).toBe(
+      true,
+    );
+  });
+
+  test("the notice names how many steps are left", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "8";
+
+    const { messages } = await runKeepingMessages();
+
+    // Fired at iteration 3 of 8, so five remain.
+    expect(budgetNotices(messages)[0]!.content).toContain("Only 5 more steps");
+  });
+
+  test("a budget too small to warn in still runs and still ends", async () => {
+    // The threshold is five from the end, so a budget of two never reaches it.
+    // The turn must still exhaust cleanly rather than warn about a negative
+    // number of remaining steps.
+    process.env.WOOPCODE_MAX_ITERATIONS = "2";
+
+    const { messages } = await runKeepingMessages();
+    expect(budgetNotices(messages)).toHaveLength(0);
+  });
+});

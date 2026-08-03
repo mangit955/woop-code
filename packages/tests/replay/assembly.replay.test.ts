@@ -86,10 +86,39 @@ describe.each(fixtures)("%s", (name) => {
     expect(second).toEqual(first);
   });
 
-  test("the system prompt is unchanged since the recording", () => {
+  test("was recorded with the corpus-wide system prompt", () => {
     // Separate from the assembly assertions on purpose: editing the prompt is
     // a legitimate change that must not read as "assembly drifted".
-    expect(SYSTEM_PROMPT.length).toBe(steps[0]!.recordedSegments.systemPrompt!);
+    //
+    // This used to compare the recording against the *current* prompt, which
+    // made every prompt edit fail until the fixtures were re-recorded — and
+    // re-recording costs a live benchmark run. So the check is that the corpus
+    // is internally consistent: every fixture carries the same system prompt
+    // size, which is what makes the replay numbers comparable across fixtures.
+    // How far today's prompt has moved from that is asserted once, below.
+    expect(steps[0]!.recordedSegments.systemPrompt).toBe(RECORDED_SYSTEM_PROMPT_CHARS);
+  });
+});
+
+/**
+ * The system prompt every fixture in the corpus was recorded with.
+ *
+ * Pinned rather than derived, so that a change to the recordings is as visible
+ * as a change to the prompt.
+ */
+const RECORDED_SYSTEM_PROMPT_CHARS = 3_763;
+
+describe("the system prompt against the corpus", () => {
+  test("today's prompt differs from the recordings by a known amount", () => {
+    // Replay reports characters per iteration, and the system prompt is carried
+    // whole on every one of them. So any difference here multiplies straight
+    // through the totals: at the time of writing, +391 characters across 932
+    // recorded iterations is the entire +364,412 the baseline moved by.
+    //
+    // Update this deliberately when the prompt changes, and state the delta in
+    // the commit — that is the whole point of the number.
+    const delta = SYSTEM_PROMPT.length - RECORDED_SYSTEM_PROMPT_CHARS;
+    expect(delta).toBe(391);
   });
 });
 

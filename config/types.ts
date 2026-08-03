@@ -32,6 +32,14 @@ export interface TokenUsage {
   completionTokens?: number;
   /** Prompt tokens served from the provider's cache, when it reports them. */
   cachedTokens?: number;
+  /**
+   * Reasoning tokens, which the provider bills but does not return.
+   *
+   * Kept apart from `completionTokens`: the two are charged differently, and a
+   * run that thinks at length while answering briefly is indistinguishable from
+   * an idle one if only the answer is counted.
+   */
+  thoughtTokens?: number;
   totalTokens?: number;
 }
 

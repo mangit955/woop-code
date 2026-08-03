@@ -191,7 +191,18 @@ export async function agentLoop(
   // iterations of the same turn assemble to different rules.
   const historyBudget = toolHistoryBudget();
   const MAX_TURNS = 6; // Reduced from 8 to limit context/token usage
-  const SAME_TOOL_THRESHOLD = 4;
+  /**
+   * Repeats of one call, with identical arguments, before it is skipped.
+   *
+   * Four allowed three wasted round trips before acting. A benchmark trial ran
+   * `readelf -s doomgeneric_mips | grep -i init` three times and several other
+   * readelf variants twice each, all inside a budget it went on to exhaust.
+   * Two is enough to let a genuine retry through — a command run again after
+   * something changed — while ending a loop one step sooner.
+   */
+  const SAME_TOOL_THRESHOLD = 2;
+  /** Iterations left when the model is told the budget is running out. */
+  const REMAINING_ITERATIONS_WARNING = 5;
   /** Tools actually run before the turn is nudged toward implementing. */
   const TOOLS_BEFORE_EFFICIENCY_WARNING = 6;
 
@@ -240,10 +251,24 @@ export async function agentLoop(
 
       // This one is about the loop budget, so the iteration counter is the
       // right measure.
-      if (iterations === MAX_ITERATIONS - 5) {
+      //
+      // Said to the model as well as to the terminal. A benchmark trial that
+      // exhausted its 200 iterations was still writing at its 198th tool call,
+      // because this warning only ever reached stderr. A status callback cannot
+      // change what the model does next; a message in the conversation can.
+      if (iterations === MAX_ITERATIONS - REMAINING_ITERATIONS_WARNING) {
+        const remaining = MAX_ITERATIONS - iterations;
         callbacks.onStatus?.(
-          `⚠️  ${MAX_ITERATIONS - iterations} iterations remaining - prioritize completion`,
+          `⚠️  ${remaining} iterations remaining - prioritize completion`,
         );
+        messages.push({
+          role: "user",
+          content:
+            `Only ${remaining} more steps are available before this turn is stopped. ` +
+            `Finish what you have started rather than beginning anything new, ` +
+            `make sure the work is in a usable state, and report what is done and ` +
+            `what is not.`,
+        });
       }
 
       let assistantText = "";

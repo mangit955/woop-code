@@ -41,11 +41,30 @@ import { compactOutcome } from "./executionLog";
  * more iterations to reach the same place. Fewer characters per request bought
  * more requests.
  *
- * The likeliest explanation is that compacting call arguments removes content
- * the agent authored: circuit-fibsqrt builds a 28,017-line file through tool
- * arguments, which are 86% of its tool history, and it is the task that
- * regressed. That is a hypothesis, not a finding — at n=1 it cannot be
- * separated from ordinary variance, and there was no budget left to try.
+ * The first explanation recorded here was that compacting call arguments
+ * removes content the agent authored — circuit-fibsqrt builds a 28,017-line
+ * file through tool arguments, and it is the task that regressed. The provider's
+ * own token counts, read back out of both runs' event logs afterwards, point
+ * somewhere simpler. On make-mips, the same task in both runs:
+ *
+ *   compaction off   iteration  50   prompt 25,115   cached 16,015
+ *                    iteration 150   prompt 75,918   cached 64,204
+ *                    iteration 200   prompt 96,388   cached 80,196
+ *
+ *   compaction on    iteration  50   prompt 26,102   no cached tokens reported
+ *                    iteration 150   prompt 28,620   no cached tokens reported
+ *                    iteration 180   prompt 29,304   no cached tokens reported
+ *
+ * Implicit caching stopped entirely, and the run totals agree: 18.1M cached
+ * tokens of 23.2M became 1.1M of 11.6M. `compactToolHistory` below walks
+ * backwards from the newest message and rewrites the older ones, which are the
+ * cache prefix, and it recomputes that boundary from a byte budget on every
+ * iteration — so the prefix differs on every request and no cache can hold.
+ *
+ * That also shows compaction was buying less than the character count suggests.
+ * At iteration 200, uncompacted, only 16k of a 96k prompt was billed at full
+ * rate; compacted, all 29k was. Peak characters fell by two thirds for roughly
+ * no saving, at the cost of a task.
  *
  * So the code, its tests and the measurements stay, and the default does not.
  * Enabling it is one environment variable, and the replay harness will report
@@ -53,9 +72,13 @@ import { compactOutcome } from "./executionLog";
  *
  *     WOOPCODE_TOOL_HISTORY_BUDGET=40000
  *
- * Before enabling it again, the thing worth testing is compacting results only
- * and leaving authored arguments intact — measured at -21% across the corpus,
- * and it cannot remove anything the agent wrote.
+ * Two things are worth trying before it is enabled again, and neither has been:
+ * compacting results only and leaving authored arguments intact (-21% across the
+ * corpus, and it cannot remove anything the agent wrote), and holding the
+ * boundary monotonic so it only ever advances — which is what would let a prefix
+ * survive long enough to be cached. Note that the replay harness cannot judge
+ * the second one: it prints cache rates observed for the original recordings and
+ * says outright that a modified assembly cannot inherit them.
  */
 export const SUGGESTED_TOOL_HISTORY_BUDGET = 40_000;
 

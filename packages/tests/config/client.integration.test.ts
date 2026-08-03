@@ -1,7 +1,40 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@google/genai";
-import { geminiClient } from "../../../config/client";
+import { geminiClient, thinkingBudget } from "../../../config/client";
 import type { Message, StreamEvent } from "../../../config/types";
+
+describe("thinking budget", () => {
+  test("defaults to letting the model decide", () => {
+    // -1 is AUTOMATIC. A token count here would be a guess about a model the
+    // caller may have overridden anyway.
+    expect(thinkingBudget({})).toBe(-1);
+  });
+
+  test("WOOPCODE_THINKING_BUDGET sets it", () => {
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "2048" })).toBe(2048);
+  });
+
+  test("zero is passed through, not read as unset", () => {
+    // Whether 0 means anything is the model's business: gemini-3.5-flash-lite
+    // rejects it with a 400, others disable thinking on it. Either way the
+    // resolver must not quietly turn it into the default, which would hide the
+    // caller's request behind an unrelated value.
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "0" })).toBe(0);
+  });
+
+  test("a nonsense value falls back rather than disabling thinking", () => {
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "lots" })).toBe(-1);
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "-5" })).toBe(-1);
+  });
+
+  test("off means send no thinking config at all", () => {
+    // The only portable way back to the pre-thinking request: gemini-3.5-flash-lite
+    // rejects a budget of 0, so "disable" cannot be expressed as a number.
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "off" })).toBeUndefined();
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: "OFF" })).toBeUndefined();
+    expect(thinkingBudget({ WOOPCODE_THINKING_BUDGET: " off " })).toBeUndefined();
+  });
+});
 
 describe("Gemini provider adapter", () => {
   test("serializes tool schemas and preserves every function call in a chunk", async () => {

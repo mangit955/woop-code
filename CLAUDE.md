@@ -1,111 +1,90 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
----
+# CLAUDE.md
 
-Default to using Bun instead of Node.js.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+Woopcode is a terminal-native coding agent (React Ink TUI + streaming agent loop) published to npm as `woopcode`. TypeScript throughout, running on Bun.
 
-## APIs
+## Commands
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+```bash
+bun install
+bun run start                 # or: bun cli.ts — launch the interactive agent
+bun cli.ts --prompt "..."     # headless single-turn path
 
-## Testing
+bun test                                            # whole suite (unit + integration + property + e2e)
+bun test packages/tests/runtime/agentLoop.test.ts   # one file
+bun test packages/tests/tools                       # one directory
+bun test --test-name-pattern "streaming"            # by test name
+bun run test                                        # bun test + tsc --noEmit (what CI runs)
+bunx --no-install tsc --noEmit                      # type check alone
 
-Use `bun test` to run tests.
+bun run docs:extract          # regenerate site/src/docs/surface.json from the code
+bun run docs:check            # extract --check + docs lint; CI gate
+bun run site                  # docs/marketing site with hot reload
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+bun run-benchmarks.ts         # benchmarks
+bun run replay:baseline       # replay harness over packages/tests/fixtures/replay
+bun onboarding/test-reset.ts  # clear local config to test onboarding (`restore` puts it back)
 ```
 
-## Frontend
+CI (`.github/workflows/ci.yml`) gates on three things: `bun test` on ubuntu **and** macOS, `tsc --noEmit`, and `docs:check`. Both OSes run because the approval classifier and the config loader depend on path semantics that differ between them.
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+## Architecture
 
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
+```text
+cli.ts              argument parsing, subcommands (commander)
+  commands/         AgentController, slash commands, provider/model subcommands
+    tui/            the React Ink interface
+  config/           the agent loop, provider client, repo context, persistence
+    runtime/        approval classification/policy, compaction, retry, logs
+      tools/        the tool registry
 ```
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+Two structural facts to know before editing:
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+- **The agent loop lives in `config/runtime.ts`, not in `commands/`.** It knows nothing about the interface, which is what lets the same loop drive both the TUI and the headless `--prompt` path. Everything flows back out through `AgentCallbacks` (text, tool start, tool finish, error).
+- **Approval is split in two.** `runtime/approval/classifier.ts` decides how risky a shell command is; `runtime/approval/policy.ts` decides whether that risk needs asking. Adding an approval mode is one entry in a table.
 
-With the following `frontend.tsx`:
+A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `config/runtime.ts` (stream, collect tool calls, execute, feed results back; 20 iterations by default) → tools resolved via `toolRegistery` in `tools/index.ts`.
 
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
+Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Only the Google entry is enabled in `config/providerRegistry.ts`; `openai` and `anthropic` are listed with `enabled: false` deliberately.
 
-// import .css files directly and it works
-import './index.css';
+### Invariants that are easy to break
 
-const root = createRoot(document.body);
+- **Unrecognised shell commands are treated as destructive**, never as safe. Failing closed is the only defensible default for something with write access to a repo.
+- **Tool errors are returned to the agent as results**, not thrown out of the turn, so it can correct a bad path and retry. Only the iteration budget ends a turn. Write error messages for the model (`File <path> does not exist`, not `ENOENT`).
+- **Persistence drops tool traffic.** Only user and assistant messages are saved; half of a call/result pair would make restored history invalid for the provider.
+- **Config failures never block startup.** A corrupt `providers.json` is moved aside and defaults recreated; a malformed approval mode falls back to the default, never to permissive.
+- **The workspace boundary is resolved, not string-matched.** Route every path through `resolveWorkspacePath` in `tools/workspace.ts` — it resolves symlinks before the containment check.
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
+### Adding a tool
 
-root.render(<Frontend />);
-```
+A tool is `{ name, description, parameters, execute(args, signal): Promise<string> }` (`config/types.ts`). Add the file to `tools/`, append it to `toolRegistery` in `tools/index.ts`, add its effect to `TOOL_EFFECTS` in `runtime/toolEffects.ts` (a missing entry reads as `unclassified` — the runtime and the docs both consume this table), then run `bun run docs:extract` and commit the updated `site/src/docs/surface.json`. Nothing in `docs/` names a tool in prose, so pages pick it up automatically; `docs:check` fails if the generated data is stale.
 
-Then, run index.ts
+The returned string is what the model sees, so it is interface, not a log line. Bound it — results are truncated at `MAX_TOOL_RESULT` (4,000 chars) before reaching the model, so truncate deliberately with a notice (`tools/readFile.ts` is the one to copy). A tool that writes must raise an approval request rather than writing directly (`tools/editFile.ts`); writing quietly bypasses the diff review the product rests on. Respect the `AbortSignal`.
 
-```sh
-bun --hot ./index.ts
-```
+## Tests
 
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+Tests live next to the code (`runtime/`, `tui/`, `config/`, `commands/`) and in `packages/tests/` when they need fixtures or span modules. A bare `bun test` picks up both.
+
+- **Real APIs, not mocks.** Bun's global is readonly, so tools are tested against real files in a temp directory. Only the provider and the approval prompt are faked.
+- **`mock.module` is registered for the entire run and cannot be undone.** Restoring it in `afterAll` does nothing (Bun binds static imports at load). A mock must be inert outside its own file: gate it on a flag set in `beforeAll` and cleared in `afterAll`, delegate to the real implementation otherwise, register once against a stable object rather than a fresh one per test, and stub the whole module (spread the real one, override only what you need). `packages/tests/e2e/` shows the shape. The suite once ran green while two persistence tests were quietly asserting against another file's stub.
+- Expose order dependence with `bun test $(git ls-files '*.test.ts' '*.test.tsx' | sort -r)`.
+- `packages/tests/README.md` deliberately holds no test counts or file inventories; `bun run docs:lint` enforces that. Don't add them.
+- Mutation testing is configured in `stryker.config.json` over the runtime and the write tools, driven by `./run-tests.sh`.
+
+## Environment variables
+
+`WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_NON_INTERACTIVE`. Bun loads `.env` automatically — no `dotenv`.
+
+User state (config, conversation, execution log) lives in `~/.config/woopcode/` (`%LOCALAPPDATA%\woopcode\` on Windows), never in the repo.
+
+## Conventions
+
+Conventional commits (`feat(tools):`, `fix(runtime):`, …), TypeScript strict mode, small focused functions.
+
+Bun over Node throughout — the full rule is in `AGENTS.md` and `.cursor/rules/use-bun-instead-of-node-vite-npm-pnpm.mdc`:
+
+- `bun <file>`, `bun test`, `bun install`, `bun build`, `bunx` — never node/npm/pnpm/vite/jest/webpack.
+- `Bun.file` over `node:fs` read/write, `Bun.$` over execa, built-in `WebSocket`, `Bun.serve()` over express, `bun:sqlite` over better-sqlite3.
+- The site uses `Bun.serve()` with HTML imports; no bundler config.

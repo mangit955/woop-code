@@ -100,6 +100,110 @@ describe("readFile Tool - Integration Tests", () => {
     });
   });
 
+  describe("Line ranges", () => {
+    const numbered = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n");
+
+    test("reads an inclusive range", async () => {
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, startLine: 5, endLine: 8 });
+
+      // Inclusive at both ends: an agent told an error is on line 8 and asking
+      // for 5-8 must be given line 8.
+      expect(result).toContain("line 5");
+      expect(result).toContain("line 8");
+      expect(result).not.toContain("line 4");
+      expect(result).not.toContain("line 9");
+    });
+
+    test("says which lines were returned and how many there are", async () => {
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, startLine: 5, endLine: 8 });
+
+      expect(result).toStartWith("Lines 5-8 of 20 in ");
+    });
+
+    test("startLine alone reads to the end", async () => {
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, startLine: 18 });
+
+      expect(result).toContain("line 20");
+      expect(result).not.toContain("line 17");
+    });
+
+    test("endLine alone reads from the start", async () => {
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, endLine: 3 });
+
+      expect(result).toContain("line 1");
+      expect(result).not.toContain("line 4");
+    });
+
+    test("an endLine past the file is clamped rather than failing", async () => {
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, startLine: 19, endLine: 999 });
+
+      expect(result).toStartWith("Lines 19-20 of 20 in ");
+    });
+
+    test("a range reaches the end of a file too large to read whole", async () => {
+      // The gap this closes: the whole-file path cuts at 16 KB from the head,
+      // so without a range the end of a large file cannot be seen at all.
+      const big = Array.from({ length: 5_000 }, (_, i) => `line ${i + 1} ${"x".repeat(40)}`).join("\n");
+      const path = await createFile("big.txt", big);
+
+      const whole = await readFileTool.execute({ path });
+      expect(whole).toContain("... File truncated");
+      expect(whole).not.toContain("line 5000 ");
+
+      const tail = await readFileTool.execute({ path, startLine: 4_998 });
+      expect(tail).toContain("line 5000 ");
+    });
+
+    test("a startLine past the end says so", async () => {
+      const path = await createFile("r.txt", numbered);
+      await expect(
+        readFileTool.execute({ path, startLine: 99 }),
+      ).rejects.toThrow(/past the end/);
+    });
+
+    test("a reversed range is rejected", async () => {
+      const path = await createFile("r.txt", numbered);
+      await expect(
+        readFileTool.execute({ path, startLine: 9, endLine: 4 }),
+      ).rejects.toThrow(/must not be before/);
+    });
+
+    test.each([0, -3, 2.5, "abc"])("rejects %p as a line number", async (value) => {
+      const path = await createFile("r.txt", numbered);
+      await expect(
+        readFileTool.execute({ path, startLine: value }),
+      ).rejects.toThrow(/whole number/);
+    });
+
+    test("numbers arriving as strings are accepted", async () => {
+      // Providers vary in whether a numeric argument survives as a number.
+      const path = await createFile("r.txt", numbered);
+      const result = await readFileTool.execute({ path, startLine: "5", endLine: "6" });
+
+      expect(result).toContain("line 5");
+      expect(result).not.toContain("line 7");
+    });
+
+    test("a whole-file read is still returned verbatim", async () => {
+      // edit_file requires oldText copied exactly from a read_file result, so
+      // the unranged path must not gain a header.
+      const path = await createFile("r.txt", numbered);
+      expect(await readFileTool.execute({ path })).toBe(numbered);
+    });
+
+    test("a trailing newline is not counted as an extra line", async () => {
+      const path = await createFile("r.txt", "a\nb\nc\n");
+      expect(await readFileTool.execute({ path, startLine: 1 })).toStartWith(
+        "Lines 1-3 of 3 in ",
+      );
+    });
+  });
+
   describe("Large Files", () => {
     test("reads 1KB file fully", async () => {
       const content = "x".repeat(1024); // 1KB
@@ -126,7 +230,8 @@ describe("readFile Tool - Integration Tests", () => {
       const result = await readFileTool.execute({ path });
 
       expect(result).toContain("... File truncated");
-      expect(result).toContain("Showing first 16384 characters");
+      expect(result).toContain("first 16384 of");
+      expect(result).toContain("startLine and endLine");
       expect(result.length).toBeLessThan(content.length);
     });
 
@@ -137,7 +242,10 @@ describe("readFile Tool - Integration Tests", () => {
       const result = await readFileTool.execute({ path });
 
       expect(result).toContain("... File truncated");
-      expect(result).toContain("Showing first 16384 characters of 1048576");
+      expect(result).toContain("first 16384 of 1048576 characters");
+      // The message names the way out, so an agent that needs the rest of the
+      // file can ask for it instead of re-reading the same head.
+      expect(result).toContain("startLine and endLine");
     });
 
     test("truncation preserves first 16KB exactly", async () => {

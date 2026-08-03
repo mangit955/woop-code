@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Runs the validation gate over what is staged. Installed by `bun run
+# hooks:install`, which points core.hooksPath here; hooksPath is local
+# configuration and is not cloned, so a fresh clone runs `bun install` and
+# gets it from the prepare script.
+
+# A merge or a rebase is mid-repair by definition. Gating a conflict
+# resolution on a suite you are halfway through fixing stops the resolution,
+# not the mistake — and the push still has to pass CI.
+git_dir=$(git rev-parse --git-dir)
+if [ -e "$git_dir/MERGE_HEAD" ] || [ -d "$git_dir/rebase-merge" ] ||
+   [ -d "$git_dir/rebase-apply" ]; then
+  exit 0
+fi
+
+exec bun ./verify.ts --staged

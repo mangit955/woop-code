@@ -17,6 +17,14 @@ export interface ProviderClient {
     repoContext: string,
     signal?: AbortSignal,
     useTools?: boolean,
+    /**
+     * The tools to offer, defaulting to the whole registry.
+     *
+     * Passed by the loop so a turn can narrow it — plan mode sends the reading
+     * tools only. Additive and last, so every existing caller and every fake
+     * provider in the suite keeps working untouched.
+     */
+    tools?: readonly Tool[],
   ): AsyncGenerator<StreamEvent>;
 }
 
@@ -68,6 +76,13 @@ export interface PromptSegments {
   conversation: number;
   /** Tool calls and their results. */
   toolResults: number;
+  /**
+   * Per-turn instructions the mode adds, such as plan mode's rules.
+   *
+   * Optional because it is 0 for every ordinary turn, and stating it as optional
+   * keeps the recorded segment literals in the replay corpus valid.
+   */
+  modeInstructions?: number;
 }
 
 /**
@@ -82,6 +97,13 @@ export type TurnContext =
   | {
       repository: string;
       executionLog?: string;
+      /**
+       * Instructions for this turn only, sent ahead of the repository context.
+       *
+       * Plan mode's rules arrive here rather than in SYSTEM_PROMPT, so a Build
+       * turn assembles byte-for-byte as it did before the mode existed.
+       */
+      instructions?: string;
     };
 
 /**
@@ -164,12 +186,51 @@ export interface ToolParameter {
   description: string;
   required: boolean;
   type?: "string" | "number" | "boolean" | "array";
+  /**
+   * The properties of each object in an array parameter.
+   *
+   * Only meaningful with `type: "array"`, and optional: an array without it
+   * holds strings, which is what every array parameter held before this existed.
+   * Describing the properties is what lets a provider reject a bad value itself —
+   * an `enum` here is enforced on their side, so an invalid status never costs a
+   * round trip to discover.
+   */
+  items?: ToolItemProperty[];
+}
+
+/** One property of the objects in an array parameter. */
+export interface ToolItemProperty {
+  name: string;
+  description: string;
+  type?: "string" | "number" | "boolean";
+  /** Allowed values, enforced by the provider. */
+  enum?: string[];
+  required?: boolean;
 }
 
 export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+}
+
+/**
+ * A step on the agent's own task list.
+ *
+ * Shared because three layers need the same shape: the tool that receives it,
+ * the UI store that holds it, and the component that renders it.
+ */
+export type TodoStatus = "pending" | "in_progress" | "completed";
+
+export const TODO_STATUSES: readonly TodoStatus[] = [
+  "pending",
+  "in_progress",
+  "completed",
+];
+
+export interface TodoItem {
+  content: string;
+  status: TodoStatus;
 }
 
 export interface ToolResult extends ToolCall {
@@ -197,6 +258,15 @@ export interface AgentCallbacks {
   onToolStart?(tool: ToolCall): void;
   onToolFinish?(tool: ToolResult): void;
   onToolError?(tool: ToolFailure): void;
+  /**
+   * A tool was refused by policy and never ran.
+   *
+   * Distinct from `onToolError`, which means the tool ran and threw. Plan mode
+   * refusing an edit is the mode working, not a fault, and reporting it as one
+   * put a red row and a `failed:` line in front of the user every time the
+   * feature did its job.
+   */
+  onToolBlocked?(tool: ToolFailure): void;
   onDone?(): void;
   onError?(error: Error): void;
   onCancel?(): void;

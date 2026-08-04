@@ -1,5 +1,6 @@
-import { getTool } from "../tools";
+import { getTool, toolRegistery } from "../tools";
 import { classifyCommand, commandOf, toolEffect } from "../runtime/toolEffects";
+import { blockedInPlanMode, planModeRefusal, planModeTools } from "../runtime/planMode";
 import { isRetryableError } from "../runtime/retry";
 import { compactToolHistory, toolHistoryBudget } from "../runtime/compaction";
 import { recentMessages } from "./config";
@@ -74,7 +75,7 @@ export function measureSegments(
   messages: Message[],
   context: TurnContext,
 ): PromptSegments {
-  const { repository, executionLog } = normalizeContext(context);
+  const { repository, executionLog, instructions } = normalizeContext(context);
   let conversation = 0;
   let toolResults = 0;
 
@@ -103,6 +104,9 @@ export function measureSegments(
     executionLog: executionLog.length,
     conversation,
     toolResults,
+    // Omitted rather than reported as 0 when there are none, so an ordinary turn
+    // measures exactly as it did before modes existed.
+    ...(instructions ? { modeInstructions: instructions.length } : {}),
   };
 }
 
@@ -110,10 +114,15 @@ export function measureSegments(
 function normalizeContext(context: TurnContext): {
   repository: string;
   executionLog: string;
+  instructions: string;
 } {
   return typeof context === "string"
-    ? { repository: context, executionLog: "" }
-    : { repository: context.repository, executionLog: context.executionLog ?? "" };
+    ? { repository: context, executionLog: "", instructions: "" }
+    : {
+        repository: context.repository,
+        executionLog: context.executionLog ?? "",
+        instructions: context.instructions ?? "",
+      };
 }
 
 /**
@@ -124,9 +133,12 @@ function normalizeContext(context: TurnContext): {
  * from what is actually sent.
  */
 export function renderContext(context: TurnContext): string {
-  const { repository, executionLog } = normalizeContext(context);
-  if (!executionLog) return repository;
-  return repository ? `${repository}\n\n${executionLog}` : executionLog;
+  const { repository, executionLog, instructions } = normalizeContext(context);
+
+  // Instructions come first: they say how this turn must behave, which the model
+  // should read before the material it is to act on. Ordered explicitly here so
+  // the measurement above and the string sent cannot drift apart.
+  return [instructions, repository, executionLog].filter(Boolean).join("\n\n");
 }
 
 /** Loop budget when nothing overrides it — tuned for interactive use. */
@@ -175,6 +187,19 @@ function maxIterations(env: Record<string, string | undefined> = process.env): n
   return parsed;
 }
 
+/** Per-turn switches that are not part of the conversation. */
+export interface AgentLoopOptions {
+  /**
+   * Investigate but change nothing; see runtime/planMode.ts.
+   *
+   * Read once here, at the start of the turn, for the same reason the tool-history
+   * budget and the thinking budget are: a mode toggled mid-turn would leave two
+   * requests of one turn assembled under different rules. A Tab pressed while the
+   * agent is working therefore takes effect on the next turn.
+   */
+  planMode?: boolean;
+}
+
 export async function agentLoop(
   client: ProviderClient,
   messages: Message[],
@@ -182,8 +207,14 @@ export async function agentLoop(
   callbacks: AgentCallbacks,
   signal?: AbortSignal,
   useTools = true,
+  options: AgentLoopOptions = {},
 ) {
   const MAX_ITERATIONS = maxIterations();
+  const planMode = options.planMode === true;
+  // Withholding the writing tools is the first of plan mode's two gates. The
+  // second is the refusal below, which is what covers a write reaching the disk
+  // through run_terminal — a tool this list has to keep.
+  const offeredTools = planMode ? planModeTools(toolRegistery) : toolRegistery;
   // Rendered once: the provider receives one string, while the measurement
   // above keeps the pieces apart.
   const renderedContext = renderContext(context);
@@ -301,6 +332,7 @@ export async function agentLoop(
           renderedContext,
           signal,
           useTools,
+          offeredTools,
         )) {
           switch (event.type) {
             case "text":
@@ -490,6 +522,48 @@ export async function agentLoop(
             name: toolCall.name,
             arguments: toolCall.arguments,
             output,
+          });
+          messages.push({
+            role: "tool",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            content: output,
+          });
+          continue;
+        }
+
+        // Plan mode's second gate. The tool never runs, and the model is told
+        // why as a result rather than an exception, so it can adjust and finish
+        // the plan instead of losing the turn.
+        //
+        // Counted against the duplicate threshold but not against the tools
+        // executed: a third identical attempt should be skipped as a repeat, and
+        // nothing ran, so nothing is owed to the efficiency warning.
+        if (planMode && blockedInPlanMode(toolCall.name, toolCall.arguments)) {
+          const output = planModeRefusal(toolCall.name);
+
+          executedTools.set(toolKey, callCount + 1);
+          callbacks.onToolStart?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+          });
+          messages.push({
+            role: "assistant_tool_call",
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            arguments: toolCall.arguments,
+            thoughtSignature: toolCall.thoughtSignature,
+            batchId,
+          });
+          // Its own callback, not onToolError: the tool did not fail, it was
+          // never run. `lastWriteStep` is deliberately untouched too — nothing
+          // was written, so the turn must not look like an unverified edit.
+          callbacks.onToolBlocked?.({
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+            error: "Plan mode",
           });
           messages.push({
             role: "tool",

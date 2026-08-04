@@ -32,6 +32,7 @@ const GATE: Record<string, string> = {
   write: "Pauses on a unified diff. Nothing is written until you approve it.",
   shell: "Gated by the approval mode.",
   ask: "Stops the turn and waits for your answer.",
+  plan: "Runs without asking. Records what the agent intends; changes nothing.",
   unclassified: "Not yet classified — see runtime/toolEffects.ts.",
 };
 

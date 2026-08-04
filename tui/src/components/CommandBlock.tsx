@@ -14,7 +14,7 @@ const TAB_WIDTH = 4;
 export interface CommandBlockProps {
   command: string;
   output?: string;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "blocked";
 }
 
 /**
@@ -59,7 +59,11 @@ export function CommandBlock({ command, output, status }: CommandBlockProps) {
               <Spinner type="dots" />
             </Text>
           ) : (
-            <Text color={status === "failed" ? colors.dangerBase : colors.textFaint}>$</Text>
+            // A refused command never ran, so it does not get the `$` that says
+            // one did.
+            <Text color={status === "failed" ? colors.dangerBase : colors.textFaint}>
+              {status === "blocked" ? "⊘" : "$"}
+            </Text>
           )}
           <Box flexShrink={1} minWidth={0}>
             <Text color={colors.textBase} wrap="truncate-end">

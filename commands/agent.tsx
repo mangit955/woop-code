@@ -158,6 +158,16 @@ async function runHeadless(
       });
       process.stderr.write(`✖ ${tool.name} failed: ${tool.error}\n`);
     },
+    onToolBlocked(tool) {
+      log.write({
+        type: "tool_blocked",
+        ts: now(),
+        id: tool.id,
+        name: tool.name,
+        reason: tool.error,
+      });
+      process.stderr.write(`⊘ ${tool.name} refused: ${tool.error}\n`);
+    },
     onText(text) {
       log.write({ type: "text", ts: now(), text });
       process.stdout.write(text);
@@ -252,6 +262,13 @@ async function runInteractive(modelOverride?: string) {
     onToolError(tool) {
       store.failTool(tool.id, isCommandTool(tool.name) ? tool.error : undefined);
       store.addSystemMessage(`${tool.name} failed: ${tool.error}`);
+      store.setStatus("Thinking...");
+    },
+
+    // No system message: the row already says it, and a refusal is the mode
+    // working rather than news. The agent is still mid-turn, writing its plan.
+    onToolBlocked(tool) {
+      store.blockTool(tool.id, tool.error);
       store.setStatus("Thinking...");
     },
 
@@ -401,6 +418,7 @@ async function buildHomeScreen(provider: string, model: string): Promise<HomeScr
     ],
     capabilities: [
       "Build",
+      "Plan",
       "Review",
       "Explain",
       "Refactor",

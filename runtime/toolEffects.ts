@@ -11,7 +11,7 @@
  * Keyed by tool name so an added tool reads as `unclassified` rather than
  * being silently treated as harmless.
  */
-export type ToolEffect = "read" | "write" | "shell" | "ask" | "unclassified";
+export type ToolEffect = "read" | "write" | "shell" | "ask" | "plan" | "unclassified";
 
 export const TOOL_EFFECTS: Record<string, Exclude<ToolEffect, "unclassified">> = {
   list_files: "read",
@@ -27,6 +27,10 @@ export const TOOL_EFFECTS: Record<string, Exclude<ToolEffect, "unclassified">> =
   run_terminal: "shell",
   run_tests: "shell",
   ask_user: "ask",
+  // Records the agent's own task list. It reaches the UI and nothing else — no
+  // file, no command — which is why it is neither a write nor a read of the
+  // workspace, and why it stays available while planning.
+  todo_write: "plan",
 };
 
 export function toolEffect(name: string): ToolEffect {

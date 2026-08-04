@@ -63,6 +63,7 @@ Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yie
 ### Invariants that are easy to break
 
 - **Unrecognised shell commands are treated as destructive**, never as safe. Failing closed is the only defensible default for something with write access to a repo.
+- **Plan mode is gated twice, and both are load-bearing.** `runtime/planMode.ts` withholds the writing tools from the provider *and* the loop refuses any write that arrives regardless. The second is not belt-and-braces: `run_terminal` has to stay available for inspection, so `sed -i`, `cat > file` and an inline script that opens a file for writing all reach the disk through a tool the first gate must keep. Deleting either one leaves a mode that only looks safe. The mode is a session property owned by `AgentController`, cycled with Tab, mirrored into the UI store for rendering, and deliberately never persisted — one that survived a restart would swallow the next session's first edit. The loop reads it once per turn, so a Tab mid-turn lands on the next turn.
 - **Tool errors are returned to the agent as results**, not thrown out of the turn, so it can correct a bad path and retry. Only the iteration budget ends a turn. Write error messages for the model (`File <path> does not exist`, not `ENOENT`).
 - **Persistence drops tool traffic.** Only user and assistant messages are saved; half of a call/result pair would make restored history invalid for the provider.
 - **Config failures never block startup.** A corrupt `providers.json` is moved aside and defaults recreated; a malformed approval mode falls back to the default, never to permissive.
@@ -71,7 +72,9 @@ Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yie
 
 ### Adding a tool
 
-A tool is `{ name, description, parameters, execute(args, signal): Promise<string> }` (`config/types.ts`). Add the file to `tools/`, append it to `toolRegistery` in `tools/index.ts`, add its effect to `TOOL_EFFECTS` in `runtime/toolEffects.ts` (a missing entry reads as `unclassified` — the runtime and the docs both consume this table), then run `bun run docs:extract` and commit the updated `site/src/docs/surface.json`. Nothing in `docs/` names a tool in prose, so pages pick it up automatically; `docs:check` fails if the generated data is stale.
+A tool is `{ name, description, parameters, execute(args, signal): Promise<string> }` (`config/types.ts`). Add the file to `tools/`, append it to `toolRegistery` in `tools/index.ts`, add its effect to `TOOL_EFFECTS` in `runtime/toolEffects.ts` (a missing entry reads as `unclassified` — the runtime and the docs both consume this table, and plan mode withholds anything unclassified), then run `bun run docs:extract` and commit the updated `site/src/docs/surface.json`.
+
+Arguments are described to both providers by `config/toolSchema.ts`, which is the one place that mapping lives. An array parameter holds strings unless it declares `items`, in which case it holds objects — and an `enum` there is enforced by the provider, so an invalid value costs no round trip. Nothing in `docs/` names a tool in prose, so pages pick it up automatically; `docs:check` fails if the generated data is stale.
 
 The returned string is what the model sees, so it is interface, not a log line. Bound it — results are truncated at `MAX_TOOL_RESULT` (4,000 chars) before reaching the model, so truncate deliberately with a notice (`tools/readFile.ts` is the one to copy). A tool that writes must raise an approval request rather than writing directly (`tools/editFile.ts`); writing quietly bypasses the diff review the product rests on. Respect the `AbortSignal`.
 

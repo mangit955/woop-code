@@ -148,6 +148,10 @@ export class CallbackSpy {
     this.calls.push({ name: "onToolError", args: [tool] });
   };
 
+  onToolBlocked = (tool: any) => {
+    this.calls.push({ name: "onToolBlocked", args: [tool] });
+  };
+
   onDone = () => {
     this.calls.push({ name: "onDone", args: [] });
   };

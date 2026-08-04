@@ -955,3 +955,120 @@ describe("AgentController - execution log across turns", () => {
     expect(seenContexts.at(-1)).toBe("");
   });
 });
+
+describe("AgentController - session mode", () => {
+  beforeEach(() => {
+    mockConversation = [];
+    mockRepoContext = "test repo";
+    globalMockClient = new MockProviderClient();
+    mockToolRegistry.clear();
+    Object.values(mockStore).forEach((m) => m.mockClear?.());
+  });
+
+  test("starts in Build", () => {
+    const controller = new AgentController("google", "test-key", {});
+
+    expect(controller.getSessionMode()).toBe("build");
+    expect(controller.isPlanMode()).toBe(false);
+  });
+
+  test("Tab flips the mode and reports the one now in effect", () => {
+    const controller = new AgentController("google", "test-key", {});
+
+    expect(controller.toggleSessionMode()).toBe("plan");
+    expect(controller.isPlanMode()).toBe(true);
+    expect(controller.toggleSessionMode()).toBe("build");
+    expect(controller.isPlanMode()).toBe(false);
+  });
+
+  test("plan mode's rules ride on the turn context", async () => {
+    const seenContexts: string[] = [];
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        yield createTextEvent("here is the plan");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+    controller.setSessionMode("plan");
+    await controller.run("change the parser");
+
+    expect(seenContexts.at(-1)).toContain("Plan mode is on");
+    // Ahead of the repository context: the rules for the turn come before the
+    // material it is to act on.
+    expect(seenContexts.at(-1)!.indexOf("Plan mode is on")).toBeLessThan(
+      seenContexts.at(-1)!.indexOf("test repo"),
+    );
+  });
+
+  test("a Build turn is assembled exactly as it was before plan mode existed", async () => {
+    const seenContexts: string[] = [];
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        yield createTextEvent("done");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+    await controller.run("fix the parser");
+
+    expect(seenContexts.at(-1)).not.toContain("Plan mode is on");
+  });
+
+  test("the turn is labelled with the mode it ran under", async () => {
+    globalMockClient.setEvents([createTextEvent("plan"), createDoneEvent()]);
+
+    const controller = new AgentController("google", "test-key", {});
+    await controller.initialize();
+    controller.setSessionMode("plan");
+    await controller.run("plan it");
+
+    expect(mockStore.startTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ agent: "Plan" }),
+    );
+  });
+
+  test("switching mid-turn applies to the next turn, not the one running", async () => {
+    // The loop reads the mode once per turn. A press while the agent is working
+    // must not leave two requests of one turn assembled under different rules.
+    mockToolRegistry.register(new MockTool("read_file", "contents"));
+
+    const seenContexts: string[] = [];
+    let firstIteration = true;
+    const controller = new AgentController("google", "test-key", {});
+
+    globalMockClient = {
+      async *stream(_msgs: any, repoContext: string) {
+        seenContexts.push(repoContext);
+        if (firstIteration) {
+          firstIteration = false;
+          // Someone presses Tab while the first iteration is in flight.
+          controller.toggleSessionMode();
+          yield createToolCallEvent("read_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("done");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await controller.initialize();
+    await controller.run("read it");
+
+    expect(controller.isPlanMode()).toBe(true);
+    // Both iterations of the turn that was already running saw Build's context.
+    for (const context of seenContexts) {
+      expect(context).not.toContain("Plan mode is on");
+    }
+
+    await controller.run("now plan it");
+    expect(seenContexts.at(-1)).toContain("Plan mode is on");
+  });
+});

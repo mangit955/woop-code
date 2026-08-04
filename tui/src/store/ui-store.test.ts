@@ -402,3 +402,112 @@ describe("UIStore command output", () => {
     });
   });
 });
+
+describe("UIStore session mode", () => {
+  test("starts in Build, because plan mode is never persisted", () => {
+    expect(new UIStore().getState().sessionMode).toBe("build");
+  });
+
+  test("Tab flips it, and reports the mode now in effect", () => {
+    const store = new UIStore();
+
+    expect(store.toggleSessionMode()).toBe("plan");
+    expect(store.getState().sessionMode).toBe("plan");
+
+    expect(store.toggleSessionMode()).toBe("build");
+    expect(store.getState().sessionMode).toBe("build");
+  });
+
+  test("setting the mode already in effect notifies nobody", () => {
+    const store = new UIStore();
+    let notifications = 0;
+    store.subscribe(() => notifications++);
+
+    store.setSessionMode("plan");
+    expect(notifications).toBe(1);
+
+    store.setSessionMode("plan");
+    expect(notifications).toBe(1);
+  });
+
+  test("clearing the timeline leaves the mode alone", () => {
+    // The mode belongs to the session, not to the transcript: /new should not
+    // quietly hand write access back.
+    const store = new UIStore();
+    store.setSessionMode("plan");
+    store.clearTimeline();
+
+    expect(store.getState().sessionMode).toBe("plan");
+  });
+});
+
+describe("UIStore task list", () => {
+  test("holds one list, replaced on each write", () => {
+    const store = new UIStore();
+    store.setTodos([{ content: "First", status: "in_progress" }]);
+    store.setTodos([
+      { content: "First", status: "completed" },
+      { content: "Second", status: "in_progress" },
+    ]);
+
+    const todos = store.getState().timeline.filter((item) => item.type === "todo");
+    expect(todos).toHaveLength(1);
+    expect(todos[0]).toMatchObject({
+      type: "todo",
+      items: [
+        { content: "First", status: "completed" },
+        { content: "Second", status: "in_progress" },
+      ],
+    });
+  });
+
+  test("moves to the end so it sits beside the latest work", () => {
+    const store = new UIStore();
+    store.setTodos([{ content: "Step", status: "pending" }]);
+    store.addUserMessage("something since");
+    store.setTodos([{ content: "Step", status: "completed" }]);
+
+    expect(store.getState().timeline.at(-1)?.type).toBe("todo");
+    expect(store.getState().timeline.filter((item) => item.type === "todo")).toHaveLength(1);
+  });
+
+  test("clearing the timeline drops it", () => {
+    const store = new UIStore();
+    store.setTodos([{ content: "Step", status: "pending" }]);
+    store.clearTimeline();
+
+    expect(store.getState().timeline).toHaveLength(0);
+  });
+});
+
+describe("UIStore blocked tools", () => {
+  test("a refused call is marked blocked, not failed", () => {
+    // Plan mode refusing a write is the mode working. Recording it as a failure
+    // put a red row and a "failed:" line in front of the user every time the
+    // feature did its job.
+    const store = new UIStore();
+    store.startTool({ id: "t1", name: "edit_file", arguments: { path: "cli.ts" } });
+    store.blockTool("t1", "Plan mode");
+
+    expect(store.getState().timeline.at(-1)).toMatchObject({
+      type: "tool",
+      status: "blocked",
+      summary: "Plan mode",
+    });
+  });
+
+  test("blocking adds no system message of its own", () => {
+    const store = new UIStore();
+    store.startTool({ id: "t1", name: "edit_file", arguments: { path: "cli.ts" } });
+    store.blockTool("t1", "Plan mode");
+
+    expect(store.getState().timeline.filter((item) => item.type === "system")).toHaveLength(0);
+  });
+
+  test("blocking a call that is not there changes nothing", () => {
+    const store = new UIStore();
+    store.blockTool("missing", "Plan mode");
+
+    expect(store.getState().timeline).toHaveLength(0);
+  });
+});

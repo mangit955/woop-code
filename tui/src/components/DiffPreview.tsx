@@ -1,11 +1,13 @@
 import { Box, measureElement, Text, type DOMElement, useInput } from "ink";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PendingEdit } from "../types";
 import { DiffViewer } from "./DiffViewer";
+import { Scrollbar } from "./Scrollbar";
 import { store } from "../store/ui-store";
 import { useUIStore } from "../store/useUIStore";
 import { usePalette } from "../styles/palette";
 import { useTerminalSize } from "../hooks/useTerminalSize";
+import { planLayout } from "../layout";
 
 interface DiffPreviewProps {
   pendingEdit: PendingEdit;
@@ -16,20 +18,31 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
 
   const { pendingEditScrollOffset } = useUIStore();
   const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
   const viewportRef = useRef<DOMElement>(null);
   const contentRef = useRef<DOMElement>(null);
+  const [measured, setMeasured] = useState({ content: 0, viewport: 0 });
 
   useEffect(() => {
+    // Coalesced the way the conversation viewport's measurement is, rather than
+    // taken once on a bare timeout: the panel is re-laid out by anything that
+    // changes the rows around it, and a limit measured before that settles
+    // leaves the diff either unscrollable or scrollable into blank space.
     const timer = setTimeout(() => {
       if (!viewportRef.current || !contentRef.current) return;
 
       const viewportHeight = measureElement(viewportRef.current).height;
       const contentHeight = measureElement(contentRef.current).height;
       store.setPendingEditScrollLimit(contentHeight - viewportHeight);
-    }, 0);
+      setMeasured((current) =>
+        current.content === contentHeight && current.viewport === viewportHeight
+          ? current
+          : { content: contentHeight, viewport: viewportHeight },
+      );
+    }, 75);
 
     return () => clearTimeout(timer);
-  }, [pendingEdit.id, pendingEdit.diff, width, height]);
+  }, [pendingEdit.id, pendingEdit.diff, pendingEdit.filePath, width, height]);
 
   useInput((input, key) => {
     if (key.upArrow) {
@@ -122,27 +135,47 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
             <Text color={colors.diffRemove}>−{deletions}</Text>
           </Box>
         </Box>
-        <Box
-          ref={viewportRef}
-          flexDirection="column"
-          flexGrow={1}
-          flexShrink={1}
-          minHeight={0}
-          overflow="hidden"
-        >
+        <Box flexDirection="row" flexGrow={1} flexShrink={1} minHeight={0} paddingRight={1}>
           <Box
-            ref={contentRef}
+            ref={viewportRef}
             flexDirection="column"
-            flexShrink={0}
-            marginTop={-pendingEditScrollOffset}
+            flexGrow={1}
+            flexShrink={1}
+            minHeight={0}
+            minWidth={0}
+            overflow="hidden"
           >
-            <DiffViewer diff={pendingEdit.diff} filePath={pendingEdit.filePath} />
+            <Box
+              ref={contentRef}
+              flexDirection="column"
+              flexShrink={0}
+              marginTop={-pendingEditScrollOffset}
+            >
+              <DiffViewer diff={pendingEdit.diff} filePath={pendingEdit.filePath} />
+            </Box>
           </Box>
+          {/* This viewport scrolls top-down, so its offset is already the
+              distance from the top — unlike the transcript's. */}
+          {/* Always painted here, unlike the transcript's. A diff is a thing
+              being judged rather than a stream being followed, and how much of
+              it is still below the fold is part of the judgement. */}
+          <Scrollbar
+            contentHeight={measured.content}
+            viewportHeight={measured.viewport}
+            offsetFromTop={pendingEditScrollOffset}
+            active
+          />
         </Box>
 
         <Box justifyContent="space-between" paddingX={2} flexShrink={0} marginTop={1}>
           <Text color={colors.textMuted}>
-            <Text color={colors.dangerBase}>Esc</Text> reject · <Text color={colors.textFaint}>↑↓</Text> scroll
+            <Text color={colors.dangerBase}>Esc</Text> reject
+            {layout.showDialogHints && (
+              <>
+                {" · "}
+                <Text color={colors.textFaint}>↑↓ PgUp/PgDn</Text> scroll
+              </>
+            )}
           </Text>
           <Text color={colors.textMuted}>
             <Text color={colors.successBase}>Enter</Text> apply

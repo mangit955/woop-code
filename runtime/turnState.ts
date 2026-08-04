@@ -25,9 +25,6 @@ export class TurnState {
    */
   toolCallsExecuted = 0;
 
-  /** Set once the efficiency notice has been sent, so it is sent only once. */
-  efficiencyWarningSent = false;
-
   /** Provider requests retried. Reported for the turn so a slow run reads differently from a flaky one. */
   retries = 0;
 

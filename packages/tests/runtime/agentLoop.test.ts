@@ -437,10 +437,10 @@ describe("agentLoop - Iteration Limits", () => {
     const promise = agentLoop(dynamicClient, messages, "", callbackSpy);
 
     await expect(promise).rejects.toThrow(
-      "Agent exceeded the maximum number of iterations (20)",
+      "Agent exceeded the maximum number of iterations (40)",
     );
-    
-    expect(mockTool.executionCount).toBe(20);
+
+    expect(mockTool.executionCount).toBe(40);
   });
 
   test("completes successfully within iteration limit", async () => {

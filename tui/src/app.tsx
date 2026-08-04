@@ -1,4 +1,4 @@
-import { Box, measureElement, type DOMElement } from "ink";
+import { Box, Text, measureElement, type DOMElement } from "ink";
 import { Header } from "./header";
 import { Timeline } from "./timeline";
 import { ConnectedStatusBar } from "./statusBar";
@@ -10,14 +10,17 @@ import { DiffPreview } from "./components/DiffPreview";
 import { ModelPicker } from "./components/ModelPicker";
 import { ApprovalPicker } from "./components/ApprovalPicker";
 import { CommandApproval } from "./components/CommandApproval";
+import { ContinueTurn } from "./components/ContinueTurn";
 import { QuestionDialog } from "./components/QuestionDialog";
 import type { AgentController } from "../../commands/agentController";
 import type { ActiveTurn, TimeLineItem } from "./types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { useCancelKey } from "./hooks/useCancelKey";
 import { planLayout } from "./layout";
-import { PaletteProvider } from "./styles/palette";
+import { PaletteProvider, usePalette } from "./styles/palette";
+import { ClockProvider } from "./hooks/useClock";
+import { Scrollbar } from "./components/Scrollbar";
 import { getModelDisplayName } from "../../providers/client";
 import { matchCommands } from "../../commands/slash/match";
 
@@ -39,13 +42,15 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const hasPendingEdit = state.pendingEdit !== null;
   const hasPendingCommand = state.pendingCommand !== null;
   const hasPendingQuestion = state.pendingQuestion !== null;
+  const hasPendingContinuation = state.pendingContinuation !== null;
   // These float over the app rather than replacing it, so the work behind them
-  // stays readable. The diff preview is not one of them: it splits the screen.
+  // stays readable. The diff preview is not one of them: it takes the screen.
   const dialogOpen =
     state.modelPickerOpen ||
     state.approvalPickerOpen ||
     hasPendingCommand ||
-    hasPendingQuestion;
+    hasPendingQuestion ||
+    hasPendingContinuation;
 
   // Registered here because App is the only component that is always mounted.
   // Every modal below replaces the composer, which is where this used to live.
@@ -71,6 +76,9 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       height={height}
       backgroundColor="#000000"
     >
+      {/* One interval drives every animation below. See useClock for what the
+          four independent timers this replaced were costing. */}
+      <ClockProvider>
       {/* Everything behind a dialog renders in the faded palette, so the panel
           above reads as the foreground instead of the app going black. */}
       <PaletteProvider dimmed={dialogOpen}>
@@ -90,28 +98,20 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
             )}
           />
         ) : hasPendingEdit ? (
-          /* Split layout: Timeline on top, Diff below */
-          <Box flexDirection="column" flexGrow={1} minHeight={0} backgroundColor="#000000">
-            <ConversationViewport
-              items={state.timeline}
-              isThinking={state.isThinking}
-              activeTurn={state.activeTurn}
-              scrollOffset={state.scrollOffset}
-              updateKey={state}
-              layoutKey={`${width}:${height}`}
-              flexShrink={1}
-            />
-
-            {/* Diff preview - takes remaining space */}
-            <Box
-              flexDirection="column"
-              flexGrow={1}
-              flexShrink={1}
-              minHeight={0}
-              backgroundColor="#000000"
-            >
-              <DiffPreview pendingEdit={state.pendingEdit!} />
-            </Box>
+          /* The whole region, not a share of it. This used to split the screen
+             with the transcript, and both halves were free to shrink: measured
+             at 80x30 with a 200-line diff, a 200-item transcript left the diff
+             two rows and a 1000-item one left it none at all — no diff body and
+             no Esc/Enter footer, while the keys still worked. Approving a write
+             with nothing on screen to judge is the failure that layout allowed. */
+          <Box
+            flexDirection="column"
+            flexGrow={1}
+            flexShrink={1}
+            minHeight={0}
+            backgroundColor="#000000"
+          >
+            <DiffPreview pendingEdit={state.pendingEdit!} />
           </Box>
         ) : (
           <ConversationViewport
@@ -137,6 +137,11 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
           gap={layout.showStatusBar ? 1 : 0}
           marginBottom={layout.showStatusBar ? 1 : 0}
         >
+          {/* Costs a row only while it has something to say, which is why it
+              can sit above a composer whose height is budgeted to the row. */}
+          {state.scrollOffset > 0 && (
+            <ScrolledAwayHint />
+          )}
           <Prompt {...promptProps} variant={layout.composer} />
           {layout.showStatusBar && <ConnectedStatusBar />}
         </Box>
@@ -162,12 +167,34 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
               <ApprovalPicker mode={state.approvalMode} />
             ) : hasPendingCommand ? (
               <CommandApproval command={state.pendingCommand!} />
+            ) : hasPendingContinuation ? (
+              <ContinueTurn continuation={state.pendingContinuation!} />
             ) : (
               <QuestionDialog question={state.pendingQuestion!} />
             )}
           </PaletteProvider>
         </Box>
       )}
+      </ClockProvider>
+    </Box>
+  );
+}
+
+/**
+ * Says the transcript is not showing its latest line.
+ *
+ * Necessary because the view now stays where the user put it: without this, a
+ * transcript that has stopped following looks identical to one that has stopped
+ * receiving.
+ */
+function ScrolledAwayHint() {
+  const colors = usePalette();
+
+  return (
+    <Box flexShrink={0}>
+      <Text color={colors.textFaint}>↑ scrolled · </Text>
+      <Text color={colors.textMuted}>End</Text>
+      <Text color={colors.textFaint}> to jump to latest</Text>
     </Box>
   );
 }
@@ -199,6 +226,9 @@ function ConversationViewport({
 }: ConversationViewportProps) {
   const viewportRef = useRef<DOMElement>(null);
   const contentRef = useRef<DOMElement>(null);
+  // Kept for the scrollbar, which needs both heights to size a thumb. The
+  // measurement was already being taken; only the second half was thrown away.
+  const [measured, setMeasured] = useState({ content: 0, viewport: 0 });
 
   const measurementTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -214,6 +244,11 @@ function ConversationViewport({
       const viewportHeight = measureElement(viewportRef.current).height;
       const contentHeight = measureElement(contentRef.current).height;
       store.setScrollLimit(contentHeight - viewportHeight);
+      setMeasured((current) =>
+        current.content === contentHeight && current.viewport === viewportHeight
+          ? current
+          : { content: contentHeight, viewport: viewportHeight },
+      );
     }, 75);
   }, [updateKey, layoutKey]);
 
@@ -225,23 +260,34 @@ function ConversationViewport({
   );
 
   return (
-    <Box
-      ref={viewportRef}
-      flexDirection="column-reverse"
-      flexGrow={flexGrow}
-      flexShrink={flexShrink}
-      minHeight={0}
-      overflow="hidden"
-    >
-      <Box flexGrow={1} />
+    <Box flexDirection="row" flexGrow={flexGrow} flexShrink={flexShrink} minHeight={0}>
       <Box
-        ref={contentRef}
-        flexDirection="column"
-        flexShrink={0}
-        marginBottom={-scrollOffset}
+        ref={viewportRef}
+        flexDirection="column-reverse"
+        flexGrow={1}
+        minHeight={0}
+        minWidth={0}
+        overflow="hidden"
       >
-        <Timeline items={items} isThinking={isThinking} activeTurn={activeTurn} />
+        <Box flexGrow={1} />
+        <Box
+          ref={contentRef}
+          flexDirection="column"
+          flexShrink={0}
+          marginBottom={-scrollOffset}
+        >
+          <Timeline items={items} isThinking={isThinking} activeTurn={activeTurn} />
+        </Box>
       </Box>
+      {/* This viewport is bottom-anchored — its offset counts up from the last
+          line — so it is converted here to the distance from the top the
+          scrollbar wants. */}
+      <Scrollbar
+        contentHeight={measured.content}
+        viewportHeight={measured.viewport}
+        offsetFromTop={measured.content - measured.viewport - scrollOffset}
+        active={scrollOffset > 0}
+      />
     </Box>
   );
 }

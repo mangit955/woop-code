@@ -28,9 +28,9 @@ the review.
 
 ## What it is bad at
 
-**Large refactors across many files.** A turn is capped at 20 iterations. Broad
-sweeping changes will run out of budget partway through, and you will get a
-partial result rather than a clean stop.
+**Large refactors across many files.** A turn works in stretches of 40 steps and
+stops to ask before taking another, so a broad sweeping change means answering
+that question repeatedly rather than handing the work over once.
 
 **Long autonomous runs.** There is no plan-then-execute mode and no background
 work. If you want to hand over a task and come back in an hour, this is the

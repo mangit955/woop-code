@@ -142,8 +142,23 @@ export function renderContext(context: TurnContext): string {
   return [instructions, repository, executionLog].filter(Boolean).join("\n\n");
 }
 
-/** Loop budget when nothing overrides it — tuned for interactive use. */
-const DEFAULT_MAX_ITERATIONS = 20;
+/**
+ * Steps a turn may take before it stops to ask whether to keep going.
+ *
+ * Not a quota guard, though it was written as one. The provider enforces quota
+ * itself and exactly: a 429 carries a `RetryInfo` saying when to come back,
+ * `providerRetryDelayMs` honours it, and the client turns it into a message
+ * naming the quota page. A constant here cannot know what is left of anyone's
+ * budget, so as a spending limit it is always either too tight or too loose.
+ *
+ * What it does guard is a pathological loop with nobody watching — an agent
+ * re-reading the same three files until the day's requests are gone. That wants
+ * a ceiling high enough that ordinary work never reaches it. Twenty was not:
+ * turns were dying mid-edit, having done nothing wrong, and the number fired
+ * almost only on the false positive. Reaching this one asks rather than fails
+ * (see `onBudgetExhausted`), which is what makes it safe to be generous.
+ */
+const DEFAULT_MAX_ITERATIONS = 40;
 
 /** Conversation turns kept in the window sent to the provider. */
 const MAX_TURNS = 6;
@@ -161,9 +176,6 @@ const SAME_TOOL_THRESHOLD = 2;
 
 /** Iterations left when the model is told the budget is running out. */
 const REMAINING_ITERATIONS_WARNING = 5;
-
-/** Tools actually run before the turn is nudged toward implementing. */
-const TOOLS_BEFORE_EFFICIENCY_WARNING = 6;
 
 /**
  * Asked once, never twice. The model may have a good reason not to verify —
@@ -194,12 +206,12 @@ export class IterationBudgetExhaustedError extends Error {
 }
 
 /**
- * Resolves the loop budget, allowing `WOOPCODE_MAX_ITERATIONS` to raise it.
+ * Resolves the loop budget, allowing `WOOPCODE_MAX_ITERATIONS` to set it.
  *
- * The interactive default is deliberately small: a human is watching, and a
- * runaway loop spends their quota. Automated callers working a single hard
- * task have the opposite tradeoff and need a far larger budget, so the limit
- * has to be settable from outside rather than compiled in.
+ * An interactive session can afford a checkpoint at the ceiling, because
+ * somebody is there to answer it. An automated caller cannot — there is nobody
+ * to ask, so the number it starts with is the number it gets — which is why the
+ * limit has to be settable from outside rather than compiled in.
  */
 function maxIterations(env: Record<string, string | undefined> = process.env): number {
   const raw = env.WOOPCODE_MAX_ITERATIONS?.trim();
@@ -585,7 +597,12 @@ export async function agentLoop(
   useTools = true,
   options: AgentLoopOptions = {},
 ) {
-  const MAX_ITERATIONS = maxIterations();
+  // The budget for one stretch of work, and the amount each checkpoint grants.
+  // Mutable because a turn the user chooses to continue is the same turn: the
+  // history, the model's reasoning and the footer's clock all carry on, and
+  // nothing has to be re-established.
+  const BUDGET_STEP = maxIterations();
+  let budget = BUDGET_STEP;
   const planMode = options.planMode === true;
   // Withholding the writing tools is the first of plan mode's two gates. The
   // second is the refusal below, which is what covers a write reaching the disk
@@ -601,21 +618,20 @@ export async function agentLoop(
   const state = new TurnState();
 
   try {
-    while (state.iterations < MAX_ITERATIONS) {
+    while (state.iterations < budget) {
       state.iterations++;
 
-      // This one is about the loop budget, so the iteration counter is the
-      // right measure.
+      // Said to the model and to nobody else. A benchmark trial that exhausted
+      // its 200 iterations was still writing at its 198th tool call, because
+      // this warning only ever reached stderr — a status callback cannot change
+      // what the model does next, and a message in the conversation can.
       //
-      // Said to the model as well as to the terminal. A benchmark trial that
-      // exhausted its 200 iterations was still writing at its 198th tool call,
-      // because this warning only ever reached stderr. A status callback cannot
-      // change what the model does next; a message in the conversation can.
-      if (state.iterations === MAX_ITERATIONS - REMAINING_ITERATIONS_WARNING) {
-        const remaining = MAX_ITERATIONS - state.iterations;
-        callbacks.onStatus?.(
-          `⚠️  ${remaining} iterations remaining - prioritize completion`,
-        );
+      // It used to be shown to the user as well, back when reaching the ceiling
+      // ended the turn as a failure and a warning was the only notice they got.
+      // Now the ceiling asks them directly, so a row saying the turn is nearly
+      // over is a worse version of a question they are about to be asked.
+      if (state.iterations === budget - REMAINING_ITERATIONS_WARNING) {
+        const remaining = budget - state.iterations;
         messages.push({
           role: "user",
           content:
@@ -687,7 +703,7 @@ export async function agentLoop(
           callbacks,
           state,
           assistantText,
-          MAX_ITERATIONS,
+          budget,
           truncated,
         );
 
@@ -727,24 +743,39 @@ export async function agentLoop(
         }
       }
 
-      // Reported once, after the tools of this iteration have run, so the
-      // count is what was actually used rather than how many times the model
-      // has been asked to respond.
-      if (
-        !state.efficiencyWarningSent &&
-        state.toolCallsExecuted >= TOOLS_BEFORE_EFFICIENCY_WARNING
-      ) {
-        state.efficiencyWarningSent = true;
-        // The ⚠️ prefix is load-bearing: it is how the UI tells an informational
-        // notice from a terminal status, so it shows in the transcript and the
-        // activity indicator keeps saying the turn is still running.
-        callbacks.onStatus?.(
-          `⚠️  ${state.toolCallsExecuted} tools used - start implementing now to conserve quota`,
-        );
+      // The budget is spent and the turn is still working. Ask before ending
+      // it: the work so far is on disk either way, and whether to spend more is
+      // the user's call rather than this constant's.
+      //
+      // Inside the loop rather than after it, so answering `continue` re-enters
+      // the same `while` with a raised ceiling instead of restarting anything.
+      if (state.iterations >= budget) {
+        // No handler means nobody is there to answer, which is not the same as
+        // an answer of `stop`. Headless runs rely on this: they never implement
+        // it, so exhaustion stays the error their exit code is built on.
+        if (!callbacks.onBudgetExhausted) break;
+
+        const decision = await callbacks.onBudgetExhausted({
+          steps: state.iterations,
+        });
+
+        // No separate abort check: cancelling resolves an open checkpoint as
+        // `stop`, so Ctrl+C arrives here as the answer below.
+        if (decision === "stop") {
+          // Reported as a cancellation because that is what it is: the user
+          // stopped a turn that was still going. It also means the turn footer
+          // reads `cancelled` rather than `failed` — the controller sets that
+          // from this callback — which is the honest word for work that was
+          // halted rather than broken.
+          callbacks.onCancel?.();
+          return "";
+        }
+
+        budget += BUDGET_STEP;
       }
     }
 
-    throw new IterationBudgetExhaustedError(MAX_ITERATIONS);
+    throw new IterationBudgetExhaustedError(budget);
   } catch (error) {
     if (signal?.aborted) {
       callbacks.onCancel?.();

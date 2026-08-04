@@ -35,6 +35,72 @@ describe("UIStore conversation scrolling", () => {
     store.setScrollLimit(4);
     expect(store.getState().scrollOffset).toBe(4);
   });
+
+  /**
+   * The transcript used to reset to the bottom whenever anything was appended,
+   * so reading a tool result mid-turn lasted until the next streamed token. The
+   * offset is measured from the last line, so holding a position means moving
+   * the number as the content grows — these cover both directions of that.
+   */
+  test("holds the reader's place while the turn keeps appending", () => {
+    const store = new UIStore();
+    store.setScrollLimit(20);
+    store.pageUp();
+    expect(store.getState().scrollOffset).toBe(8);
+
+    // Six rows of tool output land below what is being read.
+    store.setScrollLimit(26);
+    expect(store.getState().scrollOffset).toBe(14);
+
+    store.startTool({ id: "t1", name: "read_file", arguments: {} });
+    store.appendAssistantText("more");
+    expect(store.getState().scrollOffset).toBe(14);
+  });
+
+  test("follows the latest line while the reader is at the bottom", () => {
+    const store = new UIStore();
+    store.setScrollLimit(20);
+    expect(store.getState().scrollOffset).toBe(0);
+
+    store.setScrollLimit(40);
+    expect(store.getState().scrollOffset).toBe(0);
+    expect(store.isFollowing()).toBe(true);
+  });
+
+  test("scrolling back to the bottom starts following again", () => {
+    const store = new UIStore();
+    store.setScrollLimit(10);
+    store.pageUp();
+    expect(store.isFollowing()).toBe(false);
+
+    store.pageDown();
+    expect(store.isFollowing()).toBe(true);
+
+    store.setScrollLimit(30);
+    expect(store.getState().scrollOffset).toBe(0);
+  });
+
+  test("submitting a prompt returns to the latest line", () => {
+    const store = new UIStore();
+    store.setScrollLimit(20);
+    store.scrollToTop();
+    expect(store.getState().scrollOffset).toBe(20);
+
+    store.addUserMessage("what changed?");
+    expect(store.getState().scrollOffset).toBe(0);
+
+    store.setScrollLimit(28);
+    expect(store.getState().scrollOffset).toBe(0);
+  });
+
+  test("reports how far the transcript can scroll, for the scrollbar", () => {
+    const store = new UIStore();
+    store.setScrollLimit(17);
+    expect(store.getState().maxScrollOffset).toBe(17);
+
+    store.setScrollLimit(-3);
+    expect(store.getState().maxScrollOffset).toBe(0);
+  });
 });
 
 describe("UIStore edit approvals", () => {
@@ -140,6 +206,66 @@ describe("UIStore headless mode", () => {
 
     await expect(store.setPendingEdit(edit)).resolves.toBe(false);
     await expect(store.setPendingCommand(command)).resolves.toBe(false);
+  });
+
+  test("never continues a turn on an absent user's behalf", async () => {
+    const store = new UIStore();
+    // Even here, where every other approval is granted: continuing is the one
+    // answer that lets a stuck loop run unattended, which is the situation the
+    // step ceiling exists for.
+    store.setNonInteractive({ autoApprove: true });
+
+    await expect(
+      store.setPendingContinuation({ id: "cont-1", steps: 40 }),
+    ).resolves.toBe(false);
+    expect(store.getState().pendingContinuation).toBeNull();
+  });
+});
+
+describe("UIStore turn continuation", () => {
+  const continuation = { id: "cont-1", steps: 40 };
+
+  test("resolves true when the user chooses to keep going", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingContinuation(continuation);
+
+    expect(store.getState().pendingContinuation).toEqual(continuation);
+
+    store.continuePendingTurn();
+    await expect(decision).resolves.toBe(true);
+    expect(store.getState().pendingContinuation).toBeNull();
+  });
+
+  test("resolves false when the user stops the turn", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingContinuation(continuation);
+
+    store.stopPendingTurn();
+    await expect(decision).resolves.toBe(false);
+  });
+
+  /**
+   * Dismissing has to resolve, not just close. The loop is awaiting this
+   * promise, so a dialog that vanished without answering would leave the turn
+   * suspended with no way back to it.
+   */
+  test("dismissing the dialog stops the turn rather than hanging it", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingContinuation(continuation);
+
+    expect(store.hasOpenModal()).toBe(true);
+    expect(store.dismissTopModal()).toBe(true);
+
+    await expect(decision).resolves.toBe(false);
+    expect(store.hasOpenModal()).toBe(false);
+  });
+
+  test("cancelling the session resolves a checkpoint left open", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingContinuation(continuation);
+
+    store.clearPendingContinuation();
+    await expect(decision).resolves.toBe(false);
   });
 });
 

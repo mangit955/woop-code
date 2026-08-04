@@ -56,7 +56,7 @@ One structural fact to know before editing:
 
 - **Approval is split in two.** `runtime/approval/classifier.ts` decides how risky a shell command is; `runtime/approval/policy.ts` decides whether that risk needs asking. Adding an approval mode is one entry in a table.
 
-A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `runtime/loop.ts` (stream, collect tool calls, execute, feed results back; 20 iterations by default) → tools resolved via `toolRegistry` in `tools/index.ts`.
+A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `runtime/loop.ts` (stream, collect tool calls, execute, feed results back; 40 iterations per stretch, then it asks via `onBudgetExhausted` — absent handler means nobody to ask, and exhaustion throws as before) → tools resolved via `toolRegistry` in `tools/index.ts`.
 
 Providers implement `ProviderClient` in `providers/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Google, OpenAI and Anthropic are all enabled in `providers/providerRegistry.ts`. The Gemini client lives in `providers/client.ts`, the Anthropic one in `providers/anthropicClient.ts`, the OpenAI one in `providers/openaiClient.ts`; `createProviderClient` picks between them.
 

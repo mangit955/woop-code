@@ -241,8 +241,21 @@ export interface ToolFailure extends ToolCall {
   error: string;
 }
 
+/** What to do when a turn reaches its step ceiling. */
+export type BudgetDecision = "continue" | "stop";
+
 export interface AgentCallbacks {
   onStatus?(status: string): void;
+  /**
+   * The turn has used its whole budget and is not finished. Answering
+   * `continue` grants another budget and carries the same turn on.
+   *
+   * Optional, and the absence is meaningful rather than a default: it means
+   * nobody is there to ask, so the loop raises `IterationBudgetExhaustedError`
+   * as it always has. Headless runs deliberately do not implement it, which is
+   * what keeps their exit-code contract.
+   */
+  onBudgetExhausted?(info: { steps: number }): Promise<BudgetDecision>;
   /** Reported once per completed iteration, before the next one starts. */
   onUsage?(usage: IterationUsage): void;
   /** Reported exactly once when the turn ends, however it ends. */

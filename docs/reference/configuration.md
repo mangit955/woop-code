@@ -138,7 +138,7 @@ the run.
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `WOOPCODE_PROVIDER` | `google` | Pairs with `WOOPCODE_API_KEY` |
-| `WOOPCODE_MAX_ITERATIONS` | `20` | Steps the agent may take in one turn. The interactive default is deliberately low, because a human is waiting and a runaway loop spends their quota; an automated caller working one hard task wants far more |
+| `WOOPCODE_MAX_ITERATIONS` | `40` | Steps a turn may take before it stops to ask whether to keep going. Interactively the ceiling is a checkpoint, so it is set to catch a stuck loop rather than to ration requests — the provider rations those itself, and answering the checkpoint grants another `40`. A headless run has nobody to ask, so this is the whole budget and exhausting it exits `2` |
 | `WOOPCODE_MAX_ATTEMPTS` | `3` | Tries per provider request before the error surfaces |
 | `WOOPCODE_TOOL_HISTORY_BUDGET` | unset (off) | Characters of tool history to keep before older results are compacted. Off by default — see the measurements in `runtime/compaction.ts` |
 | `WOOPCODE_THINKING_BUDGET` | `-1` | Reasoning depth; see below |

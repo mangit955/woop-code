@@ -31,6 +31,12 @@ const CAPABILITIES_MIN_ROWS = 20;
 const HOME_FOOTER_MIN_ROWS = 12;
 const STATUS_BAR_MIN_ROWS = 12;
 const KEY_HINTS_MIN_COLUMNS = 56;
+/**
+ * The status bar carries the path, the meter and three hints. Below this the
+ * meter is what goes: it is the only one of the three that says nothing about
+ * what a keystroke will do.
+ */
+const CONTEXT_METER_MIN_COLUMNS = 72;
 const COMPOSER_PROVIDER_MIN_COLUMNS = 60;
 const HEADER_TAGLINE_MIN_COLUMNS = 48;
 const HEADER_META_MIN_COLUMNS = 30;
@@ -60,6 +66,8 @@ export interface LayoutPlan {
   showHomeFooter: boolean;
   showStatusBar: boolean;
   showKeyHints: boolean;
+  /** The status bar's prompt-size meter; dropped before the key hints are. */
+  showContextMeter: boolean;
   /** The composer's "Build · model · provider" line drops the provider first. */
   showComposerProvider: boolean;
   /** Header's " / coding agent" tagline. */
@@ -166,6 +174,7 @@ export function planLayout(width: number, height: number): LayoutPlan {
     showHomeFooter: height >= HOME_FOOTER_MIN_ROWS,
     showStatusBar,
     showKeyHints: width >= KEY_HINTS_MIN_COLUMNS,
+    showContextMeter: width >= CONTEXT_METER_MIN_COLUMNS,
     showComposerProvider: width >= COMPOSER_PROVIDER_MIN_COLUMNS,
     showHeaderTagline: width >= HEADER_TAGLINE_MIN_COLUMNS,
     showHeaderMeta: width >= HEADER_META_MIN_COLUMNS,

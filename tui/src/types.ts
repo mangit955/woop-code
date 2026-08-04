@@ -90,6 +90,13 @@ export interface PendingQuestion {
   questions: string[];
 }
 
+/** A turn that has spent its step budget and is asking whether to keep going. */
+export interface PendingContinuation {
+  id: string;
+  /** Steps taken so far, which is what the user is being asked to extend. */
+  steps: number;
+}
+
 export interface UIState {
   timeline: TimeLineItem[];
   activeTurn: ActiveTurn | null;
@@ -107,8 +114,19 @@ export interface UIState {
   pendingEdit: PendingEdit | null;
   pendingCommand: PendingCommand | null;
   pendingQuestion: PendingQuestion | null;
+  pendingContinuation: PendingContinuation | null;
   pendingEditScrollOffset: number;
   scrollOffset: number;
+  /**
+   * How far each viewport *can* be scrolled, measured from its rendered
+   * content. In the state rather than private to the store because the
+   * scrollbar is drawn from the pair: an offset alone cannot say how much is
+   * left below it.
+   */
+  maxScrollOffset: number;
+  maxPendingEditScrollOffset: number;
+  /** Prompt tokens the last provider request carried; null before the first. */
+  usage: { promptTokens: number } | null;
 }
 
 export interface TimelineProps {

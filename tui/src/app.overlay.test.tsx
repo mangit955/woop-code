@@ -209,9 +209,8 @@ function pendingEdit(id: string) {
 describe("a chord never answers the diff", () => {
   beforeEach(() => {
     store.clearTimeline();
-    // The diff shares the screen with the transcript, and an empty timeline
-    // renders the home screen instead — where there is no DiffPreview to press
-    // a key at.
+    // An empty timeline renders the home screen, where there is no DiffPreview
+    // to press a key at.
     store.addUserMessage(TRANSCRIPT);
   });
 
@@ -274,5 +273,56 @@ describe("a chord never answers the diff", () => {
     expect(await decision).toBe(false);
     expect(store.getState().pendingEdit).toBeNull();
     app.unmount();
+  });
+});
+
+/**
+ * The diff used to split the screen with the transcript, both halves free to
+ * shrink. Measured at 80x30 with a 200-line diff pending, a 200-item transcript
+ * left the diff two rows and a 1000-item one left it none: no diff body, and no
+ * footer either, while Enter still applied the edit. Approving a write with
+ * nothing on screen to judge is the failure that layout allowed, and only a
+ * rendered frame can catch it — every unit underneath was behaving correctly.
+ */
+describe("the diff owns the screen while it is being judged", () => {
+  beforeEach(() => {
+    store.clearTimeline();
+  });
+
+  function longEdit() {
+    const body = Array.from({ length: 200 }, (_, line) => `+added line ${line}`);
+    return {
+      id: "long",
+      filePath: "runtime/loop.ts",
+      oldContent: "before",
+      newContent: "after",
+      diff: ["--- runtime/loop.ts", "+++ runtime/loop.ts", "@@ -1 +1 @@", ...body].join("\n"),
+      toolCallId: "call-long",
+    };
+  }
+
+  test("shows the change and how to answer it, whatever is behind it", async () => {
+    for (const transcriptLength of [1, 200, 1000]) {
+      store.clearTimeline();
+      for (let index = 0; index < transcriptLength; index += 1) {
+        store.addUserMessage(`message ${index}`);
+      }
+
+      const app = mount();
+      const decision = store.setPendingEdit(longEdit());
+      await settle();
+
+      const frame = app.stdout.text();
+      expect(frame).toContain("runtime/loop.ts");
+      // The body, not just the header that names the file.
+      expect(frame).toContain("added line 0");
+      // And the way out, which went missing at the same time the body did.
+      expect(frame).toContain("reject");
+      expect(frame).toContain("apply");
+
+      store.rejectPendingEdit();
+      await expect(decision).resolves.toBe(false);
+      app.unmount();
+    }
   });
 });

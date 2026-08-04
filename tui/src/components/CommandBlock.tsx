@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
 import { usePalette } from "../styles/palette";
+import { RunningGlyph } from "./RunningGlyph";
 
 /**
  * How many lines of output a block shows before it stops. Long enough for a
@@ -55,9 +55,7 @@ export function CommandBlock({ command, output, status }: CommandBlockProps) {
       >
         <Box gap={1} flexShrink={0}>
           {status === "running" ? (
-            <Text color={colors.primary}>
-              <Spinner type="dots" />
-            </Text>
+            <RunningGlyph />
           ) : (
             // A refused command never ran, so it does not get the `$` that says
             // one did.

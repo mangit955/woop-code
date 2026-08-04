@@ -1,8 +1,36 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { anthropicClient } from "../../../config/anthropicClient";
 import { createProviderClient } from "../../../config/client";
 import { defaultModelForProvider } from "../../../config/modelCatalog";
 import type { Message, StreamEvent } from "../../../config/types";
+
+/**
+ * Says which host this file means, rather than inheriting one.
+ *
+ * The assertion below names Anthropic's public URL, and the SDK builds that from
+ * `ANTHROPIC_BASE_URL`. A developer routing Anthropic through a gateway — LiteLLM,
+ * OpenRouter, a corporate proxy — therefore failed this one test and nothing else,
+ * while CI stayed green because CI sets no such variable.
+ *
+ * Honouring vendor variables is deliberate: `config/envCredentials.ts` reads
+ * `ANTHROPIC_API_KEY` and its siblings on purpose, "so an environment already set
+ * up for another tool works without extra configuration". So the product is right
+ * and the test was wrong to depend on the shell.
+ *
+ * Restored in `afterAll`, never per test — the same rule as the `XDG_CONFIG_HOME`
+ * redirects elsewhere in the suite, and for the same reason: undoing it between
+ * tests hands the rest of the file back to the ambient environment.
+ */
+const previousBaseUrl = process.env.ANTHROPIC_BASE_URL;
+process.env.ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+afterAll(() => {
+  if (previousBaseUrl === undefined) {
+    delete process.env.ANTHROPIC_BASE_URL;
+  } else {
+    process.env.ANTHROPIC_BASE_URL = previousBaseUrl;
+  }
+});
 
 /**
  * The client against the real SDK, with only the socket faked.

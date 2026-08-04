@@ -46,21 +46,55 @@ that step — the list has nothing left to complete, so <kbd>Enter</kbd> runs it
 
 ## Reviewing a diff
 
+An edit to an existing file pauses on a diff. It shares the screen with the
+conversation rather than covering it.
+
 | Key | Action |
 | --- | --- |
 | <kbd>Enter</kbd> | Apply the edit |
 | <kbd>Esc</kbd> | Reject it |
-| <kbd>↑</kbd> <kbd>↓</kbd> | Scroll a diff too long for the screen |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Scroll a line at a time |
+| <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Scroll a screen at a time |
+| <kbd>Home</kbd> | Jump to the top of the diff |
+| <kbd>End</kbd> | Jump to the bottom |
+
+## Approving a command
+
+A shell command that needs asking opens a dialog of its own, with the command as
+it will be run and the reason it stopped.
+
+| Key | Action |
+| --- | --- |
+| <kbd>Enter</kbd> or <kbd>A</kbd> | Run it |
+| <kbd>Esc</kbd> or <kbd>R</kbd> | Refuse, and tell the agent so |
+
+Which commands stop here at all is the [approval
+mode](/docs/guides/approval-modes), not this dialog.
+
+## Answering a question
+
+The agent can ask you something mid-turn. Questions arrive as a set and are
+answered one at a time.
+
+| Key | Action |
+| --- | --- |
+| <kbd>Enter</kbd> | Submit this answer and move to the next |
+| <kbd>Esc</kbd> | Cancel the whole set |
 
 ## Pickers
 
-`/provider`, `/model`, and `/approval` open a picker.
+`/models` and `/approval` open a picker. `/provider` does not — it prints the
+configured providers as text.
 
 | Key | Action |
 | --- | --- |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Move the selection |
 | <kbd>Enter</kbd> | Choose it, and save |
 | <kbd>Esc</kbd> | Close without changing anything |
+
+The two differ in one way: the model picker has a search field, so typing
+narrows the list. The approval picker has a short fixed list and no search, so
+typing does nothing there.
 
 ## Ctrl+C
 
@@ -85,6 +119,13 @@ destruction for one keystroke.
 <kbd>Esc</kbd> rejects the thing in front of you. It does not stop the agent.
 Use <kbd>Ctrl</kbd><kbd>C</kbd> for that.
 :::
+
+## On a short terminal
+
+Every dialog prints its keys along the bottom, and that row is the first thing
+dropped when the window is too short to hold both it and the thing being
+decided. The keys still work — this page is where they live when the hint is
+gone.
 
 ## See also
 

@@ -38,6 +38,11 @@ removed. Added lines carry `+`, removed lines `−`.
 | <kbd>Enter</kbd> | Apply the edit |
 | <kbd>Esc</kbd> | Reject it |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Scroll, when the diff is longer than the screen |
+| <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Scroll a screen at a time |
+| <kbd>Home</kbd> <kbd>End</kbd> | Jump to the top or the bottom |
+
+The hint row along the bottom shows only the two answers, because they are the
+decision; the scrolling keys are there whether or not it has room to say so.
 
 ## Which tools stop here
 

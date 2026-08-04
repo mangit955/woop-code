@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
-import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
+import { toolInputSchema, type JsonSchema, type JsonSchemaType } from "./toolSchema";
 import { unsupportedProviderMessage } from "./providerRegistry";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 import {
@@ -141,31 +142,15 @@ export function geminiClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
+      offeredTools: readonly Tool[] = toolRegistery,
     ): AsyncGenerator<StreamEvent> {
       const contents = buildContents(messages);
       const tools = [
         {
-          functionDeclarations: toolRegistery.map((tool) => ({
+          functionDeclarations: offeredTools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            parameters: {
-              type: Type.OBJECT,
-              properties: Object.fromEntries(
-                tool.parameters.map((param) => [
-                  param.name,
-                  {
-                    type: toolParameterType(param.type),
-                    description: param.description,
-                    ...(param.type === "array"
-                      ? { items: { type: Type.STRING } }
-                      : {}),
-                  },
-                ]),
-              ),
-              required: tool.parameters
-                .filter((param) => param.required)
-                .map((param) => param.name),
-            },
+            parameters: geminiSchema(toolInputSchema(tool)),
           })),
         },
       ];
@@ -440,7 +425,7 @@ export function buildContents(messages: Message[]) {
   >[0]["contents"];
 }
 
-function toolParameterType(type: string | undefined) {
+function toolParameterType(type: JsonSchemaType) {
   switch (type) {
     case "number":
       return Type.NUMBER;
@@ -448,9 +433,38 @@ function toolParameterType(type: string | undefined) {
       return Type.BOOLEAN;
     case "array":
       return Type.ARRAY;
+    case "object":
+      return Type.OBJECT;
     default:
       return Type.STRING;
   }
+}
+
+/**
+ * Rewrites neutral JSON Schema into the shape the SDK wants.
+ *
+ * Only the type names differ — Gemini takes an enum where JSON Schema takes a
+ * string — so this walks the tree swapping those and leaves everything else,
+ * including `enum` values and nested object properties, as it found it.
+ */
+function geminiSchema(schema: JsonSchema): Record<string, unknown> {
+  return {
+    type: toolParameterType(schema.type),
+    ...(schema.description ? { description: schema.description } : {}),
+    ...(schema.enum ? { enum: schema.enum } : {}),
+    ...(schema.items ? { items: geminiSchema(schema.items) } : {}),
+    ...(schema.properties
+      ? {
+          properties: Object.fromEntries(
+            Object.entries(schema.properties).map(([name, property]) => [
+              name,
+              geminiSchema(property),
+            ]),
+          ),
+        }
+      : {}),
+    ...(schema.required?.length ? { required: schema.required } : {}),
+  };
 }
 
 export function createProviderClient(

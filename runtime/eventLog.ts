@@ -21,6 +21,11 @@ export type RunEvent =
   | { type: "tool_call"; ts: string; id: string; name: string; arguments: Record<string, unknown> }
   | { type: "tool_result"; ts: string; id: string; name: string; output: string }
   | { type: "tool_error"; ts: string; id: string; name: string; error: string }
+  // Refused by policy and never run — plan mode declining a write. Its own type
+  // rather than a tool_error, because anything reading a trajectory to count
+  // failures would otherwise count the agent being governed as the agent
+  // breaking.
+  | { type: "tool_blocked"; ts: string; id: string; name: string; reason: string }
   | { type: "status"; ts: string; text: string }
   | {
       type: "retry";

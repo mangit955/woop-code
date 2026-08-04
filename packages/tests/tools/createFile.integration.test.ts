@@ -5,7 +5,10 @@ import type { PendingEdit } from "../../../tui/src/types";
 
 // Only the approval prompt is faked. Everything else on the store stays real,
 // so this mock cannot break other files in the run the way a partial stub can.
-const { store: realStore } = await import("../../../tui/src/store/ui-store");
+// The module is spread as well as the store proxied, or its other exports —
+// `UIStore`, `READY_STATUS` — disappear for every file that runs after this one.
+const actualStore = await import("../../../tui/src/store/ui-store");
+const realStore = actualStore.store;
 
 let approve = true;
 let lastPendingEdit: PendingEdit | null = null;
@@ -37,7 +40,10 @@ const storeStub = new Proxy(realStore, {
   },
 });
 
-mock.module("../../../tui/src/store/ui-store", () => ({ store: storeStub }));
+mock.module("../../../tui/src/store/ui-store", () => ({
+  ...actualStore,
+  store: storeStub,
+}));
 
 const { createFileTool } = await import("../../../tools/createFile");
 const { writeFileTool } = await import("../../../tools/writeFile");

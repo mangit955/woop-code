@@ -1,6 +1,7 @@
 import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
-import type { ToolCall } from "../../../config/types";
+import type { TodoItem, ToolCall } from "../../../config/types";
 import { DEFAULT_APPROVAL_MODE, type ApprovalMode } from "../../../runtime/approval";
+import { nextSessionMode, type SessionMode } from "../../../runtime/planMode";
 
 /** The idle status, and what a transient status reverts to. */
 export const READY_STATUS = "Ready";
@@ -14,6 +15,10 @@ export class UIStore {
     modelPickerOpen: false,
     approvalMode: DEFAULT_APPROVAL_MODE,
     approvalPickerOpen: false,
+    // A session always starts able to work. Plan mode is deliberately not
+    // persisted: a mode that survived a restart would silently swallow the first
+    // edit of the next session.
+    sessionMode: "build",
     selectedModel: null,
     pendingEdit: null,
     pendingCommand: null,
@@ -198,6 +203,23 @@ export class UIStore {
     this.emit();
   }
 
+  /**
+   * Marks a call the policy refused, which is not the same as one that failed.
+   * The reason rides in `summary`, so the row reads `± Edit "cli.ts" (plan mode)`
+   * rather than announcing an error that did not happen.
+   */
+  blockTool(id: string, reason: string) {
+    this.state = {
+      ...this.state,
+      timeline: this.state.timeline.map((item) =>
+        item.type === "tool" && item.id === id
+          ? { ...item, status: "blocked", summary: reason }
+          : item,
+      ),
+    };
+    this.emit();
+  }
+
   failTool(id: string, output?: string) {
     this.state = {
       ...this.state,
@@ -222,6 +244,44 @@ export class UIStore {
 
   setApprovalMode(mode: ApprovalMode) {
     this.state = { ...this.state, approvalMode: mode, approvalPickerOpen: false };
+    this.emit();
+  }
+
+  setSessionMode(mode: SessionMode) {
+    if (this.state.sessionMode === mode) return;
+
+    this.state = { ...this.state, sessionMode: mode };
+    this.emit();
+  }
+
+  /** What Tab does. Returns the mode now in effect, for the caller to apply. */
+  toggleSessionMode(): SessionMode {
+    const mode = nextSessionMode(this.state.sessionMode);
+    this.setSessionMode(mode);
+    return mode;
+  }
+
+  /**
+   * Replaces the agent's task list.
+   *
+   * One list per session, not one per call: the tool sends the whole list every
+   * time, so a new entry each call would stack near-identical checklists down the
+   * transcript. The existing item is dropped and a fresh one appended, which
+   * keeps the list current *and* keeps it beside the work it describes rather
+   * than stranded above everything that happened since.
+   */
+  setTodos(items: TodoItem[]) {
+    const withoutPrevious = this.state.timeline.filter((item) => item.type !== "todo");
+
+    this.state = {
+      ...this.state,
+      scrollOffset: 0,
+      timeline: [
+        ...withoutPrevious,
+        { id: crypto.randomUUID(), type: "todo", items },
+      ],
+    };
+
     this.emit();
   }
 

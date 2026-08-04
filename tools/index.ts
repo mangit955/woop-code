@@ -12,6 +12,7 @@ import { globTool } from "./glob";
 import { webSearchTool } from "./webSearch";
 import { webFetchTool } from "./webFetch";
 import { questionTool } from "./question";
+import { todoWriteTool } from "./todo";
 
 export const toolRegistery: Tool[] = [
   listFilesTool,
@@ -27,6 +28,7 @@ export const toolRegistery: Tool[] = [
   webSearchTool,
   webFetchTool,
   questionTool,
+  todoWriteTool,
 ];
 
 // Providers occasionally vary casing or use the singular form while selecting a

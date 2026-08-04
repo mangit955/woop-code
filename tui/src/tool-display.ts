@@ -38,6 +38,19 @@ export function isCommandTool(name: string) {
   return RUN_TOOLS.includes(name);
 }
 
+/**
+ * Tools whose call row is suppressed because they render themselves.
+ *
+ * `todo_write` writes the checklist into the timeline, which appears directly
+ * below its own call row — the same event twice, once as `• todo write` and once
+ * as the list it just wrote. The list is the better of the two.
+ */
+const SELF_RENDERING_TOOLS = ["todo_write"];
+
+export function rendersItself(name: string) {
+  return SELF_RENDERING_TOOLS.includes(name);
+}
+
 export function toolGlyph(name: string) {
   if (SEARCH_TOOLS.includes(name)) return "*";
   if (READ_TOOLS.includes(name)) return "→";

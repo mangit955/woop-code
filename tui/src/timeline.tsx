@@ -5,8 +5,15 @@ import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
 import { TurnFooter } from "./components/TurnFooter";
 import { usePalette } from "./styles/palette";
-import { formatToolArgument, isCommandTool, toolGlyph, toolLabel } from "./tool-display";
+import {
+  formatToolArgument,
+  isCommandTool,
+  rendersItself,
+  toolGlyph,
+  toolLabel,
+} from "./tool-display";
 import { CommandBlock } from "./components/CommandBlock";
+import { TodoList } from "./components/TodoList";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -83,6 +90,9 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
         </Box>
       );
 
+    case "todo":
+      return <TodoList items={item.items} />;
+
     case "turn":
       return (
         <TurnFooter
@@ -95,6 +105,10 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
       );
 
     case "tool": {
+      // The checklist this call produced is already in the timeline just below,
+      // so the row would be the same event a second time.
+      if (rendersItself(item.name)) return null;
+
       // Command tools carry output worth reading, so they render as a block
       // rather than as a one-line record.
       if (isCommandTool(item.name)) {

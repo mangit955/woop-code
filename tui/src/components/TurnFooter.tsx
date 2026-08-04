@@ -5,6 +5,7 @@ import type { Palette } from "../styles/theme";
 import { getModelDisplayName } from "../../../config/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
 import { planLayout } from "../layout";
+import { sessionModeLabel } from "../../../runtime/planMode";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 
 /**
@@ -17,11 +18,18 @@ const PULSE_INTERVAL_MS = 240;
 /** Breathes the marker while the turn is in flight. */
 const pulseColors = ["#453B82", "#7263CE", "#8F83E0", "#ACA3EC", "#8F83E0", "#7263CE"] as const;
 
-/** Takes the palette as an argument so it fades with the layer it renders in. */
-function outcomeColor(outcome: TurnOutcome, colors: Palette) {
+/**
+ * Takes the palette as an argument so it fades with the layer it renders in.
+ *
+ * A turn that completed is coloured by the mode it ran under, read from the
+ * label the turn recorded when it started. That is history, not live state: a
+ * plan turn stays amber in scrollback after the session has switched back, which
+ * is the point — it says what that turn was allowed to do.
+ */
+function outcomeColor(outcome: TurnOutcome, colors: Palette, agent: string) {
   if (outcome === "cancelled") return colors.textMuted;
   if (outcome === "error") return colors.dangerBase;
-  return colors.primary;
+  return agent === sessionModeLabel("plan") ? colors.agentPlan : colors.primary;
 }
 
 /**
@@ -78,7 +86,7 @@ export function TurnFooter({
   const elapsed = (endedAt ?? now) - startedAt;
   const markerColor = running
     ? pulseColors[pulse]
-    : outcomeColor(outcome ?? "completed", colors);
+    : outcomeColor(outcome ?? "completed", colors, agent);
 
   // One row, always. Wrapping this split "Build · Gemini 2.5 Flash Lite · 3.5s"
   // across three lines in a narrow terminal; the model name gives up columns and

@@ -1,6 +1,6 @@
 {
   "counts": {
-    "tools": 13,
+    "tools": 14,
     "commands": 11,
     "approvalModes": 4
   },
@@ -274,6 +274,20 @@
           "type": "array",
           "required": true,
           "description": "Array of questions to ask the user (e.g., ['What is the API key?', 'Which environment?'])"
+        }
+      ]
+    },
+    {
+      "name": "todo_write",
+      "description": "Records the task list for the work in progress, so the user can see what is done and what is left.\n\nSend the complete list every time — it replaces the previous one rather than adding to it. Keep exactly one item in_progress, and mark an item completed as soon as it is finished rather than in a batch at the end.\n\nUse it for work with several distinct steps, and for a plan the user has just approved. Skip it for a single-step change or a question: a one-item list tells the user nothing they did not already know.\n\nThis records intent only. It changes no files and runs nothing, so it is available while planning.",
+      "effect": "plan",
+      "gate": "Runs without asking. Records what the agent intends; changes nothing.",
+      "parameters": [
+        {
+          "name": "todos",
+          "type": "array",
+          "required": true,
+          "description": "The complete task list, in the order the steps will be done. Replaces the previous list."
         }
       ]
     }

@@ -8,6 +8,12 @@ import {
   saveExecutionLog,
 } from "../config/config";
 import { agentLoop } from "../config/runtime";
+import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
+import {
+  nextSessionMode,
+  sessionModeLabel,
+  type SessionMode,
+} from "../runtime/planMode";
 import {
   EXECUTION_LOG_BUDGET_RATIO,
   recordsFrom,
@@ -43,6 +49,14 @@ export class AgentController {
   private isRunning = false;
   private wasCancelled = false;
   private model: string;
+  /**
+   * Build or Plan. Owned here, beside the provider, model and cancellation, and
+   * mirrored into the UI store for rendering — never read back from it.
+   *
+   * Not persisted: a plan mode that survived a restart would silently refuse the
+   * first edit of the next session.
+   */
+  private sessionMode: SessionMode = "build";
   private readonly callbacks: AgentCallbacks;
 
   constructor(
@@ -80,6 +94,32 @@ export class AgentController {
 
   getProvider() {
     return this.provider;
+  }
+
+  getSessionMode() {
+    return this.sessionMode;
+  }
+
+  isPlanMode() {
+    return this.sessionMode === "plan";
+  }
+
+  /**
+   * Switches mode, allowed even mid-turn.
+   *
+   * Unlike the model and the provider, this cannot corrupt a request in flight:
+   * the loop reads it once when the turn starts, so a press during a turn lands
+   * on the next one. Refusing it while busy would make the key feel broken at
+   * exactly the moment someone reaches for it.
+   */
+  setSessionMode(mode: SessionMode) {
+    this.sessionMode = mode;
+  }
+
+  /** What Tab does. Returns the mode now in effect. */
+  toggleSessionMode(): SessionMode {
+    this.sessionMode = nextSessionMode(this.sessionMode);
+    return this.sessionMode;
   }
 
   getModel() {
@@ -127,7 +167,9 @@ export class AgentController {
     // directly under the prompt the moment the turn starts, then travels down
     // as the turn appends tool rows and assistant text beneath it.
     store.startTurn({
-      agent: "Build",
+      // The label the turn ran under, so a plan turn stays identifiable in
+      // scrollback after the mode has been switched back.
+      agent: sessionModeLabel(this.sessionMode),
       model: this.model,
       startedAt: Date.now(),
     });
@@ -157,6 +199,9 @@ export class AgentController {
         },
         this.abortController.signal,
         !conversational,
+        // Snapshotted as the turn starts, so a Tab pressed while it runs applies
+        // to the next turn rather than changing the rules underneath this one.
+        { planMode: this.isPlanMode() },
       );
 
       const assistantText = response || this.pendingAssistantText;
@@ -251,6 +296,9 @@ export class AgentController {
     return {
       repository: this.repoContext,
       executionLog: renderExecutionLog(this.executionRecords, budget),
+      // Absent in Build mode, so an ordinary turn is assembled exactly as it was
+      // before plan mode existed.
+      ...(this.isPlanMode() ? { instructions: PLAN_MODE_PROMPT } : {}),
     };
   }
 

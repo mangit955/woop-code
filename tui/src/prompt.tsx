@@ -6,6 +6,8 @@ import { handleSlashCommand } from "../../commands/slash";
 import { registry } from "../../commands/slash/registry";
 import { matchCommands } from "../../commands/slash/match";
 import { store } from "./store/ui-store";
+import { useUIStore } from "./store/useUIStore";
+import { sessionModeColor, sessionModeLabel } from "../../runtime/planMode";
 import { usePalette } from "./styles/palette";
 import { CommandPreview } from "./components/CommandPreview";
 import { planLayout } from "./layout";
@@ -42,6 +44,9 @@ export function Prompt({
   inputActive = true,
 }: PromptProps) {
   const colors = usePalette();
+  const { sessionMode } = useUIStore();
+  const planning = sessionMode === "plan";
+  const modeColor = sessionModeColor(sessionMode, colors);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
@@ -80,6 +85,17 @@ export function Prompt({
     (input, key) => {
       lastActivityTime.current = Date.now();
       setShowCursor(true);
+
+      // Tab cycles Build ⇄ Plan. The controller is authoritative and the store
+      // mirrors it, the same way the model picker applies a choice.
+      //
+      // Safe to claim: ink-text-input ignores Tab, and this handler is inactive
+      // while a dialog owns the screen. It is not slash completion either —
+      // Enter already does that, from the highlighted row.
+      if (key.tab) {
+        store.setSessionMode(controller.toggleSessionMode());
+        return;
+      }
 
       if (value.startsWith("/") && slashMatches.length > 0) {
         if (key.upArrow) {
@@ -206,7 +222,10 @@ export function Prompt({
           />
         )}
         <Box>
-          <Text color={colors.primary}>❯ </Text>
+          {/* These variants have no label row, so the mode rides on the caret —
+              shown only while planning, leaving Build exactly as it was. */}
+          {planning && <Text color={modeColor}>{sessionModeLabel(sessionMode)} </Text>}
+          <Text color={modeColor}>❯ </Text>
           <TextInput
             value={value}
             placeholder={placeholder}
@@ -221,16 +240,11 @@ export function Prompt({
   }
 
   return (
-    <Box
-      flexDirection="column"
-      width="100%"
-      borderStyle="single"
-      borderTop={false}
-      borderRight={false}
-      borderBottom
-      borderLeft={false}
-      borderColor="#000000"
-    >
+    // No border on the outer box. It used to draw a bottom one in #000000, which
+    // is invisible against the background but still occupies a row — so the block
+    // carried on for a line past where the bar stopped, and the card looked
+    // detached from its own edge.
+    <Box flexDirection="column" width="100%">
       {slashMatches.length > 0 && (
         <CommandPreview
           matches={slashMatches}
@@ -249,7 +263,8 @@ export function Prompt({
         borderTop={false}
         borderRight={false}
         borderBottom={false}
-        borderColor={colors.primary}
+        // The one column of the card that says which mode a keystroke lands in.
+        borderColor={modeColor}
       >
         <Box
           flexDirection="column"
@@ -273,7 +288,11 @@ export function Prompt({
               the model name gives up characters instead. */}
           <Box marginTop={1} flexDirection="row" flexWrap="nowrap">
             <Box flexShrink={0}>
-              <Text color={colors.primary}>Build</Text>
+              {/* Amber while planning, and the same amber as the bar beside it:
+                  the mode is the one thing on this row that changes what a
+                  keystroke will do, so it should be legible without reading the
+                  word. */}
+              <Text color={modeColor}>{sessionModeLabel(sessionMode)}</Text>
               <Text color={colors.textFaint}>{" · "}</Text>
             </Box>
             <Box flexShrink={1} minWidth={0}>

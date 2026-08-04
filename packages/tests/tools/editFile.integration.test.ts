@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
+import { test, expect, describe, beforeAll, beforeEach, afterAll, afterEach, mock } from "bun:test";
 import { editFileTool } from "../../../tools/editFile";
 import { join } from "path";
 import { mkdirSync, rmSync } from "fs";
@@ -15,9 +15,34 @@ import { mkdirSync, rmSync } from "fs";
 // a store nobody can patch afterwards. Test methods are reset in place instead.
 const mockStore: any = {};
 
+// ...and inert outside this file. The stub used to replace the module outright,
+// which left every file that ran afterwards holding a store with five methods on
+// it: `todo_write`'s tests failed on `clearTimeline` being undefined, and only in
+// a full run. While `intercepting` is off, every property comes from the real
+// store, so the order files run in stops mattering. The whole module is spread
+// too, or `UIStore` and `READY_STATUS` vanish for everyone else.
+const actualStore = await import("../../../tui/src/store/ui-store");
+let intercepting = false;
+
+const storeStub = new Proxy(actualStore.store, {
+  get(target, property, receiver) {
+    if (intercepting && property in mockStore) return mockStore[property];
+    return Reflect.get(target, property, receiver);
+  },
+});
+
 mock.module("../../../tui/src/store/ui-store", () => ({
-  store: mockStore,
+  ...actualStore,
+  store: storeStub,
 }));
+
+beforeAll(() => {
+  intercepting = true;
+});
+
+afterAll(() => {
+  intercepting = false;
+});
 
 describe("editFile Tool - Integration Tests", () => {
   let testDir: string;

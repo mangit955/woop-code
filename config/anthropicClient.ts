@@ -3,7 +3,8 @@ import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import { thinkingBudget } from "./client";
 import { defaultModelForProvider } from "./modelCatalog";
-import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
+import { toolInputSchema } from "./toolSchema";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 /** Only the surface this client uses, so a test can supply a fake. */
@@ -97,8 +98,9 @@ export function anthropicClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
+      offeredTools: readonly Tool[] = toolRegistery,
     ): AsyncGenerator<StreamEvent> {
-      const tools = toolRegistery.map(toolSchema);
+      const tools = offeredTools.map(toolSchema);
 
       // Read once per turn, for the same reason the loop reads its own budgets
       // once: two requests of one turn should not assemble to different rules.
@@ -363,27 +365,18 @@ function describeFailure(error: unknown): unknown {
   return error;
 }
 
-function toolSchema(tool: (typeof toolRegistery)[number]): Anthropic.Tool {
+/**
+ * Anthropic takes JSON Schema directly, so the shared builder is the schema —
+ * there is nothing to translate, unlike Gemini's enum of type names.
+ */
+function toolSchema(tool: Tool): Anthropic.Tool {
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: {
-      type: "object",
-      properties: Object.fromEntries(
-        tool.parameters.map((param) => [
-          param.name,
-          {
-            type: param.type ?? "string",
-            description: param.description,
-            // The registry says "array" without saying of what; every array
-            // parameter in it is a list of strings, and JSON Schema requires
-            // the item type be stated.
-            ...(param.type === "array" ? { items: { type: "string" } } : {}),
-          },
-        ]),
-      ),
-      required: tool.parameters.filter((param) => param.required).map((param) => param.name),
-    },
+    // The SDK types `input_schema` as an open record, so a closed interface does
+    // not satisfy it. Cast at the boundary rather than opening ours up, which
+    // would let a typo through everywhere else the schema is used.
+    input_schema: toolInputSchema(tool) as Anthropic.Tool.InputSchema,
   };
 }
 

@@ -4,6 +4,7 @@ import { usePalette } from "./styles/palette";
 import { StatusSpinner } from "./components/StatusSpinner";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { planLayout, truncateStart } from "./layout";
+import { sessionModeColor } from "../../runtime/planMode";
 
 const workspacePath = process.cwd().replace(process.env.HOME ?? "", "~");
 
@@ -18,6 +19,8 @@ interface StatusBarProps {
   showKeyHints?: boolean;
   /** Columns the label may use before it has to give way to the hints. */
   labelWidth?: number;
+  /** Plan mode: the Tab hint points the other way and turns amber. */
+  planning?: boolean;
 }
 
 export function StatusBar({
@@ -25,6 +28,7 @@ export function StatusBar({
   message,
   showKeyHints = true,
   labelWidth,
+  planning = false,
 }: StatusBarProps) {
   const colors = usePalette();
 
@@ -36,6 +40,13 @@ export function StatusBar({
       </Box>
       {showKeyHints && (
         <Box gap={2} flexShrink={0}>
+          {/* Named after what the key leads to, not the state it leaves: "tab
+              plan" while building, "tab build" while planning. Amber only while
+              planning — in Build this is one hint among three and should not
+              outrank them. */}
+          <Text color={planning ? sessionModeColor("plan", colors) : colors.textFaint}>
+            tab {planning ? "build" : "plan"}
+          </Text>
           <Text color={colors.textFaint}>↑↓ scroll</Text>
           <Text color={colors.textFaint}>ctrl+c</Text>
         </Box>
@@ -97,11 +108,17 @@ function StatusLabel({
 
 // ─── Connected wrapper (reads from store) ────────────────────────────────────
 
-/** Columns the spinner, gaps, and "↑↓ scroll  ctrl+c" hints occupy. */
-const HINTS_AND_ICON_COLUMNS = 28;
+/**
+ * Columns the spinner, gaps, and "tab plan  ↑↓ scroll  ctrl+c" hints occupy.
+ *
+ * Grew by ten when the Tab hint was added — eight for the widest of "tab build"
+ * and "tab plan", two for its gap. Left short, the workspace path would run into
+ * the hints on a narrow terminal instead of being truncated before them.
+ */
+const HINTS_AND_ICON_COLUMNS = 38;
 
 export function ConnectedStatusBar() {
-  const { status } = useUIStore();
+  const { status, sessionMode } = useUIStore();
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
   const { state, message } = parseStatus(status);
@@ -110,6 +127,7 @@ export function ConnectedStatusBar() {
     <StatusBar
       status={state}
       message={message}
+      planning={sessionMode === "plan"}
       showKeyHints={layout.showKeyHints}
       labelWidth={Math.max(
         1,

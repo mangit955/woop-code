@@ -1,4 +1,6 @@
 import type { ApprovalMode, CommandRisk } from "../../runtime/approval";
+import type { SessionMode } from "../../runtime/planMode";
+import type { TodoItem } from "../../config/types";
 
 export type TimeLineItem =
   | {
@@ -22,11 +24,21 @@ export type TimeLineItem =
       type: "tool";
       name: string;
       arguments: Record<string, unknown>;
-      status: "running" | "completed" | "failed";
+      /**
+       * `blocked` is a refusal by policy — plan mode declining a write. It is
+       * kept apart from `failed` because the tool never ran and nothing is
+       * wrong, so it must not be drawn like a fault.
+       */
+      status: "running" | "completed" | "failed" | "blocked";
       /** Short report of what came back, e.g. "8 matches". */
       summary?: string;
       /** Command output, kept for tools rendered as a shell block. */
       output?: string;
+    }
+  | {
+      id: string;
+      type: "todo";
+      items: TodoItem[];
     }
   | ({
       id: string;
@@ -83,6 +95,11 @@ export interface UIState {
   activeTurn: ActiveTurn | null;
   approvalMode: ApprovalMode;
   approvalPickerOpen: boolean;
+  /**
+   * Build or Plan, mirrored from the controller so components can subscribe.
+   * The controller stays authoritative — the same split `selectedModel` uses.
+   */
+  sessionMode: SessionMode;
   status: string;
   isThinking: boolean;
   modelPickerOpen: boolean;

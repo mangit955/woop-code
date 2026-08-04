@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
+import { test, expect, describe, beforeAll, beforeEach, afterAll, afterEach, mock } from "bun:test";
 import { writeFileTool } from "../../../tools/writeFile";
 import { join } from "path";
 import { mkdirSync, rmSync } from "fs";
@@ -19,9 +19,32 @@ import { mkdirSync, rmSync } from "fs";
 // a store nobody can patch afterwards. Test methods are reset in place instead.
 const mockStore: any = {};
 
+// ...and inert outside this file: while `intercepting` is off every property
+// comes from the real store, so a file running after this one still gets a whole
+// one. See the same note in editFile.integration.test.ts for what replacing the
+// module outright broke.
+const actualStore = await import("../../../tui/src/store/ui-store");
+let intercepting = false;
+
+const storeStub = new Proxy(actualStore.store, {
+  get(target, property, receiver) {
+    if (intercepting && property in mockStore) return mockStore[property];
+    return Reflect.get(target, property, receiver);
+  },
+});
+
 mock.module("../../../tui/src/store/ui-store", () => ({
-  store: mockStore,
+  ...actualStore,
+  store: storeStub,
 }));
+
+beforeAll(() => {
+  intercepting = true;
+});
+
+afterAll(() => {
+  intercepting = false;
+});
 
 describe("writeFile Tool - Integration Tests", () => {
   let testDir: string;

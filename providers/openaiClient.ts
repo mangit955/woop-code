@@ -1,10 +1,10 @@
 import OpenAI from "openai";
-import { toolRegistery } from "../tools";
-import { SYSTEM_PROMPT } from "./systemPrompt";
+import { toolRegistry } from "../tools";
+import { SYSTEM_PROMPT } from "../config/systemPrompt";
 import { thinkingBudget } from "./client";
 import { defaultModelForProvider } from "./modelCatalog";
-import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
-import { toolInputSchema } from "./toolSchema";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "../config/types";
+import { toolInputSchema } from "../config/toolSchema";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 /** Only the surface this client uses, so a test can supply a fake. */
@@ -79,7 +79,7 @@ export function openaiClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
-      offeredTools: readonly Tool[] = toolRegistery,
+      offeredTools: readonly Tool[] = toolRegistry,
     ): AsyncGenerator<StreamEvent> {
       // Not the whole registry: plan mode narrows this, and a client that reads
       // the registry directly silently offers writing tools while planning.
@@ -283,7 +283,7 @@ function describeFailure(error: unknown): unknown {
   if (error instanceof OpenAI.AuthenticationError) {
     return new Error(
       `OpenAI rejected the API key.\n\n` +
-        `Run "woopcode provider login openai" with a key from ` +
+        `Run "woopcode providers login -p openai -a <api-key>" with a key from ` +
         `https://platform.openai.com/api-keys`,
     );
   }

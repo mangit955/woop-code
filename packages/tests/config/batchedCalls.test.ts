@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildContents } from "../../../config/client";
+import { buildContents } from "../../../providers/client";
 import type { Message } from "../../../config/types";
 
 /**

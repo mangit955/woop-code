@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { anthropicClient, anthropicThinking } from "../../../config/anthropicClient";
+import { anthropicClient, anthropicThinking } from "../../../providers/anthropicClient";
 import type { Message, StreamEvent } from "../../../config/types";
 import {
   fakeAnthropic,

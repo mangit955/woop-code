@@ -18,7 +18,7 @@ import { useTerminalSize } from "./hooks/useTerminalSize";
 import { useCancelKey } from "./hooks/useCancelKey";
 import { planLayout } from "./layout";
 import { PaletteProvider } from "./styles/palette";
-import { getModelDisplayName } from "../../config/client";
+import { getModelDisplayName } from "../../providers/client";
 import { matchCommands } from "../../commands/slash/match";
 
 interface AppProps {

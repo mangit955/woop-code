@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { toolRegistery } from "../tools";
-import { SYSTEM_PROMPT } from "./systemPrompt";
+import { toolRegistry } from "../tools";
+import { SYSTEM_PROMPT } from "../config/systemPrompt";
 import { thinkingBudget } from "./client";
 import { defaultModelForProvider } from "./modelCatalog";
-import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
-import { toolInputSchema } from "./toolSchema";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "../config/types";
+import { toolInputSchema } from "../config/toolSchema";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 /** Only the surface this client uses, so a test can supply a fake. */
@@ -98,7 +98,7 @@ export function anthropicClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
-      offeredTools: readonly Tool[] = toolRegistery,
+      offeredTools: readonly Tool[] = toolRegistry,
     ): AsyncGenerator<StreamEvent> {
       const tools = offeredTools.map(toolSchema);
 
@@ -347,7 +347,7 @@ function describeFailure(error: unknown): unknown {
   if (error instanceof Anthropic.AuthenticationError) {
     return new Error(
       `Anthropic rejected the API key.\n\n` +
-        `Run "woopcode provider login anthropic" with a key from ` +
+        `Run "woopcode providers login -p anthropic -a <api-key>" with a key from ` +
         `https://console.anthropic.com/settings/keys`,
     );
   }

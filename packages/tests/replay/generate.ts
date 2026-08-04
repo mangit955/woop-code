@@ -20,7 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
 import { Glob } from "bun";
-import { measureSegments } from "../../../config/runtime";
+import { measureSegments } from "../../../runtime/loop";
 import { recentMessages } from "../../../config/config";
 import { parseEvents, replaySteps } from "./reconstruct";
 

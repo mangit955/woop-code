@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { MAX_TOOL_RESULT, truncateToolResult } from "../../../config/runtime";
+import { MAX_TOOL_RESULT, truncateToolResult } from "../../../runtime/loop";
 
 describe("tool result truncation", () => {
   test("output within the budget is untouched", () => {

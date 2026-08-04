@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import { anthropicClient } from "../../../config/anthropicClient";
-import { createProviderClient } from "../../../config/client";
-import { defaultModelForProvider } from "../../../config/modelCatalog";
+import { anthropicClient } from "../../../providers/anthropicClient";
+import { createProviderClient } from "../../../providers/client";
+import { defaultModelForProvider } from "../../../providers/modelCatalog";
 import type { Message, StreamEvent } from "../../../config/types";
 
 /**

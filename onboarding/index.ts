@@ -2,7 +2,7 @@ import { render } from "ink";
 import React from "react";
 import { SetupWizard } from "./setupWizard";
 import { getConfig } from "../config/config";
-import { isProviderEnabled } from "../config/providerRegistry";
+import { isProviderEnabled } from "../providers/providerRegistry";
 import {
   canPromptInteractively,
   resolveEnvCredentials,

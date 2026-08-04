@@ -4,14 +4,14 @@ import type { AgentCallbacks, TurnSummary } from "../config/types";
 import { App, store } from "../tui/src";
 import { render } from "ink";
 import { AgentController } from "./agentController";
-import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from "../config/client";
+import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from "../providers/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
 import { isCommandTool, summarizeToolOutput } from "../tui/src/tool-display";
 import { parseApprovalMode } from "../runtime/approval";
 import { createEventLog, now } from "../runtime/eventLog";
-import { IterationBudgetExhaustedError } from "../config/runtime";
+import { IterationBudgetExhaustedError } from "../runtime/loop";
 import { VERSION } from "../config/version";
 import { PassThrough } from "stream";
 

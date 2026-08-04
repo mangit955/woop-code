@@ -1,5 +1,5 @@
 import { describe, test, expect, mock } from "bun:test";
-import { agentLoop, measureSegments, renderContext } from "../../../config/runtime";
+import { agentLoop, measureSegments, renderContext } from "../../../runtime/loop";
 import { SYSTEM_PROMPT } from "../../../config/systemPrompt";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
 import { createRuntimeTest, createStreamingProvider } from "../shared/testHelpers";

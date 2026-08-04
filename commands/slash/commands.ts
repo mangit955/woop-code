@@ -7,9 +7,9 @@ import {
   getConversation,
   saveConversation,
 } from "../../config/config";
-import { isProviderEnabled, unsupportedProviderMessage } from "../../config/providerRegistry";
-import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../config/client";
-import { toolRegistery } from "../../tools";
+import { isProviderEnabled, unsupportedProviderMessage } from "../../providers/providerRegistry";
+import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../providers/client";
+import { toolRegistry } from "../../tools";
 import { VERSION } from "../../config/version";
 // The catalog owns the shape of models.json and the join with providerRegistry,
 // so the CLI command and this slash command cannot describe a model differently.
@@ -18,7 +18,7 @@ import {
   defaultModelForProvider,
   modelBelongsToProvider,
   providerLabel,
-} from "../../config/modelCatalog";
+} from "../../providers/modelCatalog";
 
 const models = allModels();
 
@@ -419,7 +419,7 @@ const statusCommand: SlashCommand = {
       `Model: ${getModelDisplayName(model)} (${model})`,
       ``,
       `Conversation: ${conversation.length} messages`,
-      `Tools: ${toolRegistery.length} registered`,
+      `Tools: ${toolRegistry.length} registered`,
       `Version: ${VERSION}`,
     ].join("\n");
   },

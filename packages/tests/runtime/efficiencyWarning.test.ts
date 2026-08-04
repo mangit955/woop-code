@@ -15,7 +15,7 @@ const getTool = mock((name: string) => mockToolRegistry.get(name));
 const actualTools = await import("../../../tools");
 mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
-const { agentLoop } = await import("../../../config/runtime");
+const { agentLoop } = await import("../../../runtime/loop");
 
 /** Replays a different response for each iteration of the loop. */
 class ScriptedClient implements ProviderClient {

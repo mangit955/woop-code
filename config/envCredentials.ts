@@ -1,4 +1,4 @@
-import { isProviderEnabled } from "./providerRegistry";
+import { isProviderEnabled } from "../providers/providerRegistry";
 
 /**
  * Credentials sourced from the process environment rather than from

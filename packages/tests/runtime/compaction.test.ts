@@ -4,7 +4,7 @@ import {
   compactToolHistory,
   toolHistoryBudget,
 } from "../../../runtime/compaction";
-import { measureSegments } from "../../../config/runtime";
+import { measureSegments } from "../../../runtime/loop";
 import {
   createAssistantToolCallMessage,
   createToolMessage,

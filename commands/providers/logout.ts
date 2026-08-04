@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { getConfig, saveConfig } from "../../config/config";
-import { isProviderEnabled } from "../../config/providerRegistry";
+import { isProviderEnabled } from "../../providers/providerRegistry";
 
 export const logoutCommand = new Command("logout")
   .description("Lets user logout from the provider")

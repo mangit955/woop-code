@@ -16,6 +16,7 @@ since: 0.6.0
 | Key | Action |
 | --- | --- |
 | <kbd>Enter</kbd> | Send the prompt |
+| <kbd>Tab</kbd> | Switch between [Build and Plan](/docs/guides/plan-mode) |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Scroll the conversation a line at a time |
 | <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Scroll a screen at a time |
 | <kbd>Home</kbd> | Jump to the start of the conversation |
@@ -23,6 +24,10 @@ since: 0.6.0
 
 The arrow keys scroll rather than recall: there is no prompt history, so
 <kbd>↑</kbd> does not bring back what you typed last.
+
+<kbd>Tab</kbd> is not slash completion — <kbd>Enter</kbd> already does that from
+the highlighted row. The composer changes colour and the caret follows, so the
+mode is visible without looking anywhere else.
 
 ## Completing a slash command
 

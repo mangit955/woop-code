@@ -1,5 +1,5 @@
 import { fetch } from "bun";
-import { isProviderEnabled, unsupportedProviderMessage } from "./providerRegistry";
+import { isProviderEnabled, unsupportedProviderMessage } from "../providers/providerRegistry";
 
 /**
  * Verifies an API key. Providers without a runtime client are refused here so

@@ -38,6 +38,7 @@
     "cli.ts",
     "commands/",
     "config/",
+    "providers/",
     "runtime/",
     "tools/",
     "tui/",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_MODEL_ID } from "../../../config/client";
+import { DEFAULT_MODEL_ID } from "../../../providers/client";
 import {
   allModels,
   defaultModelForProvider,
@@ -11,8 +11,8 @@ import {
   modelBelongsToProvider,
   modelStatus,
   providerLabel,
-} from "../../../config/modelCatalog";
-import { PROVIDERS } from "../../../config/providerRegistry";
+} from "../../../providers/modelCatalog";
+import { PROVIDERS } from "../../../providers/providerRegistry";
 
 /**
  * The catalog is hand-edited data, and hand-edited data drifts: this file

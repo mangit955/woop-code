@@ -1,9 +1,9 @@
 import { describe, test, expect } from "bun:test";
 import type { ProviderClient, StreamEvent, Message } from "../../../config/types";
 import { MockProviderClient } from "../shared/mocks";
-import { anthropicClient } from "../../../config/anthropicClient";
+import { anthropicClient } from "../../../providers/anthropicClient";
 import { fakeAnthropic, textBlock } from "../shared/anthropicStream";
-import { openaiClient } from "../../../config/openaiClient";
+import { openaiClient } from "../../../providers/openaiClient";
 import { fakeOpenAI, textItem } from "../shared/openaiStream";
 import {
   createTextEvent,

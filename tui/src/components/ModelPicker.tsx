@@ -2,7 +2,7 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useEffect, useMemo, useState } from "react";
 import { getConfig, saveConfig } from "../../../config/config";
-import { allModels, isRunnable, providerLabel } from "../../../config/modelCatalog";
+import { allModels, isRunnable, providerLabel } from "../../../providers/modelCatalog";
 import type { AgentController } from "../../../commands/agentController";
 import { store } from "../store/ui-store";
 import { colors } from "../styles/theme";

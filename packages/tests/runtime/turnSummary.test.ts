@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from "bun:test";
-import { agentLoop } from "../../../config/runtime";
+import { agentLoop } from "../../../runtime/loop";
 import { toolEffect } from "../../../runtime/toolEffects";
-import { toolRegistery } from "../../../tools";
+import { toolRegistry } from "../../../tools";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
 import { createRuntimeTest, createStreamingProvider } from "../shared/testHelpers";
 import {
@@ -31,7 +31,7 @@ function registerTool(name: string, output = "ok") {
 
 describe("tool effect classification", () => {
   test("classifies every registered tool", () => {
-    const unclassified = toolRegistery
+    const unclassified = toolRegistry
       .map((tool) => tool.name)
       .filter((name) => toolEffect(name) === "unclassified");
 

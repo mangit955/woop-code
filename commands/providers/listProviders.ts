@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { getConfig } from "../../config/config";
-import { isProviderEnabled } from "../../config/providerRegistry";
+import { isProviderEnabled } from "../../providers/providerRegistry";
 import { renderTable } from "../table";
 
 interface ProviderRow {

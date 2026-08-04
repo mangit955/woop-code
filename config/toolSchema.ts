@@ -1,8 +1,8 @@
 /**
  * One description of a tool's arguments, for every provider.
  *
- * Both clients built this themselves — `config/client.ts` into Gemini's `Type`
- * enum, `config/anthropicClient.ts` into JSON Schema strings — from the same
+ * Both clients built this themselves — `providers/client.ts` into Gemini's `Type`
+ * enum, `providers/anthropicClient.ts` into JSON Schema strings — from the same
  * `ToolParameter` list, and each carried its own copy of the rule that an array
  * holds strings. Two copies of one mapping is how the second goes stale, and it
  * did: neither could express an array of objects, so `todo_write` had nowhere to

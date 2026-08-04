@@ -5,7 +5,7 @@
     "command": "./run-tests.sh"
   },
   "mutate": [
-    "config/runtime.ts",
+    "runtime/loop.ts",
     "tools/readFile.ts",
     "tools/writeFile.ts",
     "tools/editFile.ts",

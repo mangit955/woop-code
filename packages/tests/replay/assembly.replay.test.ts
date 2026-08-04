@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { measureSegments } from "../../../config/runtime";
+import { measureSegments } from "../../../runtime/loop";
 import { recentMessages } from "../../../config/config";
 import { SYSTEM_PROMPT } from "../../../config/systemPrompt";
 import { parseEvents, replaySteps, type ReplayStep } from "./reconstruct";

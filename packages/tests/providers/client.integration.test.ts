@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@google/genai";
-import { geminiClient, thinkingBudget } from "../../../config/client";
+import { geminiClient, thinkingBudget } from "../../../providers/client";
 import type { Message, StreamEvent } from "../../../config/types";
 
 describe("thinking budget", () => {

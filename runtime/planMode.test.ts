@@ -7,7 +7,7 @@ import {
   sessionModeLabel,
 } from "./planMode";
 import { TOOL_EFFECTS, toolEffect } from "./toolEffects";
-import { toolRegistery } from "../tools";
+import { toolRegistry } from "../tools";
 import type { Tool } from "../config/types";
 
 /**
@@ -28,7 +28,7 @@ const tool = (name: string): Tool => ({
 
 describe("plan mode — the tools offered", () => {
   test("withholds every writing tool", () => {
-    const offered = planModeTools(toolRegistery).map((entry) => entry.name);
+    const offered = planModeTools(toolRegistry).map((entry) => entry.name);
 
     const writers = Object.entries(TOOL_EFFECTS)
       .filter(([, effect]) => effect === "write")
@@ -41,7 +41,7 @@ describe("plan mode — the tools offered", () => {
   });
 
   test("keeps reading, asking, planning and shell tools", () => {
-    const offered = planModeTools(toolRegistery).map((entry) => entry.name);
+    const offered = planModeTools(toolRegistry).map((entry) => entry.name);
 
     expect(offered).toContain("read_file");
     expect(offered).toContain("grep");
@@ -56,13 +56,13 @@ describe("plan mode — the tools offered", () => {
     const invented = tool("frobnicate");
     expect(toolEffect(invented.name)).toBe("unclassified");
 
-    expect(planModeTools([...toolRegistery, invented]).map((e) => e.name)).not.toContain(
+    expect(planModeTools([...toolRegistry, invented]).map((e) => e.name)).not.toContain(
       "frobnicate",
     );
   });
 
   test("offers strictly fewer tools than Build mode", () => {
-    expect(planModeTools(toolRegistery).length).toBeLessThan(toolRegistery.length);
+    expect(planModeTools(toolRegistry).length).toBeLessThan(toolRegistry.length);
   });
 });
 

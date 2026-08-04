@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileTool } from "../../../tools/readFile";
-import { createProviderClient } from "../../../config/client";
+import { createProviderClient } from "../../../providers/client";
 import type { Message, StreamEvent } from "../../../config/types";
 
 /**

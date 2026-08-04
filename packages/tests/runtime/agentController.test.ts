@@ -61,7 +61,7 @@ mock.module("../../../config/config", () => ({
 
 afterAll(() => {
   mock.module("../../../config/config", () => actualConfig);
-  mock.module("../../../config/client", () => actualClient);
+  mock.module("../../../providers/client", () => actualClient);
   mock.module("../../../tools", () => actualTools);
 });
 
@@ -72,9 +72,9 @@ const createProviderClient = mock((provider: string, apiKey: string, model?: str
   return globalMockClient;
 });
 
-const actualClient = await import("../../../config/client");
+const actualClient = await import("../../../providers/client");
 
-mock.module("../../../config/client", () => ({
+mock.module("../../../providers/client", () => ({
   ...actualClient,
   createProviderClient,
 }));

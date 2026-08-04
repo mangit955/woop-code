@@ -1,8 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { toolRegistery } from "../tools";
-import { SYSTEM_PROMPT } from "./systemPrompt";
-import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
-import { toolInputSchema, type JsonSchema, type JsonSchemaType } from "./toolSchema";
+import { toolRegistry } from "../tools";
+import { SYSTEM_PROMPT } from "../config/systemPrompt";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "../config/types";
+import { toolInputSchema, type JsonSchema, type JsonSchemaType } from "../config/toolSchema";
 import { unsupportedProviderMessage } from "./providerRegistry";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 import {
@@ -143,7 +143,7 @@ export function geminiClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
-      offeredTools: readonly Tool[] = toolRegistery,
+      offeredTools: readonly Tool[] = toolRegistry,
     ): AsyncGenerator<StreamEvent> {
       const contents = buildContents(messages);
       const tools = [

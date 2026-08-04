@@ -17,7 +17,7 @@ last of them fails a check.
 
 1. **Write the tool** in `tools/`. Copy `tools/readFile.ts` — it is the one that
    demonstrates every invariant below.
-2. **Append it to `toolRegistery`** in `tools/index.ts`.
+2. **Append it to `toolRegistry`** in `tools/index.ts`.
 3. **Add its effect to `TOOL_EFFECTS`** in `runtime/toolEffects.ts` — `read`,
    `write`, `shell` or `ask`. A missing entry reads as `unclassified`, and both
    the runtime and `site/scripts/extract.ts` consume that table.
@@ -35,7 +35,7 @@ hold you to the contract.
 ## Invariants
 
 **Bound the output, and say you did.** Results are trimmed to `MAX_TOOL_RESULT`
-in `config/runtime.ts` before reaching the model, keeping both ends. That is a
+in `runtime/loop.ts` before reaching the model, keeping both ends. That is a
 backstop, not a plan: truncate deliberately at a limit you choose and append a
 notice saying what was dropped and how to get the rest. `tools/readFile.ts` does
 this twice — once for a whole file, once for a requested range.
@@ -81,7 +81,7 @@ warns about it by name and writes the tool into the surface as `unclassified`,
 so read what extract prints rather than only its exit code.
 
 The contract sweep in `packages/tests/contracts/tool.contract.test.ts` picks up
-the new tool the moment it is in `toolRegistery` — there is nothing to add
+the new tool the moment it is in `toolRegistry` — there is nothing to add
 there, but it will hold you to the invariants above.
 
 Then exercise the tool for real, which no check above does:

@@ -6,8 +6,8 @@ import {
   getProviderInfo,
   isProviderEnabled,
   unsupportedProviderMessage,
-} from "../../../config/providerRegistry";
-import { createProviderClient } from "../../../config/client";
+} from "../../../providers/providerRegistry";
+import { createProviderClient } from "../../../providers/client";
 import { loginProvider } from "../../../config/authProvider";
 
 describe("provider registry", () => {

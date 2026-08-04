@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { DEFAULT_MODEL_ID } from "../config/client";
+import { DEFAULT_MODEL_ID } from "../providers/client";
 import { getConfig } from "../config/config";
 import {
   allModels,
@@ -9,7 +9,7 @@ import {
   modelStatus,
   providerLabel,
   type Model,
-} from "../config/modelCatalog";
+} from "../providers/modelCatalog";
 import { renderTable } from "./table";
 
 /** Marks the row a turn would use right now, so the table answers "which am I on". */

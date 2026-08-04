@@ -1,4 +1,4 @@
-import { createProviderClient, DEFAULT_MODEL_ID } from "../config/client";
+import { createProviderClient, DEFAULT_MODEL_ID } from "../providers/client";
 import {
   MAX_REPO_CONTEXT_CHARS,
   buildRepositoryContext,
@@ -7,7 +7,7 @@ import {
   saveConversation,
   saveExecutionLog,
 } from "../config/config";
-import { agentLoop } from "../config/runtime";
+import { agentLoop } from "../runtime/loop";
 import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
 import {
   nextSessionMode,

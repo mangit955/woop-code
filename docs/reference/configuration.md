@@ -94,13 +94,77 @@ something you may want to remove yourself.
 
 ## Environment
 
+### Location
+
 | Variable | Effect |
 | --- | --- |
 | `XDG_CONFIG_HOME` | Moves the config directory on macOS and Linux |
 | `LOCALAPPDATA` | Moves the config directory on Windows |
 
-Woopcode does not read an API key from the environment. Pass it once through
-`woopcode providers login`, which stores it.
+### Credentials
+
+Woopcode reads an API key from the environment when one is present, and prefers
+it over the stored config. This is what lets it run somewhere with no writable
+home directory and no terminal to run setup in — a CI job, a benchmark
+container built fresh for every trial.
+
+They are checked in this order, and the first one set wins:
+
+| Variable | Provider |
+| --- | --- |
+| `WOOPCODE_API_KEY` | Whatever `WOOPCODE_PROVIDER` names, or `google` |
+| `GEMINI_API_KEY` | `google` |
+| `GOOGLE_API_KEY` | `google` |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | `google` |
+| `OPENAI_API_KEY` | `openai` |
+| `ANTHROPIC_API_KEY` | `anthropic` |
+
+An unusable provider is treated differently depending on which variable named
+it. `WOOPCODE_API_KEY` with `WOOPCODE_PROVIDER` is an instruction addressed to
+Woopcode, so naming a provider it has no client for is an error at startup
+rather than a failure on the first turn. A vendor variable is not an
+instruction — `ANTHROPIC_API_KEY` is usually exported for some other tool
+sharing the shell — so an unusable one is skipped and the search continues to
+the next, or to the stored config.
+
+:::note
+A key in the environment is used as-is and never written to `providers.json`.
+Nothing is stored, which is the point for a container that is discarded after
+the run.
+:::
+
+### Behaviour
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `WOOPCODE_PROVIDER` | `google` | Pairs with `WOOPCODE_API_KEY` |
+| `WOOPCODE_MAX_ITERATIONS` | `20` | Steps the agent may take in one turn. The interactive default is deliberately low, because a human is waiting and a runaway loop spends their quota; an automated caller working one hard task wants far more |
+| `WOOPCODE_MAX_ATTEMPTS` | `3` | Tries per provider request before the error surfaces |
+| `WOOPCODE_TOOL_HISTORY_BUDGET` | unset (off) | Characters of tool history to keep before older results are compacted. Off by default — see the measurements in `runtime/compaction.ts` |
+| `WOOPCODE_THINKING_BUDGET` | `-1` | Reasoning depth; see below |
+| `WOOPCODE_NON_INTERACTIVE` | unset | `1` stops Woopcode opening the setup wizard, so a missing key fails loudly instead of blocking on a prompt nothing can answer. `CI=true` does the same |
+
+A value that is not a positive integer is ignored with a warning on stderr, and
+the default is used. An unreadable setting never silently changes behaviour.
+
+### `WOOPCODE_THINKING_BUDGET`
+
+Takes `off`, `-1` (automatic, the default), or a token count. The three
+providers accept different things, so the same value does not mean the same
+thing everywhere — and a number is never faked into a budget the provider did
+not apply.
+
+| Value | Google | OpenAI | Anthropic |
+| --- | --- | --- | --- |
+| `off` | No thinking config sent | `reasoning.effort: none` | `thinking: disabled` |
+| `-1` | Model decides | Model default | Model decides |
+| a count | Used as the token budget | Model default | Model decides |
+
+Only Gemini takes a token count. Current Claude models reject an explicit
+budget, and OpenAI takes an effort level rather than a number, so on both a
+count falls back to letting the model decide — which is what `-1` already
+meant. On Gemini, budgets below roughly a thousand are ignored by the model
+rather than honoured.
 
 ## See also
 

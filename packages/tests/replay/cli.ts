@@ -12,7 +12,7 @@
  */
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { measureSegments } from "../../../config/runtime";
+import { measureSegments } from "../../../runtime/loop";
 import { recentMessages } from "../../../config/config";
 import {
   SUGGESTED_TOOL_HISTORY_BUDGET,

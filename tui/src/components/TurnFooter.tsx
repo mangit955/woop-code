@@ -2,7 +2,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import { usePalette } from "../styles/palette";
 import type { Palette } from "../styles/theme";
-import { getModelDisplayName } from "../../../config/client";
+import { getModelDisplayName } from "../../../providers/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
 import { planLayout } from "../layout";
 import { sessionModeLabel } from "../../../runtime/planMode";

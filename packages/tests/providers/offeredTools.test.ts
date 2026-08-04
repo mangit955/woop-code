@@ -1,10 +1,10 @@
 import { describe, test, expect } from "bun:test";
 import { Type } from "@google/genai";
-import { geminiClient } from "../../../config/client";
-import { anthropicClient } from "../../../config/anthropicClient";
-import { openaiClient } from "../../../config/openaiClient";
-import { enabledProviderIds } from "../../../config/providerRegistry";
-import { toolRegistery } from "../../../tools";
+import { geminiClient } from "../../../providers/client";
+import { anthropicClient } from "../../../providers/anthropicClient";
+import { openaiClient } from "../../../providers/openaiClient";
+import { enabledProviderIds } from "../../../providers/providerRegistry";
+import { toolRegistry } from "../../../tools";
 import { planModeTools } from "../../../runtime/planMode";
 import { TOOL_EFFECTS } from "../../../runtime/toolEffects";
 import type { Message, ProviderClient, Tool } from "../../../config/types";
@@ -15,7 +15,7 @@ import { fakeOpenAI, textItem } from "../shared/openaiStream";
  * Every provider must send the tool list it was given, not the whole registry.
  *
  * This is plan mode's first gate, and it lives in each client. The loop narrows
- * the list and passes it to `stream`; a client that reads `toolRegistery`
+ * the list and passes it to `stream`; a client that reads `toolRegistry`
  * directly offers the model `edit_file` while the session is planning, and
  * nothing else in the suite notices — the loop's own tests use a fake provider,
  * so they stay green either way.
@@ -115,19 +115,19 @@ describe("provider tool lists", () => {
       test("sends the whole registry when the caller names none", async () => {
         const offered = await probe.offeredTo();
 
-        expect(offered).toHaveLength(toolRegistery.length);
+        expect(offered).toHaveLength(toolRegistry.length);
         for (const name of writingTools) expect(offered).toContain(name);
       });
 
       test("sends exactly the narrowed list", async () => {
-        const narrowed = planModeTools(toolRegistery);
+        const narrowed = planModeTools(toolRegistry);
         const offered = await probe.offeredTo(narrowed);
 
         expect(offered).toEqual(narrowed.map((tool) => tool.name));
       });
 
       test("offers no writing tool while planning", async () => {
-        const offered = await probe.offeredTo(planModeTools(toolRegistery));
+        const offered = await probe.offeredTo(planModeTools(toolRegistry));
 
         for (const name of writingTools) expect(offered).not.toContain(name);
         expect(offered).toContain("read_file");

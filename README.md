@@ -8,7 +8,7 @@
 
 Woopcode runs where you work: in the terminal and inside the current repository. Ask it to investigate, explain, implement, review, or test a change; it streams progress, uses focused tools, and presents edits as a readable diff before it writes to an existing file.
 
-> **Status:** an early-stage project with a production-ready Google Gemini workflow. Other provider entries may appear in configuration, but Google Gemini is the only runtime provider currently implemented.
+> **Status:** an early-stage project. Google Gemini, OpenAI, and Anthropic are all implemented and usable. Gemini is the most heavily exercised path — it is what the benchmark suite runs against — so treat it as the best-tested option rather than the only one.
 
 ## Demo
 
@@ -45,14 +45,20 @@ cd path/to/your-project
 woopcode
 ```
 
-On first launch, Woopcode opens the setup flow and asks for a Google Gemini API key. You can also configure it from the command line:
+On first launch, Woopcode opens the setup flow, asks which provider you want, and takes a key for it. You can also configure it from the command line:
 
 ```bash
 woopcode providers login --provider google --api-key "$GOOGLE_API_KEY"
 woopcode providers list
 ```
 
-Get a Google Gemini key from [Google AI Studio](https://aistudio.google.com/apikey).
+| Provider | `--provider` | Get a key |
+| --- | --- | --- |
+| Google Gemini | `google` | [Google AI Studio](https://aistudio.google.com/apikey) |
+| OpenAI | `openai` | [OpenAI API keys](https://platform.openai.com/api-keys) |
+| Anthropic Claude | `anthropic` | [Anthropic Console](https://console.anthropic.com/settings/keys) |
+
+Woopcode also picks up a key from the environment — `WOOPCODE_API_KEY` with `WOOPCODE_PROVIDER`, or a vendor variable like `OPENAI_API_KEY` — which is how it runs in CI and benchmark containers with no config file. See [Configuration](docs/reference/configuration.md).
 
 ### 3. Give it a task
 
@@ -154,6 +160,7 @@ Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` fo
 
 | Key                     | Action                                                                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Tab`                   | Switch between Build and Plan. Plan investigates and proposes without changing anything — see [Plan mode](docs/guides/plan-mode.md).                   |
 | `↑` / `↓`               | Scroll the conversation.                                                                                                                               |
 | `Page Up` / `Page Down` | Move through the conversation by a page.                                                                                                               |
 | `Home` / `End`          | Jump to the oldest message or back to the latest one.                                                                                                  |
@@ -191,7 +198,7 @@ The project is TypeScript throughout and uses:
 
 - [Bun](https://bun.sh) for the runtime, package management, filesystem APIs, and test runner
 - [React](https://react.dev) and [Ink](https://github.com/vadimdemedes/ink) for the terminal UI
-- [Google Gen AI](https://ai.google.dev) for the current streaming provider integration
+- [Google Gen AI](https://ai.google.dev), the [OpenAI SDK](https://github.com/openai/openai-node), and the [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) for the streaming provider integrations
 
 Useful implementation entry points:
 
@@ -199,7 +206,7 @@ Useful implementation entry points:
 | ------------------------------------------------------ | ----------------------------------------------------------------------- |
 | [`cli.ts`](cli.ts)                                     | Command-line entry point.                                               |
 | [`commands/agent.tsx`](commands/agent.tsx)             | Interactive agent lifecycle and terminal input.                         |
-| [`config/runtime.ts`](config/runtime.ts)               | Streaming agent loop, tool execution, recovery, and limits.             |
+| [`runtime/loop.ts`](runtime/loop.ts)               | Streaming agent loop, tool execution, recovery, and limits.             |
 | [`tools/index.ts`](tools/index.ts)                     | Built-in tool registry and provider-name compatibility.                 |
 | [`tui/src/`](tui/src)                                  | The React Ink interface, timeline, prompt, scrolling, and diff preview. |
 | [`commands/slash/README.md`](commands/slash/README.md) | Slash-command implementation notes.                                     |

@@ -108,7 +108,7 @@ All are generally useful, not Harbor-specific:
 | Fail fast without a TTY | `onboarding/index.ts` | The Ink wizard would otherwise block until the harness timeout — a hung agent instead of a clear error |
 | `-m, --model` | `commands/agent.tsx`, `cli.ts` | Lets a caller select a model per run without mutating stored config |
 | `--events <path>` | `runtime/eventLog.ts` | Machine-readable trajectory, separate from human stdout |
-| `WOOPCODE_MAX_ITERATIONS` | `config/runtime.ts` | The interactive default of 20 is far too low for a benchmark task; it was the binding constraint in early runs |
+| `WOOPCODE_MAX_ITERATIONS` | `runtime/loop.ts` | The interactive default of 20 is far too low for a benchmark task; it was the binding constraint in early runs |
 | Exit code 2 for budget exhaustion | `commands/agent.tsx` | Distinguishes "didn't finish" from "broke" |
 | Clean exit on config failure | `cli.ts` | A one-line message and exit 1 instead of an unhandled-rejection stack trace |
 

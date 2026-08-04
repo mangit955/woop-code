@@ -4,7 +4,7 @@ import { getConfig, saveConfig } from "../../config/config";
 import {
   isProviderEnabled,
   unsupportedProviderMessage,
-} from "../../config/providerRegistry";
+} from "../../providers/providerRegistry";
 
 export const loginCommand = new Command("login")
   .description("Lets user login into the provider (use it as default)")

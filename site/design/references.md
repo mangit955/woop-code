@@ -104,7 +104,7 @@ rule definitions. Hand-maintaining it would guarantee it is wrong.
 
 We have the same problem at smaller scale, and our README already has the bug:
 it says "13 tools" as hand-written prose. `site/scripts/extract.ts` reads
-`toolRegistery`, the slash-command `registry`, and `APPROVAL_MODES`, so counts,
+`toolRegistry`, the slash-command `registry`, and `APPROVAL_MODES`, so counts,
 names, descriptions, and parameters cannot drift from the product.
 
 **Reject: five package-manager tabs on every install command.**

@@ -1,6 +1,6 @@
 ---
 name: runtime-change
-description: Use when changing anything that decides what goes into the prompt — config/runtime.ts, runtime/compaction.ts, runtime/executionLog.ts, config/systemPrompt.ts, or buildRepositoryContext and recentMessages in config/config.ts. Requires a replay baseline captured before the edit and compared after, because the harness that measures this is opt-in and the gate does not know it exists. Triggers on "context window", "compaction", "token budget", "system prompt", "the agent is sending too much", or any edit to the agent loop.
+description: Use when changing anything that decides what goes into the prompt — runtime/loop.ts, runtime/compaction.ts, runtime/executionLog.ts, config/systemPrompt.ts, or buildRepositoryContext and recentMessages in config/config.ts. Requires a replay baseline captured before the edit and compared after, because the harness that measures this is opt-in and the gate does not know it exists. Triggers on "context window", "compaction", "token budget", "system prompt", "the agent is sending too much", or any edit to the agent loop.
 ---
 
 # Changing what the prompt carries

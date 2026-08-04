@@ -91,11 +91,9 @@ in plain text and `logout` is what removes it.
 woopcode providers set --provider google
 ```
 
-Only useful once there is more than one implemented provider.
-
 :::note
-Google Gemini and Anthropic Claude both run. `openai` is listed so you can see
-it is planned; selecting it does not produce a working session.
+Google Gemini, OpenAI and Anthropic Claude all run, so any of them can be set
+as the default.
 :::
 
 ## Where this is written

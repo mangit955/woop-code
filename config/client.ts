@@ -12,6 +12,7 @@ import {
   modelBelongsToProvider,
 } from "./modelCatalog";
 import { anthropicClient } from "./anthropicClient";
+import { openaiClient } from "./openaiClient";
 
 export const ACTIVE_PROVIDER_MODELS: Record<string, string> = {
   google: "Gemini 3.5 Flash Lite",
@@ -492,6 +493,9 @@ export function createProviderClient(
 
     case "anthropic":
       return anthropicClient(apiKey, runnable ?? defaultModelForProvider("anthropic"));
+
+    case "openai":
+      return openaiClient(apiKey, runnable ?? defaultModelForProvider("openai"));
 
     default:
       // Providers listed as disabled in the registry are refused at login and

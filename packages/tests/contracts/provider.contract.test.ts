@@ -3,6 +3,8 @@ import type { ProviderClient, StreamEvent, Message } from "../../../config/types
 import { MockProviderClient } from "../shared/mocks";
 import { anthropicClient } from "../../../config/anthropicClient";
 import { fakeAnthropic, textBlock } from "../shared/anthropicStream";
+import { openaiClient } from "../../../config/openaiClient";
+import { fakeOpenAI, textItem } from "../shared/openaiStream";
 import {
   createTextEvent,
   createToolCallEvent,
@@ -287,5 +289,13 @@ testProviderContract("anthropicClient", () =>
     "test-key",
     "claude-opus-5",
     fakeAnthropic(() => ({ events: [...textBlock(0, "Contract test response")] })).api as any,
+  ),
+);
+
+testProviderContract("openaiClient", () =>
+  openaiClient(
+    "test-key",
+    "gpt-5.5",
+    fakeOpenAI(() => ({ events: [...textItem(0, "Contract test response")] })).api as any,
   ),
 );

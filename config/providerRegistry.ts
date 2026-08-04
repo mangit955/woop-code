@@ -25,9 +25,9 @@ export const PROVIDERS: ProviderInfo[] = [
   {
     id: "openai",
     name: "OpenAI",
-    enabled: false,
+    enabled: true,
     keyUrl: "https://platform.openai.com/api-keys",
-    description: "GPT models (not supported yet)",
+    description: "GPT models, with reasoning effort you can dial down",
   },
   {
     id: "anthropic",

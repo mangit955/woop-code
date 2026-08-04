@@ -141,12 +141,26 @@ describe("finding models", () => {
 
 describe("status comes from the provider registry", () => {
   const google = findModel("gemini-3.5-flash")!;
-  const openai = findModel("gpt-5.5")!;
 
-  test("a model on a disabled provider is coming soon", () => {
+  /**
+   * Every provider in the registry has a client now, so no row in the catalog
+   * is coming-soon. The branch is still the one that runs the moment a model
+   * lands for a provider that has not shipped, so it is tested with a model the
+   * catalog does not contain — status asks the registry about the provider and
+   * nothing else, which is exactly the property worth pinning.
+   */
+  const unshipped = { id: "zeta-1", provider: "zeta", name: "Zeta 1", contextWindow: 128_000 };
+
+  test("a model on a provider with no client is coming soon", () => {
     // Derived, not stored: nothing in models.json says this.
-    expect(modelStatus(openai)).toBe("coming-soon");
-    expect(describeStatus(modelStatus(openai))).toBe("Coming Soon");
+    expect(modelStatus(unshipped)).toBe("coming-soon");
+    expect(describeStatus(modelStatus(unshipped))).toBe("Coming Soon");
+  });
+
+  test("every catalogued model is runnable today", () => {
+    for (const model of allModels()) {
+      expect(isRunnable(model)).toBe(true);
+    }
   });
 
   test("a runnable model is ready", () => {
@@ -158,7 +172,7 @@ describe("status comes from the provider registry", () => {
   });
 
   test("being active does not make an unavailable model look ready", () => {
-    expect(modelStatus(openai, openai.id)).toBe("coming-soon");
+    expect(modelStatus(unshipped, unshipped.id)).toBe("coming-soon");
   });
 
   test("provider labels come from the registry", () => {

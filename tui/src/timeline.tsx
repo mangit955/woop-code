@@ -21,14 +21,22 @@ interface TimelineProps {
   activeTurn: ActiveTurn | null;
 }
 
-export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
-  const colors = usePalette();
+/**
+ * Timeline items laid out per frame.
+ *
+ * Ink re-lays out every mounted node on every commit, so an unbounded
+ * transcript makes streaming progressively slower: measured, 200 streamed
+ * tokens took 364ms at 50 items, 526ms at 500, and 2018ms at 2000 — about ten
+ * milliseconds of layout per token by then. Capping bounds that cost whatever
+ * the session length. The price is that rows past the cap leave in-app
+ * scrollback; the conversation itself is untouched, and the count says so.
+ */
+const MAX_RENDERED_ITEMS = 300;
 
+export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
   return (
     <Box flexDirection="column" flexShrink={0}>
-      {items.map((item) => (
-        <TimelineItem key={item.id} item={item} />
-      ))}
+      <TimelineHistory items={items} />
       {/* Rendered after the items rather than as one of them: the running turn's
           footer has to stay below whatever the turn appends next, which is what
           walks it down the transcript toward the composer. */}
@@ -45,6 +53,38 @@ export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
     </Box>
   );
 }
+
+/**
+ * The settled transcript, memoized on the items array.
+ *
+ * The array identity only changes when the store emits, so a clock tick
+ * re-renders the running turn's footer and the spinners inside it and leaves
+ * every finished row alone.
+ */
+const TimelineHistory = memo(function TimelineHistory({
+  items,
+}: {
+  items: TimeLineItem[];
+}) {
+  const colors = usePalette();
+  const hidden = Math.max(0, items.length - MAX_RENDERED_ITEMS);
+  const rendered = hidden === 0 ? items : items.slice(hidden);
+
+  return (
+    <>
+      {hidden > 0 && (
+        <Box marginBottom={1} paddingLeft={2} flexShrink={0}>
+          <Text color={colors.textFaint}>
+            {`… ${hidden} earlier item${hidden === 1 ? "" : "s"}`}
+          </Text>
+        </Box>
+      )}
+      {rendered.map((item) => (
+        <TimelineItem key={item.id} item={item} />
+      ))}
+    </>
+  );
+});
 
 const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }) {
   const colors = usePalette();

@@ -1,5 +1,10 @@
 import { describe, test, expect, beforeEach, mock } from "bun:test";
-import type { Message, ProviderClient, StreamEvent } from "../../../config/types";
+import type {
+  Message,
+  ProviderClient,
+  StreamEvent,
+  TurnSummary,
+} from "../../../config/types";
 import { MockTool, MockToolRegistry, CallbackSpy } from "../shared/mocks";
 import {
   createUserMessage,
@@ -53,7 +58,19 @@ function warnings(spy: CallbackSpy): string[] {
     .filter((status) => status.startsWith("⚠️"));
 }
 
-describe("efficiency warning counts tools, not iterations", () => {
+function summary(spy: CallbackSpy) {
+  const calls = spy.getCallsByName("onTurnSummary");
+  return calls.at(-1)?.args[0] as TurnSummary | undefined;
+}
+
+/**
+ * These used to assert a notice that fired at the sixth tool call. It was
+ * removed: unlike the iteration-budget warning it sat beside, it pushed nothing
+ * into the conversation, so the advice it gave — start implementing — reached
+ * only the user, who is not the one deciding what to call next. What remains
+ * are the counters underneath it, which the turn summary still reports.
+ */
+describe("a turn counts the tools it actually ran", () => {
   let callbackSpy: CallbackSpy;
   let messages: Message[];
 
@@ -64,35 +81,17 @@ describe("efficiency warning counts tools, not iterations", () => {
     mockToolRegistry.register(new MockTool("read_file", "contents"));
   });
 
-  test("fires on the sixth tool even when they arrive in one response", async () => {
-    // The old counter would report "1 tool used" here.
+  test("counts every call in a response, not the response", async () => {
+    // Six calls arriving together are six tools run. A counter reading the
+    // iteration would call this one.
     const client = new ScriptedClient([toolCalls(6)]);
 
     await agentLoop(client, messages, "", callbackSpy);
 
-    const notices = warnings(callbackSpy).filter((text) => text.includes("tools used"));
-    expect(notices).toHaveLength(1);
-    expect(notices[0]).toContain("6 tools used");
+    expect(summary(callbackSpy)?.toolCalls).toBe(6);
   });
 
-  test("does not fire when the sixth response ran no tool", async () => {
-    // Five tool calls, then the model answers. The old counter warned "6 tools
-    // used" at the start of the sixth iteration, before any sixth tool existed.
-    const client = new ScriptedClient([
-      toolCalls(1, 0),
-      toolCalls(1, 1),
-      toolCalls(1, 2),
-      toolCalls(1, 3),
-      toolCalls(1, 4),
-      [createTextEvent("finished"), createDoneEvent()],
-    ]);
-
-    await agentLoop(client, messages, "", callbackSpy);
-
-    expect(warnings(callbackSpy).filter((text) => text.includes("tools used"))).toHaveLength(0);
-  });
-
-  test("counts tools across iterations and reports the running total", async () => {
+  test("accumulates across iterations", async () => {
     const client = new ScriptedClient([
       toolCalls(4, 0),
       toolCalls(3, 4),
@@ -101,26 +100,12 @@ describe("efficiency warning counts tools, not iterations", () => {
 
     await agentLoop(client, messages, "", callbackSpy);
 
-    const notices = warnings(callbackSpy).filter((text) => text.includes("tools used"));
-    expect(notices).toHaveLength(1);
-    expect(notices[0]).toContain("7 tools used");
-  });
-
-  test("reports at most once per turn", async () => {
-    const client = new ScriptedClient([
-      toolCalls(6, 0),
-      toolCalls(6, 6),
-      [createTextEvent("finished"), createDoneEvent()],
-    ]);
-
-    await agentLoop(client, messages, "", callbackSpy);
-
-    expect(warnings(callbackSpy).filter((text) => text.includes("tools used"))).toHaveLength(1);
+    expect(summary(callbackSpy)?.toolCalls).toBe(7);
   });
 
   test("skipped duplicate calls do not count as tools used", async () => {
-    // Eight identical calls: four run, the rest are skipped by the duplicate
-    // guard, so the total stays below the warning threshold.
+    // Eight identical calls. SAME_TOOL_THRESHOLD lets two through and the
+    // duplicate guard skips the rest.
     const repeated: StreamEvent[] = [
       ...Array.from({ length: 8 }, (_, index) =>
         createToolCallEvent("read_file", { path: "same.ts" }, `call-${index}`),
@@ -131,19 +116,30 @@ describe("efficiency warning counts tools, not iterations", () => {
 
     await agentLoop(client, messages, "", callbackSpy);
 
-    expect(warnings(callbackSpy).filter((text) => text.includes("tools used"))).toHaveLength(0);
+    // Two ran; the rest never reached a tool, so counting them would report
+    // work the turn did not do.
+    expect(summary(callbackSpy)?.toolCalls).toBe(2);
   });
 
-  test("the iteration-budget notice still tracks iterations", async () => {
-    // Fifteen tool-calling responses reach the iteration milestone.
+  test("the iteration-budget notice reaches the model, not the terminal", async () => {
+    // Thirty-five tool-calling responses reach the milestone five from the end
+    // of the default budget.
     const client = new ScriptedClient(
-      Array.from({ length: 15 }, (_, index) => toolCalls(1, index)),
+      Array.from({ length: 35 }, (_, index) => toolCalls(1, index)),
     );
 
     await agentLoop(client, messages, "", callbackSpy);
 
-    const notices = warnings(callbackSpy).filter((text) => text.includes("iterations remaining"));
-    expect(notices).toHaveLength(1);
-    expect(notices[0]).toContain("5 iterations remaining");
+    // It is a nudge for the model — stop starting new work — and the user is
+    // asked about the ceiling directly rather than warned about it here. See
+    // packages/tests/runtime/iterationBudget.test.ts for both halves.
+    expect(warnings(callbackSpy).filter((t) => t.includes("iterations remaining"))).toHaveLength(0);
+    expect(
+      messages.filter(
+        (message) =>
+          message.role === "user" &&
+          (message.content ?? "").includes("before this turn is stopped"),
+      ),
+    ).toHaveLength(1);
   });
 });

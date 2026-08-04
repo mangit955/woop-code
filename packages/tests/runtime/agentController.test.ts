@@ -79,7 +79,9 @@ mock.module("../../../providers/client", () => ({
   createProviderClient,
 }));
 
-// Mock the UI store
+// Mock the UI store. Every store method the controller calls needs an entry —
+// this stub replaces the module for the whole run, so a missing one fails here
+// and in any other file that touches the controller.
 const mockStore = {
   addUserMessage: mock(() => {}),
   startTurn: mock(() => {}),
@@ -94,6 +96,7 @@ const mockStore = {
   clearPendingEdit: mock(() => {}),
   clearPendingCommand: mock(() => {}),
   cancelPendingQuestion: mock(() => {}),
+  clearPendingContinuation: mock(() => {}),
 };
 
 mock.module("../../../tui/src", () => ({

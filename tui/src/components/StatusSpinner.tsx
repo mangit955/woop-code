@@ -1,11 +1,14 @@
 import { Box, Text } from "ink";
-import { useEffect, useState } from "react";
 import { useDimmed } from "../styles/palette";
 import { dimHex } from "../styles/theme";
+import { useClock } from "../hooks/useClock";
 
 const TRACK_LENGTH = 8;
-const HOLD_AT_START = 30;
-const HOLD_AT_END = 9;
+// Scaled to the shared 100ms clock from the 60ms interval this used to own, so
+// the sweep still takes about the same three seconds end to end. The holds are
+// where the rounding goes; the travel is fixed by the track.
+const HOLD_AT_START = 18;
+const HOLD_AT_END = 5;
 const TOTAL_FRAMES =
   TRACK_LENGTH + HOLD_AT_END + (TRACK_LENGTH - 1) + HOLD_AT_START;
 
@@ -88,18 +91,10 @@ function inactiveColor(
 }
 
 export function StatusSpinner() {
-  const [frame, setFrame] = useState(0);
+  const frame = useClock() % TOTAL_FRAMES;
   // The spinner carries its own ramp, so it fades itself.
   const dimmed = useDimmed();
   const shade = (color: string) => (dimmed ? dimHex(color) : color);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFrame((current) => (current + 1) % TOTAL_FRAMES);
-    }, 60);
-
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <Box width={TRACK_LENGTH} flexShrink={0}>

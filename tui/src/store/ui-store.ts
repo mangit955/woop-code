@@ -1,4 +1,4 @@
-import type { Listener, PendingCommand, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
+import type { Listener, PendingCommand, PendingContinuation, PendingEdit, PendingQuestion, TimeLineItem, TurnIdentity, TurnOutcome, UIState } from "../types";
 import type { TodoItem, ToolCall } from "../../../config/types";
 import { DEFAULT_APPROVAL_MODE, type ApprovalMode } from "../../../runtime/approval";
 import { nextSessionMode, type SessionMode } from "../../../runtime/planMode";
@@ -23,20 +23,34 @@ export class UIStore {
     pendingEdit: null,
     pendingCommand: null,
     pendingQuestion: null,
+    pendingContinuation: null,
     pendingEditScrollOffset: 0,
     scrollOffset: 0,
+    maxScrollOffset: 0,
+    maxPendingEditScrollOffset: 0,
+    usage: null,
   };
   private listeners: Set<Listener> = new Set();
   private activeAssistantId: string | null = null;
   private pendingEmit = false;
-  private maxScrollOffset = 0;
-  private maxPendingEditScrollOffset = 0;
+  /**
+   * Whether the transcript is pinned to its latest line.
+   *
+   * Appending used to reset `scrollOffset` to 0 outright, so scrolling up to
+   * read a tool result mid-turn survived exactly until the next streamed token
+   * yanked the view back down. The offset is now left alone while the user is
+   * reading, and only `setScrollLimit` — the one place that learns how much the
+   * content grew — moves it, to hold the same lines on screen.
+   */
+  private follow = true;
   private editResolvers: Map<
     string,
     { resolve: (approved: boolean) => void; reject: (error: Error) => void }
   > = new Map();
   private commandResolvers: Map<string, { resolve: (approved: boolean) => void }> = new Map();
   private questionResolvers: Map<string, { resolve: (answers: string[] | null) => void }> = new Map();
+  private continuationResolvers: Map<string, { resolve: (shouldContinue: boolean) => void }> =
+    new Map();
   private nonInteractive = false;
   private nonInteractiveApproval = false;
   private statusResetTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,9 +98,12 @@ export class UIStore {
   }
 
   addUserMessage(content: string) {
+    // The one append that does jump to the bottom: submitting a prompt is a
+    // statement that you want to watch what it does.
+    this.follow = true;
     this.state = {
       ...this.state,
-      scrollOffset: 0, // Reset scroll on new message
+      scrollOffset: 0,
       timeline: [
         ...this.state.timeline,
         {
@@ -109,8 +126,27 @@ export class UIStore {
     this.state = {
       ...this.state,
       activeTurn: { id: crypto.randomUUID(), ...turn },
+      // Cleared rather than carried over: the meter reports the prompt the
+      // *current* turn is sending, and a stale number beside a new turn reads
+      // as a measurement of it.
+      usage: null,
     };
 
+    this.emit();
+  }
+
+  /**
+   * Records what the last provider request cost.
+   *
+   * Only the prompt side is kept. That is the number the context window is
+   * spent on and the one a user can act on by clearing the conversation;
+   * completion tokens are gone the moment they are rendered.
+   */
+  setUsage(promptTokens: number | undefined) {
+    if (promptTokens === undefined) return;
+    if (this.state.usage?.promptTokens === promptTokens) return;
+
+    this.state = { ...this.state, usage: { promptTokens } };
     this.emit();
   }
 
@@ -162,7 +198,6 @@ export class UIStore {
   startTool(tool: ToolCall) {
     this.state = {
       ...this.state,
-      scrollOffset: 0, // Reset scroll
       timeline: [
         ...this.state.timeline,
         {
@@ -275,7 +310,6 @@ export class UIStore {
 
     this.state = {
       ...this.state,
-      scrollOffset: 0,
       timeline: [
         ...withoutPrevious,
         { id: crypto.randomUUID(), type: "todo", items },
@@ -291,7 +325,6 @@ export class UIStore {
 
     this.state = {
       ...this.state,
-      scrollOffset: 0, // Reset scroll
       timeline: [
         ...this.state.timeline,
         {
@@ -418,11 +451,11 @@ export class UIStore {
       return Promise.resolve(this.nonInteractiveApproval);
     }
 
-    this.maxPendingEditScrollOffset = 0;
     this.state = {
       ...this.state,
       pendingEdit: edit,
       pendingEditScrollOffset: 0,
+      maxPendingEditScrollOffset: 0,
     };
     this.emit();
 
@@ -553,15 +586,66 @@ export class UIStore {
     this.emit();
   }
 
+  /**
+   * Asks whether a turn that has spent its budget should carry on.
+   *
+   * Declines rather than blocking when nobody is at the keyboard. Answering
+   * "continue" for an absent user is the one wrong answer available: it is the
+   * case where a stuck loop runs unattended, which is the whole reason a
+   * ceiling exists.
+   */
+  setPendingContinuation(continuation: PendingContinuation): Promise<boolean> {
+    if (this.nonInteractive) {
+      return Promise.resolve(false);
+    }
+
+    this.state = { ...this.state, pendingContinuation: continuation };
+    this.emit();
+
+    return new Promise((resolve) => {
+      this.continuationResolvers.set(continuation.id, { resolve });
+    });
+  }
+
+  continuePendingTurn() {
+    this.resolvePendingContinuation(true);
+  }
+
+  stopPendingTurn() {
+    this.resolvePendingContinuation(false);
+  }
+
+  /** Dismissed without an answer — the turn stops, as with any other modal. */
+  clearPendingContinuation() {
+    this.resolvePendingContinuation(false);
+  }
+
+  private resolvePendingContinuation(shouldContinue: boolean) {
+    const continuation = this.state.pendingContinuation;
+    if (!continuation) return;
+
+    this.continuationResolvers.get(continuation.id)?.resolve(shouldContinue);
+    this.continuationResolvers.delete(continuation.id);
+    this.state = { ...this.state, pendingContinuation: null };
+    this.emit();
+  }
+
   /** True when a modal owns the screen, so global keys can tell. */
   hasOpenModal() {
-    const { modelPickerOpen, approvalPickerOpen, pendingCommand, pendingQuestion, pendingEdit } =
-      this.state;
+    const {
+      modelPickerOpen,
+      approvalPickerOpen,
+      pendingCommand,
+      pendingQuestion,
+      pendingContinuation,
+      pendingEdit,
+    } = this.state;
     return (
       modelPickerOpen ||
       approvalPickerOpen ||
       pendingCommand !== null ||
       pendingQuestion !== null ||
+      pendingContinuation !== null ||
       pendingEdit !== null
     );
   }
@@ -589,6 +673,10 @@ export class UIStore {
       this.cancelPendingQuestion();
       return true;
     }
+    if (this.state.pendingContinuation) {
+      this.clearPendingContinuation();
+      return true;
+    }
     if (this.state.pendingEdit) {
       this.rejectPendingEdit();
       return true;
@@ -600,11 +688,11 @@ export class UIStore {
     this.clearPendingEdit();
     this.clearPendingCommand();
     this.cancelPendingQuestion();
+    this.clearPendingContinuation();
     // This sets the status directly, so a pending reset would be redundant at
     // best and would fire over a later status at worst.
     this.clearStatusReset();
-    this.maxScrollOffset = 0;
-    this.maxPendingEditScrollOffset = 0;
+    this.follow = true;
     this.state = {
       ...this.state,
       timeline: [],
@@ -615,7 +703,11 @@ export class UIStore {
       pendingEditScrollOffset: 0,
       pendingCommand: null,
       pendingQuestion: null,
+      pendingContinuation: null,
       scrollOffset: 0,
+      maxScrollOffset: 0,
+      maxPendingEditScrollOffset: 0,
+      usage: null,
     };
     this.activeAssistantId = null;
     this.emit();
@@ -634,8 +726,13 @@ export class UIStore {
 
     const scrollOffset = Math.max(
       0,
-      Math.min(this.state.scrollOffset + lines, this.maxScrollOffset),
+      Math.min(this.state.scrollOffset + lines, this.state.maxScrollOffset),
     );
+
+    // Reaching the bottom re-arms the follow, leaving it disarms it. Set even
+    // when the offset did not move, so pressing ↓ at the bottom of a transcript
+    // that has grown while the user was reading puts them back in follow.
+    this.follow = scrollOffset === 0;
 
     if (scrollOffset === this.state.scrollOffset) return;
 
@@ -655,29 +752,64 @@ export class UIStore {
   }
 
   scrollToTop() {
+    this.follow = false;
     this.state = {
       ...this.state,
-      scrollOffset: this.maxScrollOffset,
+      scrollOffset: this.state.maxScrollOffset,
     };
     this.emit();
   }
 
+  /**
+   * Records how far the transcript can scroll, and holds the reader's place.
+   *
+   * This is the only place that learns the content grew, so it is where a view
+   * scrolled away from the bottom is kept still: the offset is measured from
+   * the last line, so rows landing below would otherwise push what the user is
+   * reading off the top by exactly the amount the content grew. Adding that
+   * amount back keeps the same lines on screen, without the store needing to
+   * know the height of anything it appended.
+   */
   setScrollLimit(maxScrollOffset: number) {
-    this.maxScrollOffset = Math.max(0, maxScrollOffset);
-    const scrollOffset = Math.min(this.state.scrollOffset, this.maxScrollOffset);
+    const limit = Math.max(0, maxScrollOffset);
+    const previousLimit = this.state.maxScrollOffset;
+    const grew = Math.max(0, limit - previousLimit);
 
-    if (scrollOffset === this.state.scrollOffset) return;
+    const held = this.follow ? 0 : this.state.scrollOffset + grew;
+    const scrollOffset = Math.max(0, Math.min(held, limit));
 
-    this.state = { ...this.state, scrollOffset };
+    if (
+      scrollOffset === this.state.scrollOffset &&
+      limit === this.state.maxScrollOffset
+    ) {
+      return;
+    }
+
+    this.state = { ...this.state, scrollOffset, maxScrollOffset: limit };
     this.emit();
   }
 
-  resetScroll() {
+  /** Back to the latest line, and following it again. */
+  scrollToBottom() {
+    this.follow = true;
+
+    if (this.state.scrollOffset === 0) return;
+
     this.state = {
       ...this.state,
       scrollOffset: 0,
     };
     this.emit();
+  }
+
+  /** The name `End` and the slash commands already use. */
+  resetScroll() {
+    this.scrollToBottom();
+  }
+
+  /** Whether the transcript is pinned to its latest line. */
+  isFollowing() {
+    return this.follow;
   }
 
   scrollPendingEditBy(lines: number) {
@@ -687,7 +819,7 @@ export class UIStore {
       0,
       Math.min(
         this.state.pendingEditScrollOffset + lines,
-        this.maxPendingEditScrollOffset,
+        this.state.maxPendingEditScrollOffset,
       ),
     );
 
@@ -698,15 +830,24 @@ export class UIStore {
   }
 
   setPendingEditScrollLimit(maxScrollOffset: number) {
-    this.maxPendingEditScrollOffset = Math.max(0, maxScrollOffset);
+    const limit = Math.max(0, maxScrollOffset);
     const pendingEditScrollOffset = Math.min(
       this.state.pendingEditScrollOffset,
-      this.maxPendingEditScrollOffset,
+      limit,
     );
 
-    if (pendingEditScrollOffset === this.state.pendingEditScrollOffset) return;
+    if (
+      pendingEditScrollOffset === this.state.pendingEditScrollOffset &&
+      limit === this.state.maxPendingEditScrollOffset
+    ) {
+      return;
+    }
 
-    this.state = { ...this.state, pendingEditScrollOffset };
+    this.state = {
+      ...this.state,
+      pendingEditScrollOffset,
+      maxPendingEditScrollOffset: limit,
+    };
     this.emit();
   }
 
@@ -717,10 +858,14 @@ export class UIStore {
   }
 
   scrollPendingEditToEnd() {
-    if (this.state.pendingEditScrollOffset === this.maxPendingEditScrollOffset) return;
+    if (
+      this.state.pendingEditScrollOffset === this.state.maxPendingEditScrollOffset
+    ) {
+      return;
+    }
     this.state = {
       ...this.state,
-      pendingEditScrollOffset: this.maxPendingEditScrollOffset,
+      pendingEditScrollOffset: this.state.maxPendingEditScrollOffset,
     };
     this.emit();
   }

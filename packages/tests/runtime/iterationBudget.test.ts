@@ -3,7 +3,11 @@ import {
   agentLoop,
   IterationBudgetExhaustedError,
 } from "../../../runtime/loop";
-import type { ProviderClient, StreamEvent } from "../../../config/types";
+import type {
+  AgentCallbacks,
+  ProviderClient,
+  StreamEvent,
+} from "../../../config/types";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
 import { createRuntimeTest } from "../shared/testHelpers";
 
@@ -86,21 +90,21 @@ describe("iteration budget", () => {
     delete process.env.WOOPCODE_MAX_ITERATIONS;
 
     const error = await runToExhaustion();
-    expect(error?.message).toContain("(20)");
+    expect(error?.message).toContain("(40)");
   });
 
   test("a non-numeric budget falls back to the default", async () => {
     process.env.WOOPCODE_MAX_ITERATIONS = "many";
 
     const error = await runToExhaustion();
-    expect(error?.message).toContain("(20)");
+    expect(error?.message).toContain("(40)");
   });
 
   test("a non-positive budget falls back to the default", async () => {
     process.env.WOOPCODE_MAX_ITERATIONS = "0";
 
     const error = await runToExhaustion();
-    expect(error?.message).toContain("(20)");
+    expect(error?.message).toContain("(40)");
   });
 });
 
@@ -111,6 +115,14 @@ describe("iteration budget", () => {
  * it was still starting new work at the wall, because the only notice went to
  * stderr through onStatus. The model cannot act on something it was never sent.
  */
+/** The nudge pushed into the conversation as the ceiling comes into view. */
+const budgetNotices = (messages: Array<{ role: string; content?: string }>) =>
+  messages.filter(
+    (message) =>
+      message.role === "user" &&
+      (message.content ?? "").includes("before this turn is stopped"),
+  );
+
 describe("running out of budget", () => {
   /** Runs to exhaustion, keeping the transcript and the statuses. */
   async function runKeepingMessages() {
@@ -125,26 +137,21 @@ describe("running out of budget", () => {
     return { messages, callbacks };
   }
 
-  const budgetNotices = (messages: Array<{ role: string; content?: string }>) =>
-    messages.filter(
-      (message) =>
-        message.role === "user" &&
-        (message.content ?? "").includes("before this turn is stopped"),
-    );
-
-  test("the model is told, not just the terminal", async () => {
+  test("the model is told, and only the model", async () => {
     process.env.WOOPCODE_MAX_ITERATIONS = "8";
 
     const { messages, callbacks } = await runKeepingMessages();
 
     expect(budgetNotices(messages)).toHaveLength(1);
-    // The status still fires: the TUI shows it, and removing it would trade one
-    // audience for the other.
+    // The status used to fire too, back when reaching the ceiling ended the
+    // turn as a failure and this row was the user's only warning. The ceiling
+    // asks them directly now, so a transcript row saying the turn is nearly
+    // over is a worse version of the question they are about to be asked.
     const statuses = callbacks
       .getCallsByName("onStatus")
       .map((call: { args: any[] }) => String(call.args[0]));
     expect(statuses.some((text) => text.includes("iterations remaining"))).toBe(
-      true,
+      false,
     );
   });
 
@@ -165,5 +172,82 @@ describe("running out of budget", () => {
 
     const { messages } = await runKeepingMessages();
     expect(budgetNotices(messages)).toHaveLength(0);
+  });
+});
+
+/**
+ * Reaching the ceiling asks rather than fails.
+ *
+ * The distinction that matters here is between "the user said stop" and "there
+ * was nobody to ask". They look the same from inside the loop and mean opposite
+ * things: one is a turn a human ended, the other is a headless run whose exit
+ * code a harness reads. An absent callback is the second, and must keep
+ * throwing however the first behaves.
+ */
+describe("the budget checkpoint", () => {
+  /** Runs to exhaustion with a handler, capturing what the loop did. */
+  async function runWithHandler(
+    onBudgetExhausted: AgentCallbacks["onBudgetExhausted"],
+  ) {
+    const { callbacks, messages } = createRuntimeTest();
+    callbacks.onError = () => {};
+    callbacks.onBudgetExhausted = onBudgetExhausted;
+
+    let threw: unknown;
+    try {
+      await agentLoop(neverFinishingProvider(), messages, "", callbacks);
+    } catch (error) {
+      threw = error;
+    }
+    return { threw, callbacks, messages };
+  }
+
+  test("with nobody to ask, exhaustion is still an error", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "2";
+
+    // No handler at all — the headless case, whose exit code depends on this.
+    const error = await runToExhaustion();
+    expect(error).toBeInstanceOf(IterationBudgetExhaustedError);
+  });
+
+  test("continuing carries the same turn past the original ceiling", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "8";
+
+    let asked = 0;
+    const { messages } = await runWithHandler(async () => {
+      asked += 1;
+      // Continue once, then stop, so the test ends rather than looping forever.
+      return asked === 1 ? "continue" : "stop";
+    });
+
+    expect(asked).toBe(2);
+    // Once for the first eight steps, once for the eight the checkpoint added.
+    // The warning tracking the extension is how the model learns the second
+    // stretch is also finite.
+    expect(budgetNotices(messages)).toHaveLength(2);
+  });
+
+  test("the handler is told how many steps have been taken", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "3";
+
+    const seen: number[] = [];
+    await runWithHandler(async ({ steps }) => {
+      seen.push(steps);
+      return seen.length === 1 ? "continue" : "stop";
+    });
+
+    expect(seen).toEqual([3, 6]);
+  });
+
+  test("stopping ends the turn as a cancellation, not a failure", async () => {
+    process.env.WOOPCODE_MAX_ITERATIONS = "2";
+
+    const { threw, callbacks } = await runWithHandler(async () => "stop");
+
+    // Nothing thrown is the point: the controller marks a turn `error` from a
+    // raised exception, and this turn did not fail — it was halted.
+    expect(threw).toBeUndefined();
+    expect(callbacks.getCallsByName("onCancel")).toHaveLength(1);
+    expect(callbacks.getCallsByName("onError")).toHaveLength(0);
   });
 });

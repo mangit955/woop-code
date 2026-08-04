@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
-import { useEffect, useState } from "react";
 import { usePalette } from "../styles/palette";
+import { useClock } from "../hooks/useClock";
 import type { Palette } from "../styles/theme";
 import { getModelDisplayName } from "../../../providers/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
@@ -9,11 +9,13 @@ import { sessionModeLabel } from "../../../runtime/planMode";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 
 /**
- * Fast enough that the tenths digit reads as a running clock, slow enough that
- * it costs a fraction of what streaming tokens already cost per second.
+ * Frames of the shared 100ms clock between pulse steps.
+ *
+ * Two rather than the 240ms this used to run at: the clock cannot be divided
+ * into 240, and the elapsed time has to update every frame anyway to keep the
+ * tenths digit honest, so the pulse costs nothing extra at 200ms.
  */
-const TICK_INTERVAL_MS = 100;
-const PULSE_INTERVAL_MS = 240;
+const PULSE_EVERY_FRAMES = 2;
 
 /** Breathes the marker while the turn is in flight. */
 const pulseColors = ["#453B82", "#7263CE", "#8F83E0", "#ACA3EC", "#8F83E0", "#7263CE"] as const;
@@ -53,40 +55,59 @@ interface TurnFooterProps extends TurnIdentity {
   outcome: TurnOutcome | null;
 }
 
-export function TurnFooter({
+/**
+ * Splits on whether the turn is still running, and the split is load-bearing.
+ *
+ * Only a running footer may subscribe to the clock. Context does not respect
+ * `memo`, so a finished footer that read the clock would re-render on every
+ * tick — and a long session holds hundreds of them, which is the cost the
+ * shared clock exists to remove.
+ */
+export function TurnFooter(props: TurnFooterProps) {
+  if (props.endedAt === null) return <RunningTurnFooter {...props} />;
+
+  return (
+    <TurnFooterRow
+      {...props}
+      elapsed={props.endedAt - props.startedAt}
+      pulseFrame={null}
+    />
+  );
+}
+
+function RunningTurnFooter(props: TurnFooterProps) {
+  const frame = useClock();
+
+  // Read at render rather than held in state: the clock already re-renders this
+  // component, so a second copy of "what time is it" would only be one more
+  // thing to keep in step.
+  return (
+    <TurnFooterRow
+      {...props}
+      elapsed={Date.now() - props.startedAt}
+      pulseFrame={frame}
+    />
+  );
+}
+
+function TurnFooterRow({
   agent,
   model,
-  startedAt,
   endedAt,
   outcome,
-}: TurnFooterProps) {
+  elapsed,
+  pulseFrame,
+}: TurnFooterProps & { elapsed: number; pulseFrame: number | null }) {
   const colors = usePalette();
-
-  const running = endedAt === null;
-  const [now, setNow] = useState(() => Date.now());
-  const [pulse, setPulse] = useState(0);
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
 
-  useEffect(() => {
-    if (!running) return;
-
-    const clock = setInterval(() => setNow(Date.now()), TICK_INTERVAL_MS);
-    const breathing = setInterval(
-      () => setPulse((frame) => (frame + 1) % pulseColors.length),
-      PULSE_INTERVAL_MS,
-    );
-
-    return () => {
-      clearInterval(clock);
-      clearInterval(breathing);
-    };
-  }, [running]);
-
-  const elapsed = (endedAt ?? now) - startedAt;
-  const markerColor = running
-    ? pulseColors[pulse]
-    : outcomeColor(outcome ?? "completed", colors, agent);
+  const markerColor =
+    pulseFrame === null
+      ? outcomeColor(outcome ?? "completed", colors, agent)
+      : pulseColors[
+          Math.floor(pulseFrame / PULSE_EVERY_FRAMES) % pulseColors.length
+        ];
 
   // One row, always. Wrapping this split "Build · Gemini 2.5 Flash Lite · 3.5s"
   // across three lines in a narrow terminal; the model name gives up columns and

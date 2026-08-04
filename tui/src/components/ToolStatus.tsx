@@ -1,6 +1,6 @@
-import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
+import { Text } from "ink";
 import { usePalette } from "../styles/palette";
+import { RunningGlyph } from "./RunningGlyph";
 
 interface ToolStatusProps {
   status: "running" | "completed" | "failed" | "blocked";
@@ -11,13 +11,7 @@ interface ToolStatusProps {
 export function ToolStatus({ status, glyph }: ToolStatusProps) {
   const colors = usePalette();
 
-  if (status === "running") {
-    return (
-      <Text color={colors.primary}>
-        <Spinner type="dots" />
-      </Text>
-    );
-  }
+  if (status === "running") return <RunningGlyph />;
 
   // A completed call is a record, not an outcome to celebrate: the glyph says
   // what kind of work it was and stays out of the way. Only failure stands out.

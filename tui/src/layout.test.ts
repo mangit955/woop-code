@@ -14,6 +14,19 @@ describe("layout planning", () => {
     expect(layout.rhythm).toBe(3);
   });
 
+  test("drops the context meter before the keys that say what a press does", () => {
+    // The meter reports; the hints instruct. On a status bar too narrow for
+    // both, the one that cannot change what happens next is the one to lose.
+    expect(planLayout(72, 30).showContextMeter).toBe(true);
+    expect(planLayout(71, 30).showContextMeter).toBe(false);
+    expect(planLayout(71, 30).showKeyHints).toBe(true);
+
+    for (let width = 20; width <= 120; width++) {
+      const layout = planLayout(width, 30);
+      if (layout.showContextMeter) expect(layout.showKeyHints).toBe(true);
+    }
+  });
+
   test("swaps the wordmark for the compact mark before it can clip", () => {
     // The figlet is 73 columns; anything narrower must not render it.
     expect(planLayout(FULL_WORDMARK_COLUMNS + 4, 30).wordmark).toBe("full");

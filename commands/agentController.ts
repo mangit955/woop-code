@@ -346,6 +346,7 @@ export class AgentController {
     store.clearPendingEdit();
     store.clearPendingCommand();
     store.cancelPendingQuestion();
+    store.clearPendingContinuation();
     this.abortController?.abort();
   }
 

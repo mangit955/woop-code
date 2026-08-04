@@ -10,6 +10,7 @@ import { useUIStore } from "./store/useUIStore";
 import { sessionModeColor, sessionModeLabel } from "../../runtime/planMode";
 import { usePalette } from "./styles/palette";
 import { CommandPreview } from "./components/CommandPreview";
+import { PromptHistory } from "./history";
 import { planLayout } from "./layout";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 
@@ -53,6 +54,10 @@ export function Prompt({
   const { width, height } = useTerminalSize();
   const layout = planLayout(width, height);
   const lastActivityTime = useRef(Date.now());
+  // A ref rather than state: the composer re-mounts when the layout swaps the
+  // block variant for the inline one, and history that reset on a resize would
+  // be worse than none.
+  const history = useRef(new PromptHistory());
 
   useEffect(() => {
     const BLINK_INTERVAL = 530;
@@ -107,12 +112,29 @@ export function Prompt({
           return;
         }
       } else {
+        // ↑/↓ recall prompts, which is what they do in every shell the user
+        // reached this terminal through. Transcript scrolling keeps PgUp/PgDn,
+        // Home/End and the wheel.
+        //
+        // With nothing submitted yet there is nothing to recall, so they fall
+        // through to scrolling rather than doing nothing at all — the first
+        // keystroke of a session should not be a no-op.
         if (key.upArrow) {
-          store.scrollUp();
+          const recalled = history.current.previous(value);
+          if (recalled === null) {
+            if (history.current.isEmpty()) store.scrollUp();
+            return;
+          }
+          handleValueChange(recalled);
           return;
         }
         if (key.downArrow) {
-          store.scrollDown();
+          if (!history.current.isWalking()) {
+            if (history.current.isEmpty()) store.scrollDown();
+            return;
+          }
+          const recalled = history.current.next();
+          if (recalled !== null) handleValueChange(recalled);
           return;
         }
         if (key.pageUp) {
@@ -170,6 +192,11 @@ export function Prompt({
          return;
       }
     }
+
+    // Recorded here rather than on entry: everything above either opens a
+    // picker or completes a half-typed command back into the composer, and
+    // neither is a prompt the user would want ↑ to bring back.
+    history.current.push(prompt);
 
     // 🔥 Slash command interception
     const context = {

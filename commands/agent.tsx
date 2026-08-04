@@ -242,6 +242,27 @@ async function runInteractive(modelOverride?: string) {
       store.setStatus(status);
     },
 
+    // The loop reports this every iteration and the TUI used to drop it, so
+    // nothing on screen said how much of the window the session was spending.
+    // Each provider client normalises `promptTokens` to the whole prompt —
+    // Anthropic's sums its three counts — so the number means the same thing
+    // whichever one is answering.
+    onUsage(iteration) {
+      store.setUsage(iteration.usage?.promptTokens);
+    },
+
+    // Implemented here and deliberately not in `runHeadless`: the loop treats
+    // an absent handler as "nobody is there to ask" and raises the budget error
+    // instead, which is what the headless exit codes are built on.
+    async onBudgetExhausted({ steps }) {
+      const shouldContinue = await store.setPendingContinuation({
+        id: crypto.randomUUID(),
+        steps,
+      });
+
+      return shouldContinue ? "continue" : "stop";
+    },
+
     onToolStart(tool) {
       store.finishAssistantMessage();
       store.startTool(tool);
@@ -363,9 +384,26 @@ async function runInteractive(modelOverride?: string) {
     }
   };
 
+  // The app paints a full-height frame, so it belongs on the alternate screen:
+  // in the normal buffer it overwrites the scrollback of whatever the user was
+  // doing and leaves its last frame stranded there on exit.
+  //
+  // Restoring is not optional, and `handleExit` is not enough on its own — an
+  // uncaught throw leaves the terminal in the alternate buffer with mouse
+  // reporting still on, which reads as a hung shell. `restoreTerminal` is
+  // idempotent so the exit hook and the normal path can both call it.
+  let terminalRestored = false;
+  const restoreTerminal = () => {
+    if (terminalRestored || !process.stdin.isTTY) return;
+    terminalRestored = true;
+    process.stdin.off("data", onData);
+    process.stdout.write("\x1b[?1006l\x1b[?1000l\x1b[?1049l");
+  };
+
   if (process.stdin.isTTY) {
     process.stdin.on("data", onData);
-    process.stdout.write("\x1b[?1000h\x1b[?1006h");
+    process.stdout.write("\x1b[?1049h\x1b[?1000h\x1b[?1006h");
+    process.once("exit", restoreTerminal);
   }
 
   const { unmount } = render(
@@ -379,18 +417,18 @@ async function runInteractive(modelOverride?: string) {
     if (exiting) return;
     exiting = true;
 
-    if (process.stdin.isTTY) {
-      process.stdin.off("data", onData);
-      process.stdout.write("\x1b[?1006l\x1b[?1000l");
-    }
     if (scrollFrame) clearTimeout(scrollFrame);
 
     store.clearPendingEdit();
     store.clearPendingCommand();
     store.cancelPendingQuestion();
+    store.clearPendingContinuation();
     controller.cancel();
     await controller.dispose();
     unmount();
+    // After unmount, so Ink's final frame lands in the alternate buffer rather
+    // than in the scrollback the user is about to get back.
+    restoreTerminal();
     process.exit(0);
   }
 

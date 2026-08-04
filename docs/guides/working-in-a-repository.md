@@ -73,8 +73,9 @@ edit than describing the outcome.
 **Ask before you change.** A question costs one turn and no writes, and it
 tells you whether the agent has understood the project before you let it edit.
 
-**Keep the scope to one thing.** A turn has a budget of 20 iterations. Two
-unrelated changes in one prompt tends to produce a partial result for both.
+**Keep the scope to one thing.** A turn works in stretches of 40 steps and asks
+before taking another. Two unrelated changes in one prompt tends to mean
+answering that question with neither of them finished.
 
 ## Git
 

@@ -1,4 +1,9 @@
-import type { ProviderClient, StreamEvent, Tool } from "../../../config/types";
+import type {
+  AgentCallbacks,
+  ProviderClient,
+  StreamEvent,
+  Tool,
+} from "../../../config/types";
 
 /**
  * Mock Provider Client for testing
@@ -163,6 +168,18 @@ export class CallbackSpy {
   onCancel = () => {
     this.calls.push({ name: "onCancel", args: [] });
   };
+
+  /**
+   * Declared, and deliberately left undefined.
+   *
+   * Unlike every other callback here, this one's absence carries meaning: the
+   * loop reads a missing handler as "nobody is there to ask" and raises the
+   * budget error, which is the behaviour headless runs and most of these tests
+   * depend on. Giving it a default implementation would quietly turn every
+   * exhaustion test into a continuation test. Tests that want the checkpoint
+   * assign it themselves.
+   */
+  onBudgetExhausted?: AgentCallbacks["onBudgetExhausted"];
 
   getCallsByName(name: string) {
     return this.calls.filter((call) => call.name === name);

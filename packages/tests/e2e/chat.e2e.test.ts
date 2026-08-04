@@ -1,11 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { AgentController } from "../../../commands/agentController";
 import { MockProviderClient, CallbackSpy } from "../shared/mocks";
-import {
-  createTextEvent,
-  createDoneEvent,
-  createUserMessage,
-} from "../shared/factories";
+import { createTextEvent, createDoneEvent } from "../shared/factories";
 
 /**
  * End-to-End Chat Workflow Tests

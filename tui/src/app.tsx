@@ -14,7 +14,7 @@ import { ContinueTurn } from "./components/ContinueTurn";
 import { QuestionDialog } from "./components/QuestionDialog";
 import type { AgentController } from "../../commands/agentController";
 import type { ActiveTurn, TimeLineItem } from "./types";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { useCancelKey } from "./hooks/useCancelKey";
 import { planLayout } from "./layout";
@@ -116,7 +116,6 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
         ) : (
           <ConversationViewport
             items={state.timeline}
-            isThinking={state.isThinking}
             activeTurn={state.activeTurn}
             scrollOffset={state.scrollOffset}
             updateKey={state}
@@ -201,7 +200,6 @@ function ScrolledAwayHint() {
 
 interface ConversationViewportProps {
   items: TimeLineItem[];
-  isThinking: boolean;
   activeTurn: ActiveTurn | null;
   scrollOffset: number;
   updateKey: object;
@@ -216,7 +214,6 @@ interface ConversationViewportProps {
  */
 function ConversationViewport({
   items,
-  isThinking,
   activeTurn,
   scrollOffset,
   updateKey,
@@ -276,7 +273,7 @@ function ConversationViewport({
           flexShrink={0}
           marginBottom={-scrollOffset}
         >
-          <Timeline items={items} isThinking={isThinking} activeTurn={activeTurn} />
+          <Timeline items={items} activeTurn={activeTurn} />
         </Box>
       </Box>
       {/* This viewport is bottom-anchored — its offset counts up from the last

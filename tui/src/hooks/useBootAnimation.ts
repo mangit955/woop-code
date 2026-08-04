@@ -3,13 +3,11 @@ import { useState, useEffect } from "react";
 export type BootPhase = "logo" | "steps" | "launching" | "done";
 
 export interface BootAnimationState {
-  logoText: string;
   loadingStep: number; // index of the currently-spinning step (-1 = none)
   doneSteps: Set<number>;
   phase: BootPhase;
 }
 
-const LOGO = "Woopcode";
 const STEPS = ["Runtime", "Provider", "Tool Registry", "Repository Context"];
 
 const LOGO_DURATION_MS = 600; // duration of LogoReveal animation
@@ -18,10 +16,9 @@ const STEP_GAP_MS  = 220;     // gap between steps starting (must be > STEP_HOLD
 const LAUNCH_MS    = 350;     // "Launching..." shown for this long before onComplete
 
 export function useBootAnimation(onComplete: () => void): BootAnimationState {
-  const [logoText, setLogoText]     = useState("");
   const [loadingStep, setLoadingStep] = useState(-1);
-  const [doneSteps, setDoneSteps]   = useState<Set<number>>(new Set());
-  const [phase, setPhase]           = useState<BootPhase>("logo");
+  const [doneSteps, setDoneSteps]     = useState<Set<number>>(new Set());
+  const [phase, setPhase]             = useState<BootPhase>("logo");
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -58,10 +55,9 @@ export function useBootAnimation(onComplete: () => void): BootAnimationState {
 
     return () => timers.forEach(clearTimeout);
     // onComplete is stable (comes from useState setter reference in agent.tsx)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { logoText, loadingStep, doneSteps, phase };
+  return { loadingStep, doneSteps, phase };
 }
 
 export { STEPS };

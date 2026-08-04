@@ -93,7 +93,6 @@ function RunningTurnFooter(props: TurnFooterProps) {
 function TurnFooterRow({
   agent,
   model,
-  endedAt,
   outcome,
   elapsed,
   pulseFrame,

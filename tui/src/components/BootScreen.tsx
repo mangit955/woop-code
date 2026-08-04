@@ -9,7 +9,7 @@ interface BootScreenProps {
 }
 
 export function BootScreen({ onComplete }: BootScreenProps) {
-  const { logoText, loadingStep, doneSteps, phase } = useBootAnimation(onComplete);
+  const { loadingStep, doneSteps, phase } = useBootAnimation(onComplete);
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>

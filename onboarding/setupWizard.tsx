@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
-import chalk from "chalk";
 import { getEnabledProviders, type ProviderInfo } from "../providers/providerRegistry";
 import { loginProvider } from "../config/authProvider";
 import { getConfig, saveConfig } from "../config/config";

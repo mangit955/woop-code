@@ -1,6 +1,5 @@
 import { test, expect } from "bun:test";
 import { handleSlashCommand } from "../../../commands/slash/handler";
-import { registry } from "../../../commands/slash/registry";
 import { registerCommands } from "../../../commands/slash/commands";
 import type { SlashCommandContext } from "../../../commands/slash/types";
 

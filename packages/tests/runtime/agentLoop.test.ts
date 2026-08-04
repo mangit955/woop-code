@@ -14,7 +14,7 @@ import {
   createDoneEvent,
   generateLargeText,
 } from "../shared/factories";
-import { clone, extractAssistantText, getLastMessage } from "../shared/helpers";
+import { getLastMessage } from "../shared/helpers";
 
 // Mock the getTool function from tools module
 const mockToolRegistry = new MockToolRegistry();

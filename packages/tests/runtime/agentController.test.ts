@@ -39,10 +39,22 @@ const buildRepositoryContext = mock(async () => mockRepoContext);
 // any later test asserting on real persistence is silently testing this instead.
 const actualConfig = await import("../../../config/config");
 
+// The execution log is stubbed for the same reason the conversation is: the
+// controller persists both after every turn, and the spread above kept the real
+// saveExecutionLog — so these tests were writing the developer's own
+// ~/.config/woopcode/execution-log.json, provable from its mtime.
+let mockExecutionRecords: unknown[] = [];
+const getExecutionLog = mock(async () => [...mockExecutionRecords]);
+const saveExecutionLog = mock(async (records: unknown[]) => {
+  mockExecutionRecords = [...records];
+});
+
 mock.module("../../../config/config", () => ({
   ...actualConfig,
   getConversation,
   saveConversation,
+  getExecutionLog,
+  saveExecutionLog,
   buildRepositoryContext,
   recentMessages: (messages: Message[], maxTurns: number) => messages,
 }));

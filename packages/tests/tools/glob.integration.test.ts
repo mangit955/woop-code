@@ -7,8 +7,12 @@ describe("glob tool - integration tests", () => {
   let testDir: string;
 
   beforeEach(async () => {
-    // Create unique test directory
-    testDir = join(process.cwd(), `.glob-test-${Date.now()}`);
+    // A UUID, not the clock. Date.now() has millisecond resolution, so two test
+    // processes could build the same path — mkdirSync with `recursive` accepts an
+    // existing directory silently, and then the first afterEach to finish deleted
+    // the other run's files mid-test. It only failed when something else was
+    // touching the tree, which reads as flake rather than as this.
+    testDir = join(process.cwd(), `.glob-test-${crypto.randomUUID()}`);
     mkdirSync(testDir, { recursive: true });
 
     // Create test file structure

@@ -13,6 +13,33 @@ import {
   createUserMessage,
 } from "../shared/factories";
 import type { Message } from "../../../config/types";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as joinPath } from "node:path";
+
+/**
+ * This file's whole subject is what reaches disk, so it has to be told which
+ * disk. Without the redirect it read and rewrote the developer's real
+ * `~/.config/woopcode/conversation.json` — it saved `[]` and restored what it
+ * found, which works alone and loses the user's history the moment two runs
+ * overlap: one saves `[]`, the other reads that as the original, and restores
+ * emptiness permanently.
+ *
+ * `getConfigDir` reads the variable per call, so setting it after the static
+ * imports and before any test body is enough.
+ */
+const previousConfigHome = process.env.XDG_CONFIG_HOME;
+const temporaryConfigHome = mkdtempSync(joinPath(tmpdir(), "woopcode-persistence-e2e-"));
+process.env.XDG_CONFIG_HOME = temporaryConfigHome;
+
+afterAll(() => {
+  if (previousConfigHome === undefined) {
+    delete process.env.XDG_CONFIG_HOME;
+  } else {
+    process.env.XDG_CONFIG_HOME = previousConfigHome;
+  }
+  rmSync(temporaryConfigHome, { recursive: true, force: true });
+});
 
 /**
  * End-to-End Persistence Workflow Tests

@@ -18,6 +18,16 @@ await writeFileTool.execute({ path: file, content: "new" });
 expect(await Bun.file(file).text()).toBe("new");
 ```
 
+**Note the UUID.** `Date.now()` has millisecond resolution, so two test processes
+build the same path, `mkdirSync({ recursive: true })` accepts the existing
+directory silently, and the first `afterEach` deletes the other run's files
+mid-test — a failure that only appears when something else is touching the tree.
+`glob.integration.test.ts` had it.
+
+A fixture a *tool* will resolve has to live inside the workspace, not `tmpdir()`:
+every file tool routes through `resolveWorkspacePath` and refuses anything
+outside. The snippet above works because `writeFileTool` is handed the path.
+
 Only two things are faked in this suite: the provider, because a test run makes
 no network calls, and the approval prompt, because there is no human. Everything
 else is the real thing. Prefer the factories and fakes in
@@ -52,9 +62,13 @@ So a mock must be inert outside its own file. Four rules, all four required.
 - **`CI=true` changes rendering.** Ink writes only its final frame when it
   detects CI, so a test asserting on frames must pass `interactive: true` or it
   reads an empty string on a runner and passes locally forever.
-- **Redirect config.** Anything touching config sets `XDG_CONFIG_HOME` to a
-  temporary directory first, so a run never reads or writes the developer's real
-  config.
+- **Redirect config, and put it back in `afterAll` only.** Anything touching
+  config sets `XDG_CONFIG_HOME` to a temporary directory first, so a run never
+  reads or writes the developer's real config. Restoring it in `afterEach` defeats
+  the whole thing: `approval.integration.test.ts` did `delete
+  process.env.XDG_CONFIG_HOME` per test, so on any machine where that variable was
+  not already set the redirect was gone after the *first* test and every later one
+  wrote the real `~/.config/woopcode/providers.json` — provable from its mtime.
 - **Time and randomness belong in the arguments.** A test that waits on a real
   clock is a test that fails on a loaded runner — that is what broke the
   cancellation test on macOS CI.
@@ -89,6 +103,15 @@ memory:
 
 ```bash
 for f in $(git ls-files '*.test.ts' '*.test.tsx'); do bun test "$f" || echo "BROKEN $f"; done
+```
+
+Neither sweep catches a test that shares state with *another run*. Three bugs got
+through all of the above and only failed when something else touched the tree at
+the same moment. Run several suites at once to reproduce that class:
+
+```bash
+for i in 1 2 3 4; do (bun test > /tmp/load-$i.txt 2>&1 &); done
+sleep 90; grep -lE " fail" /tmp/load-*.txt
 ```
 
 Then `bun run verify --all`.

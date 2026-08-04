@@ -156,7 +156,7 @@ describe("terminal Tool - Integration Tests", () => {
   describe("File Operations", () => {
     test("can read files", async () => {
       // Create temp file
-      const tmpFile = `/tmp/woop-terminal-test-${Date.now()}.txt`;
+      const tmpFile = `/tmp/woop-terminal-test-${crypto.randomUUID()}.txt`;
       await Bun.write(tmpFile, "test content");
 
       const result = await terminalTool.execute({
@@ -167,7 +167,7 @@ describe("terminal Tool - Integration Tests", () => {
     });
 
     test("can write files", async () => {
-      const tmpFile = `/tmp/woop-terminal-test-${Date.now()}.txt`;
+      const tmpFile = `/tmp/woop-terminal-test-${crypto.randomUUID()}.txt`;
 
       await terminalTool.execute({
         command: `echo 'written content' > ${tmpFile}`,

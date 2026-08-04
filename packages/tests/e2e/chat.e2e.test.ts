@@ -27,6 +27,34 @@ import {
 
 // Mock the provider client creation
 import { beforeAll, afterAll, mock } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as joinPath } from "node:path";
+
+/**
+ * The controller persists after every turn, including a failed one, so this file
+ * reads and writes config — and until this redirect it did so in the developer's
+ * real `~/.config/woopcode`. Proven by `execution-log.json`'s mtime moving when
+ * this file alone runs.
+ *
+ * It also made `provider error is handled gracefully` fail under concurrency:
+ * that test asserts `onError` fired exactly once, and a save colliding with
+ * another run's save fires a second one. `getConfigDir` in `config/paths.ts`
+ * reads the variable on every call, so setting it here — after the static
+ * imports, before any test body — is enough.
+ */
+const previousConfigHome = process.env.XDG_CONFIG_HOME;
+const temporaryConfigHome = mkdtempSync(joinPath(tmpdir(), "woopcode-chat-e2e-"));
+process.env.XDG_CONFIG_HOME = temporaryConfigHome;
+
+afterAll(() => {
+  if (previousConfigHome === undefined) {
+    delete process.env.XDG_CONFIG_HOME;
+  } else {
+    process.env.XDG_CONFIG_HOME = previousConfigHome;
+  }
+  rmSync(temporaryConfigHome, { recursive: true, force: true });
+});
 
 let mockClient: MockProviderClient;
 

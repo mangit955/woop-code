@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,7 +6,8 @@ import { join } from "node:path";
 // Approval now depends on the configured mode, so config reads go to a temp
 // directory rather than the developer's real ~/.config/woopcode.
 const previousConfigHome = process.env.XDG_CONFIG_HOME;
-process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "woopcode-approval-"));
+const temporaryConfigHome = mkdtempSync(join(tmpdir(), "woopcode-approval-"));
+process.env.XDG_CONFIG_HOME = temporaryConfigHome;
 
 const { createFileTool } = await import("../../../tools/createFile");
 const { terminalTool } = await import("../../../tools/terminal");
@@ -25,7 +26,26 @@ describe("tool approvals", () => {
 
   afterEach(() => {
     for (const file of createdFiles.splice(0)) rmSync(file, { force: true });
-    if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+  });
+
+  /**
+   * The redirect is restored once, at the end — never per test.
+   *
+   * This used to `delete process.env.XDG_CONFIG_HOME` in `afterEach`, which on
+   * any machine without that variable set (the normal case) removed the redirect
+   * after the *first* test. Every later `useApprovalMode` then wrote the
+   * developer's real `~/.config/woopcode/providers.json`: proven by its mtime
+   * moving when this file alone runs. Two runs at once raced on that one real
+   * file, so a mode set by one was read by the other and the assertion failed
+   * with nothing in it to suggest why.
+   */
+  afterAll(() => {
+    if (previousConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = previousConfigHome;
+    }
+    rmSync(temporaryConfigHome, { recursive: true, force: true });
   });
 
   test("does not create a file when its diff is rejected", async () => {

@@ -321,7 +321,7 @@ Understanding the architecture helps with contributions:
 
 ### Key Concepts
 
-**Runtime Loop** (`config/runtime.ts`)
+**Runtime Loop** (`runtime/loop.ts`)
 - Orchestrates agent execution
 - Manages streaming from providers
 - Executes tools
@@ -332,7 +332,7 @@ Understanding the architecture helps with contributions:
 - Tools registered in `tools/index.ts`
 - Each tool returns a string result
 
-**Provider Abstraction** (`config/client.ts`)
+**Provider Abstraction** (`providers/client.ts`)
 - Standardized interface for LLM providers
 - Streaming-first design
 - Support for tool calling

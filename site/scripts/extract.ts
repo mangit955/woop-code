@@ -2,7 +2,7 @@
  * Pulls the documented surface out of the code that owns it.
  *
  * Tool names, their parameters, the slash commands, the approval modes and
- * their descriptions all exist already — in `toolRegistery`, in the slash
+ * their descriptions all exist already — in `toolRegistry`, in the slash
  * `registry`, in `APPROVAL_MODES`. Writing them out a second time in markdown
  * means maintaining two copies of the same list, and the second copy is the one
  * that goes stale. README.md already says "13 tools" as hand-written prose;
@@ -15,7 +15,7 @@
  * command name in prose.
  */
 
-import { toolRegistery } from "../../tools";
+import { toolRegistry } from "../../tools";
 import { registry, registerCommands } from "../../commands/slash";
 import { APPROVAL_MODES, DEFAULT_APPROVAL_MODE } from "../../runtime/approval/approval-mode";
 import { VERSION } from "../../config/version";
@@ -38,7 +38,7 @@ const GATE: Record<string, string> = {
 
 registerCommands();
 
-const tools = toolRegistery.map((tool) => {
+const tools = toolRegistry.map((tool) => {
   const effect = toolEffect(tool.name);
 
   return {

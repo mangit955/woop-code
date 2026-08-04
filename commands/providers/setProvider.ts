@@ -3,7 +3,7 @@ import { getConfig, saveConfig } from "../../config/config";
 import {
   isProviderEnabled,
   unsupportedProviderMessage,
-} from "../../config/providerRegistry";
+} from "../../providers/providerRegistry";
 
 export const setProviderCommand = new Command("set")
   .description("Lets user set the default provider")

@@ -14,7 +14,7 @@ import { webFetchTool } from "./webFetch";
 import { questionTool } from "./question";
 import { todoWriteTool } from "./todo";
 
-export const toolRegistery: Tool[] = [
+export const toolRegistry: Tool[] = [
   listFilesTool,
   readFileTool,
   terminalTool,
@@ -43,7 +43,7 @@ const toolAliases: Record<string, string> = {
 /** Resolve a provider-facing tool name against a registry. */
 export function resolveTool(
   name: string,
-  registry: readonly Tool[] = toolRegistery,
+  registry: readonly Tool[] = toolRegistry,
 ): Tool | undefined {
   const canonicalName = toolAliases[name] ?? name;
   return registry.find((tool) => tool.name === canonicalName);

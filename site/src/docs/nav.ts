@@ -63,6 +63,9 @@ export const NAV: NavSection[] = [
       // — but it is the first thing a reader meets after the quickstart, and
       // the quickstart links here at the moment they first see a diff.
       { slug: "guides/approval-modes", title: "Approval modes" },
+      // Beside approval modes for the same reason: it is the other half of what
+      // stops the agent changing something you did not agree to.
+      { slug: "guides/plan-mode", title: "Plan mode" },
       { slug: "guides/reviewing-diffs", title: "Reviewing diffs" },
       { slug: "guides/working-in-a-repository", title: "Working in a repository" },
       { slug: "guides/sessions-and-history", title: "Sessions & history" },

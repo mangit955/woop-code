@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import {
   agentLoop,
   IterationBudgetExhaustedError,
-} from "../../../config/runtime";
+} from "../../../runtime/loop";
 import type { ProviderClient, StreamEvent } from "../../../config/types";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
 import { createRuntimeTest } from "../shared/testHelpers";

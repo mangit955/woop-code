@@ -27,3 +27,16 @@ jobs/
 # Python caches from the Harbor agent's test suite.
 __pycache__/
 .pytest_cache/
+
+# User state, which lives in ~/.config/woopcode/ and never in the repo. Both
+# were committed under config/ once, where nothing imported them — the running
+# program reads the copies under getConfigDir() (config/paths.ts). Scoped to
+# config/ rather than blanket-ignored: config/models.json is real source, and a
+# bare `conversation.json` rule would also hide a fixture with that name.
+config/providers.json
+config/conversation.json
+config/execution-log.json
+
+# Local agent worktrees. Full repo copies; regenerable, and large enough to slow
+# every search over the tree.
+.claude/worktrees/

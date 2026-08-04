@@ -61,7 +61,7 @@ let mockClient: MockProviderClient;
 // Captured before the mock is registered, so the stub can keep the module's
 // other exports (DEFAULT_MODEL_ID and friends, which unrelated modules import)
 // and can hand back to the real implementation when this file is not running.
-const actualClient = await import("../../../config/client");
+const actualClient = await import("../../../providers/client");
 // Held as a direct reference rather than read off the namespace at call time,
 // so the delegation below cannot resolve back to the mock and recurse.
 const realCreateProviderClient = actualClient.createProviderClient;
@@ -82,7 +82,7 @@ afterAll(() => {
   usingMockClient = false;
 });
 
-mock.module("../../../config/client", () => ({
+mock.module("../../../providers/client", () => ({
   ...actualClient,
   createProviderClient: (provider: string, apiKey: string, model?: string) =>
     usingMockClient ? mockClient : realCreateProviderClient(provider, apiKey, model),

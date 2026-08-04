@@ -301,6 +301,44 @@ describe("editFile Tool - Integration Tests", () => {
       ).rejects.toThrow(`File not found: ${nonExistent}`);
     });
 
+    // The arguments arrive from a language model, so an omitted one is a
+    // routine occurrence rather than a programmer error. `newText` was cast
+    // straight to string and handed to applyEdit, which splices it into the
+    // rebuilt file with `join("")` — and join renders undefined as empty. So a
+    // missing newText silently *deleted* the matched text and reported
+    // "Edited <path>" as success. Visible on the diff when someone is watching
+    // one; applied unseen under --prompt or full-auto.
+    test("refuses a missing newText instead of silently deleting", async () => {
+      const path = await createFile("test.txt", "hello world");
+
+      await expect(
+        editFileTool.execute({ path, oldText: "world" }),
+      ).rejects.toThrow("Missing required argument: newText");
+
+      expect(await readFile(path)).toBe("hello world");
+    });
+
+    test("refuses a missing oldText", async () => {
+      const path = await createFile("test.txt", "hello world");
+
+      await expect(
+        editFileTool.execute({ path, newText: "universe" }),
+      ).rejects.toThrow("Missing required argument: oldText");
+
+      expect(await readFile(path)).toBe("hello world");
+    });
+
+    // Deletion. `typeof` rather than truthiness is what keeps this working:
+    // "" is a legitimate replacement, and the same distinction createFile
+    // already draws for an empty file.
+    test("accepts an empty newText as a deletion", async () => {
+      const path = await createFile("test.txt", "hello world");
+
+      await editFileTool.execute({ path, oldText: " world", newText: "" });
+
+      expect(await readFile(path)).toBe("hello");
+    });
+
     test("throws when oldText not found in file", async () => {
       const path = await createFile("test.txt", "hello world");
 

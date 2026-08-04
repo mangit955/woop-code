@@ -1,5 +1,5 @@
 import { test, expect, describe, mock } from "bun:test";
-import { agentLoop } from "../../../config/runtime";
+import { agentLoop } from "../../../runtime/loop";
 import type { Message } from "../../../config/types";
 import { MockTool, MockToolRegistry, CallbackSpy } from "../shared/mocks";
 import { createStreamingProvider } from "../shared/testHelpers";

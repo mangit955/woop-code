@@ -70,7 +70,7 @@ export const countLinesTool: Tool = {
 ## Register it
 
 ```ts title="tools/index.ts"
-export const toolRegistery: Tool[] = [
+export const toolRegistry: Tool[] = [
   // ...
   countLinesTool,
 ];

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Plan mode — Woopcode docs</title>
+    <meta name="description" content="Let the agent investigate and propose without letting it change anything, and why a read-only session still needs the terminal." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Order matters: authored light first, generated dark second. See tokens.css. -->
+    <link rel="stylesheet" href="/docs/tokens.css" />
+    <link rel="stylesheet" href="/docs/tokens.generated.css" />
+    <link rel="stylesheet" href="/docs/layout.css" />
+    <link rel="stylesheet" href="/docs/components.css" />
+    <script>
+      // Before first paint: a saved theme must not flash the other one.
+      try {
+        var saved = localStorage.getItem("woopcode-theme");
+        if (saved) document.documentElement.dataset.theme = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__mark" aria-hidden="true"></span>
+        <span class="topbar__name">woopcode</span>
+        <span class="topbar__section">docs</span>
+      </a>
+
+      <div class="topbar__actions">
+        <button class="topbar__menu" type="button" aria-expanded="false"
+          aria-controls="sidebar" data-menu>Menu</button>
+        <button class="search-trigger" type="button" data-search-open>
+          <span>Search</span>
+          <kbd class="search-trigger__key">⌘K</kbd>
+        </button>
+        <span class="topbar__version">v0.7.0</span>
+        <button class="topbar__theme" type="button" data-theme-toggle
+          aria-label="Switch between light and dark">Theme</button>
+        <a class="topbar__cta" href="https://github.com/mangit955/woop-code"
+          target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="layout__sidebar" id="sidebar" data-sidebar><nav class="sidebar" aria-label="Documentation">
+    <div class="sidebar__rail" aria-hidden="true"></div>
+    <div class="nav-group">
+        <p class="nav-group__label">Introduction</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/introduction/what-is-woopcode">What Woopcode is</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/why">Why use it</a></li><li class="nav-item"><a class="nav-link" href="/docs/introduction/how-a-turn-works">How a turn works</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Getting started</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/getting-started/install">Install</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/connect-a-provider">Connect a provider</a></li><li class="nav-item"><a class="nav-link" href="/docs/getting-started/first-session">Your first session</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Guides</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/guides/approval-modes">Approval modes</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/plan-mode" aria-current="page">Plan mode</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/reviewing-diffs">Reviewing diffs</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/working-in-a-repository">Working in a repository</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/sessions-and-history">Sessions &amp; history</a></li><li class="nav-item"><a class="nav-link" href="/docs/guides/configuring-providers">Configuring providers</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Reference</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/reference/cli">CLI</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/slash-commands">Slash commands</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools">Tools</a><ul class="nav-list nav-list--nested"><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/list-files">list_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/read-file">read_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-terminal">run_terminal</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/create-file">create_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/write-file">write_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/edit-file">edit_file</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/grep">grep</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/run-tests">run_tests</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/find-files">find_files</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/glob">glob</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-search">web_search</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/web-fetch">web_fetch</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/ask-user">ask_user</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/tools/todo-write">todo_write</a></li></ul></li><li class="nav-item"><a class="nav-link" href="/docs/reference/configuration">Configuration</a></li><li class="nav-item"><a class="nav-link" href="/docs/reference/keyboard">Keyboard</a></li></ul>
+      </div><div class="nav-group">
+        <p class="nav-group__label">Architecture</p>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="/docs/architecture/how-it-works">How it works</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/running-from-source">Running from source</a></li><li class="nav-item"><a class="nav-link" href="/docs/architecture/adding-a-tool">Adding a tool</a></li></ul>
+      </div>
+  </nav></div>
+      <main class="layout__main"><article class="page">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/docs">Docs</a><span class="crumbs__sep" aria-hidden="true">/</span><span>Guides</span><span class="crumbs__sep" aria-hidden="true">/</span><span aria-current="page">Plan mode</span></nav>
+    <h1 id="plan-mode">Plan mode</h1>
+<p>A session is in one of two modes. <strong>Build</strong> is the normal one: the agent reads,
+runs commands, and proposes edits you approve on a diff. <strong>Plan</strong> is the same
+session with one promise added — nothing it does can change the repository.</p>
+<p>Press <kbd>Tab</kbd> to switch. The composer changes colour and the caret
+follows it, so you can see which mode you are in without checking anywhere else.</p>
+<p>Use it when you want the answer before the change: <em>how would you restructure
+this?</em>, <em>what breaks if I rename that?</em>, <em>where does this get called from?</em> The
+agent looks around properly — reads files, greps, runs the test suite — and
+replies with a proposal in prose instead of starting work.</p>
+<h2 id="what-still-runs">What still runs<a class="anchor" href="#what-still-runs" aria-label="Link to this section">#</a></h2>
+<p>Reading is untouched. So is the terminal, which is the part people expect to be
+switched off:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Still available</th>
+<th>Refused</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Reading and searching files</td>
+<td>Editing a file</td>
+</tr>
+<tr>
+<td>Listing and globbing</td>
+<td>Creating or overwriting a file</td>
+</tr>
+<tr>
+<td>Running the tests, the build, the type checker</td>
+<td><code>sed -i</code>, <code>cat &gt; file</code>, a script that opens a file for writing</td>
+</tr>
+<tr>
+<td><code>git log</code>, <code>git diff</code>, <code>git status</code></td>
+<td><code>git commit</code>, <code>git checkout</code>, anything that moves the tree</td>
+</tr>
+<tr>
+<td>Asking you a question</td>
+<td>Any tool whose effect has not been classified</td>
+</tr>
+</tbody></table></div>
+<p>The terminal has to stay: inspection is most of what planning is, and a mode
+that cannot run <code>bun test</code> cannot tell you whether the thing you are asking
+about currently works.</p>
+<p>That is also why the refusal is judged on the <strong>command</strong>, not on the tool. A
+filtered tool list cannot see arguments, so <code>run_terminal</code> reaching the disk
+through a redirect is caught when the call is made rather than when the list is
+built.</p>
+<aside class="callout callout--note"><p class="callout__label">Note</p><p>A tool Woopcode does not recognise is refused, not allowed. A mode whose whole
+promise is that nothing changes has to fail closed, so a newly added tool is
+withheld until someone records what it does.</p>
+</aside>
+<h2 id="what-the-agent-is-told">What the agent is told<a class="anchor" href="#what-the-agent-is-told" aria-label="Link to this section">#</a></h2>
+<p>A refused write comes back to the agent as a result, not an error, so the turn
+keeps going:</p>
+<figure class="code code--terminal">
+      <figcaption class="code__bar">
+        <span class="code__dots" aria-hidden="true"></span>
+        <span class="code__title">woopcode</span>
+      </figcaption>
+      <pre data-lang="terminal"><code><span class="line">Not applied: edit_file was refused because this session is in plan mode.</span><span class="line">Nothing was written and the workspace is unchanged. Do not attempt another way</span><span class="line">of writing it — every writing tool and any shell command that edits a file is</span><span class="line">refused while planning, including redirects and sed -i. Finish investigating</span><span class="line">and reply with the plan in prose: what you would change, in which files, and</span><span class="line">how it would be verified.</span></code></pre>
+    </figure>
+<p>It cannot report the change as applied, and it cannot route around the refusal,
+so it finishes the plan instead of losing the turn.</p>
+<h2 id="leaving-it">Leaving it<a class="anchor" href="#leaving-it" aria-label="Link to this section">#</a></h2>
+<p>Press <kbd>Tab</kbd> again. There is deliberately no tool for it — the mode
+belongs to the person at the keyboard, and an agent that could leave plan mode
+would not be much of a guarantee.</p>
+<p>Switching mid-turn takes effect on the <strong>next</strong> turn. The mode is read once when
+a turn starts, so a turn already running finishes under the rules it began with
+rather than changing halfway.</p>
+<aside class="callout callout--warning"><p class="callout__label">Warning</p><p>Plan mode is not saved. Every session starts in Build, including the one you
+open right after quitting a planning session.</p>
+<p>This is deliberate. A mode that survived a restart would silently swallow the
+first edit of your next session, and you would be left wondering why the agent
+said it changed a file that never changed.</p>
+</aside>
+<h2 id="plan-mode-and-approval-modes">Plan mode and approval modes<a class="anchor" href="#plan-mode-and-approval-modes" aria-label="Link to this section">#</a></h2>
+<p>They solve different halves of the same problem and both apply at once.</p>
+<p><a href="/docs/guides/approval-modes">Approval modes</a> decide <strong>what you get asked
+about</strong>. Plan mode decides <strong>what is possible at all</strong>. Even in <code>full-auto</code>,
+which asks about nothing, a planning session still writes nothing — the refusal
+happens before the approval question is ever reached.</p>
+<h2 id="see-also">See also<a class="anchor" href="#see-also" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="/docs/guides/approval-modes">Approval modes</a> — the other half of the control</li>
+<li><a href="/docs/reference/keyboard">Keyboard</a> — every binding, including <kbd>Tab</kbd></li>
+</ul>
+
+    <p class="page-since">Added in woopcode@0.7.0</p>
+    <nav class="pager" aria-label="Pagination">
+    <a class="pager__card pager__card--previous" href="/docs/guides/approval-modes">
+          <span class="pager__direction">Previous</span>
+          <span class="pager__title">Approval modes</span>
+        </a><a class="pager__card pager__card--next" href="/docs/guides/reviewing-diffs">
+          <span class="pager__direction">Next</span>
+          <span class="pager__title">Reviewing diffs</span>
+        </a>
+  </nav>
+  </article></main>
+      <div class="layout__toc"><nav class="toc" aria-label="On this page">
+    <p class="toc__label">On this page</p>
+    <ul class="toc__list"><li class="toc-item toc-item--h2">
+          <a href="#what-still-runs" data-toc="what-still-runs">What still runs</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#what-the-agent-is-told" data-toc="what-the-agent-is-told">What the agent is told</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#leaving-it" data-toc="leaving-it">Leaving it</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#plan-mode-and-approval-modes" data-toc="plan-mode-and-approval-modes">Plan mode and approval modes</a>
+        </li><li class="toc-item toc-item--h2">
+          <a href="#see-also" data-toc="see-also">See also</a>
+        </li></ul>
+  </nav></div>
+    </div>
+
+    <div class="scrim" data-scrim hidden></div>
+
+    <div class="palette" data-palette hidden>
+      <div class="palette__scrim" data-palette-dismiss></div>
+      <div class="palette__box" role="dialog" aria-modal="true"
+        aria-label="Search documentation">
+        <input class="palette__input" type="search" data-palette-input
+          placeholder="Search the docs" autocomplete="off" spellcheck="false"
+          aria-controls="palette-results" aria-expanded="true" />
+        <ul class="palette__results" id="palette-results" role="listbox"
+          data-palette-results></ul>
+        <p class="palette__hint">
+          <kbd>↑</kbd><kbd>↓</kbd> to move · <kbd>↵</kbd> to open ·
+          <kbd>esc</kbd> to close
+        </p>
+      </div>
+    </div>
+
+    <script src="/docs/client.js" defer></script>
+  </body>
+</html>

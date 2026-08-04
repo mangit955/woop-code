@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach, mock } from "bun:test";
-import { agentLoop } from "../../../config/runtime";
+import { agentLoop } from "../../../runtime/loop";
 import { PLAN_MODE_PROMPT } from "../../../config/systemPrompt";
 import type { Message, StreamEvent, Tool, TurnSummary } from "../../../config/types";
 import { MockTool, MockToolRegistry, CallbackSpy } from "../shared/mocks";

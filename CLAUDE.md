@@ -42,21 +42,23 @@ Those same three run before a commit rather than after a push. `verify.ts` holds
 
 ```text
 cli.ts              argument parsing, subcommands (commander)
-  commands/         AgentController, slash commands, provider/model subcommands
-    tui/            the React Ink interface
-  config/           the agent loop, provider client, repo context, persistence
-    runtime/        approval classification/policy, compaction, retry, logs
-      tools/        the tool registry
+commands/           AgentController, slash commands, provider/model subcommands
+  tui/              the React Ink interface
+runtime/            the agent loop, approval, compaction, retry, logs
+providers/          the three provider clients, the registry, the model catalog
+config/             repo context, persistence, paths, the system prompt, types
+tools/              the tool registry
 ```
 
-Two structural facts to know before editing:
+The agent loop is `runtime/loop.ts`. It knows nothing about the interface, which is what lets the same loop drive both the TUI and the headless `--prompt` path; everything flows back out through `AgentCallbacks` (text, tool start, tool finish, error).
 
-- **The agent loop lives in `config/runtime.ts`, not in `commands/`.** It knows nothing about the interface, which is what lets the same loop drive both the TUI and the headless `--prompt` path. Everything flows back out through `AgentCallbacks` (text, tool start, tool finish, error).
+One structural fact to know before editing:
+
 - **Approval is split in two.** `runtime/approval/classifier.ts` decides how risky a shell command is; `runtime/approval/policy.ts` decides whether that risk needs asking. Adding an approval mode is one entry in a table.
 
-A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `config/runtime.ts` (stream, collect tool calls, execute, feed results back; 20 iterations by default) → tools resolved via `toolRegistery` in `tools/index.ts`.
+A turn: `cli.ts` → `AgentController` (owns client, model, cancellation) → `buildRepositoryContext` in `config/config.ts` (package metadata, README, agent instruction files, structure — each capped, the whole capped again) → `agentLoop` in `runtime/loop.ts` (stream, collect tool calls, execute, feed results back; 20 iterations by default) → tools resolved via `toolRegistry` in `tools/index.ts`.
 
-Providers implement `ProviderClient` in `config/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Google, OpenAI and Anthropic are all enabled in `config/providerRegistry.ts`. The Gemini client lives in `config/client.ts`, the Anthropic one in `config/anthropicClient.ts`, the OpenAI one in `config/openaiClient.ts`; `createProviderClient` picks between them.
+Providers implement `ProviderClient` in `providers/client.ts`, whose `stream()` yields `StreamEvent`s (`text`, `tool_call`, `done`). Google, OpenAI and Anthropic are all enabled in `providers/providerRegistry.ts`. The Gemini client lives in `providers/client.ts`, the Anthropic one in `providers/anthropicClient.ts`, the OpenAI one in `providers/openaiClient.ts`; `createProviderClient` picks between them.
 
 **Both Anthropic and OpenAI require the reasoning that preceded a tool call to be replayed with that call's result**, and both fail quietly without it — the request is accepted and the model reasons from less than it had, with nothing in the response to notice by. `Message` has nowhere to put reasoning, so each client keeps it for the length of a turn (one client is constructed per turn) and replays it when rendering. That is why the agent loop, the message type and persistence stay provider-agnostic.
 
@@ -68,7 +70,7 @@ Token counts do not mean the same thing across the two. Anthropic's `input_token
 
 - **Unrecognised shell commands are treated as destructive**, never as safe. Failing closed is the only defensible default for something with write access to a repo.
 - **Plan mode is gated twice, and both are load-bearing.** `runtime/planMode.ts` withholds the writing tools from the provider *and* the loop refuses any write that arrives regardless. The second is not belt-and-braces: `run_terminal` has to stay available for inspection, so `sed -i`, `cat > file` and an inline script that opens a file for writing all reach the disk through a tool the first gate must keep. Deleting either one leaves a mode that only looks safe. The mode is a session property owned by `AgentController`, cycled with Tab, mirrored into the UI store for rendering, and deliberately never persisted — one that survived a restart would swallow the next session's first edit. The loop reads it once per turn, so a Tab mid-turn lands on the next turn.
-- **A provider client sends the tool list it was given, never `toolRegistery` directly.** `stream()`'s last parameter is that list, and plan mode narrows it; a client that reads the registry itself offers the model `edit_file` while the session is planning. The OpenAI client shipped doing exactly that — branched before the parameter existed, merged after, no textual conflict — so `packages/tests/config/offeredTools.test.ts` is driven by `enabledProviderIds()`: a new provider with no probe entry fails the coverage test rather than being quietly exempt. Arguments go through `config/toolSchema.ts`, which is the only copy of that mapping.
+- **A provider client sends the tool list it was given, never `toolRegistry` directly.** `stream()`'s last parameter is that list, and plan mode narrows it; a client that reads the registry itself offers the model `edit_file` while the session is planning. The OpenAI client shipped doing exactly that — branched before the parameter existed, merged after, no textual conflict — so `packages/tests/providers/offeredTools.test.ts` is driven by `enabledProviderIds()`: a new provider with no probe entry fails the coverage test rather than being quietly exempt. Arguments go through `config/toolSchema.ts`, which is the only copy of that mapping.
 - **Tool errors are returned to the agent as results**, not thrown out of the turn, so it can correct a bad path and retry. Only the iteration budget ends a turn. Write error messages for the model (`File <path> does not exist`, not `ENOENT`).
 - **Persistence drops tool traffic.** Only user and assistant messages are saved; half of a call/result pair would make restored history invalid for the provider.
 - **Config failures never block startup.** A corrupt `providers.json` is moved aside and defaults recreated; a malformed approval mode falls back to the default, never to permissive.
@@ -77,7 +79,7 @@ Token counts do not mean the same thing across the two. Anthropic's `input_token
 
 ### Adding a tool
 
-A tool is `{ name, description, parameters, execute(args, signal): Promise<string> }` (`config/types.ts`). Add the file to `tools/`, append it to `toolRegistery` in `tools/index.ts`, add its effect to `TOOL_EFFECTS` in `runtime/toolEffects.ts` (a missing entry reads as `unclassified` — the runtime and the docs both consume this table, and plan mode withholds anything unclassified), then run `bun run docs:extract` and commit the updated `site/src/docs/surface.json`.
+A tool is `{ name, description, parameters, execute(args, signal): Promise<string> }` (`config/types.ts`). Add the file to `tools/`, append it to `toolRegistry` in `tools/index.ts`, add its effect to `TOOL_EFFECTS` in `runtime/toolEffects.ts` (a missing entry reads as `unclassified` — the runtime and the docs both consume this table, and plan mode withholds anything unclassified), then run `bun run docs:extract` and commit the updated `site/src/docs/surface.json`.
 
 Arguments are described to both providers by `config/toolSchema.ts`, which is the one place that mapping lives. An array parameter holds strings unless it declares `items`, in which case it holds objects — and an `enum` there is enforced by the provider, so an invalid value costs no round trip. Nothing in `docs/` names a tool in prose, so pages pick it up automatically; `docs:check` fails if the generated data is stale.
 
@@ -91,7 +93,7 @@ Tests live next to the code (`runtime/`, `tui/`, `config/`, `commands/`) and in 
 - **`mock.module` is registered for the entire run and cannot be undone.** Restoring it in `afterAll` does nothing (Bun binds static imports at load). A mock must be inert outside its own file: gate it on a flag set in `beforeAll` and cleared in `afterAll`, delegate to the real implementation otherwise, register once against a stable object rather than a fresh one per test, and stub the whole module (spread the real one, override only what you need). `packages/tests/e2e/` shows the shape. The suite once ran green while two persistence tests were quietly asserting against another file's stub.
 - Expose order dependence with `bun test $(git ls-files '*.test.ts' '*.test.tsx' | sort -r)`. It only covers tracked files, so a new test that is still untracked is silently skipped by the sweep.
 - **Name a fixture with a UUID, and redirect `XDG_CONFIG_HOME` for the whole file.** `Date.now()` has millisecond resolution, so two runs can build the same fixture path and delete each other's files; and restoring `XDG_CONFIG_HOME` in `afterEach` rather than `afterAll` points the rest of the file at the developer's real `~/.config/woopcode`. Both bugs existed, both passed every sequential sweep, and both only failed when something else touched the tree at the same time. To reproduce that class: `for i in 1 2 3 4; do (bun test > /tmp/load-$i.txt 2>&1 &); done`.
-- **The replay fixtures cannot be sent to a live provider.** They carry no `thoughtSignature` — the event log never wrote the field — and `buildContents` in `config/client.ts` documents Gemini refusing function-call parts without one. They reconstruct prompt *sizes* faithfully, which is what the replay harness measures; they are not a recorded conversation you can replay against the API.
+- **The replay fixtures cannot be sent to a live provider.** They carry no `thoughtSignature` — the event log never wrote the field — and `buildContents` in `providers/client.ts` documents Gemini refusing function-call parts without one. They reconstruct prompt *sizes* faithfully, which is what the replay harness measures; they are not a recorded conversation you can replay against the API.
 - Stubbing a global (`globalThis.fetch`) is the way to fake a network boundary, and is not subject to the `mock.module` trap above — it is per-file and restorable in `afterEach`. `packages/tests/tools/webSearch.integration.test.ts` is the example.
 - `packages/tests/README.md` deliberately holds no test counts or file inventories; `bun run docs:lint` enforces that. Don't add them.
 - Mutation testing is configured in `stryker.config.json` over the runtime and the write tools, driven by `./run-tests.sh`.

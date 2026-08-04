@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type Anthropic from "@anthropic-ai/sdk";
-import { buildAnthropicMessages } from "../../../config/anthropicClient";
+import { buildAnthropicMessages } from "../../../providers/anthropicClient";
 import { recentMessages } from "../../../config/config";
 import type { Message } from "../../../config/types";
 

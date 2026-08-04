@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import type { Tool } from "../../../config/types";
-import { toolRegistery } from "../../../tools";
+import { toolRegistry } from "../../../tools";
 import { toolEffect } from "../../../runtime/toolEffects";
 import { readFileTool } from "../../../tools/readFile";
 import { listFilesTool } from "../../../tools/listFiles";
@@ -114,7 +114,7 @@ export function testToolContract(toolName: string, tool: Tool) {
 // said contracts were "applied to every implementation". Driving this off the
 // registry is what makes that sentence true, and means a new tool inherits the
 // contract by being registered rather than by someone remembering this file.
-for (const tool of toolRegistery) {
+for (const tool of toolRegistry) {
   testToolContract(tool.name, tool);
 }
 
@@ -181,18 +181,18 @@ describe("Real Tool Contract Compliance", () => {
  */
 describe("Tool Registry Contract", () => {
   test("all registered tools have unique names", async () => {
-    const { toolRegistery } = await import("../../../tools");
+    const { toolRegistry } = await import("../../../tools");
     
-    const names = toolRegistery.map(t => t.name);
+    const names = toolRegistry.map(t => t.name);
     const uniqueNames = new Set(names);
     
     expect(uniqueNames.size).toBe(names.length);
   });
 
   test("all registered tools satisfy Tool interface", async () => {
-    const { toolRegistery } = await import("../../../tools");
+    const { toolRegistry } = await import("../../../tools");
     
-    for (const tool of toolRegistery) {
+    for (const tool of toolRegistry) {
       expect(tool.name).toBeDefined();
       expect(tool.description).toBeDefined();
       expect(tool.parameters).toBeDefined();
@@ -218,17 +218,17 @@ describe("Tool Registry Contract", () => {
   });
 
   test("all tools have non-empty descriptions", async () => {
-    const { toolRegistery } = await import("../../../tools");
+    const { toolRegistry } = await import("../../../tools");
     
-    for (const tool of toolRegistery) {
+    for (const tool of toolRegistry) {
       expect(tool.description.length).toBeGreaterThan(0);
     }
   });
 
   test("all tools have valid parameter definitions", async () => {
-    const { toolRegistery } = await import("../../../tools");
+    const { toolRegistry } = await import("../../../tools");
     
-    for (const tool of toolRegistery) {
+    for (const tool of toolRegistry) {
       expect(Array.isArray(tool.parameters)).toBe(true);
       
       for (const param of tool.parameters) {

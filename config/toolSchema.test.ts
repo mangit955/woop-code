@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { parameterSchema, toolInputSchema } from "./toolSchema";
 import type { Tool, ToolParameter } from "./types";
-import { toolRegistery } from "../tools";
+import { toolRegistry } from "../tools";
 
 const parameter = (overrides: Partial<ToolParameter>): ToolParameter => ({
   name: "value",
@@ -110,7 +110,7 @@ describe("toolInputSchema", () => {
   });
 
   test("every registered tool produces a usable schema", () => {
-    for (const registered of toolRegistery) {
+    for (const registered of toolRegistry) {
       const schema = toolInputSchema(registered);
 
       expect(schema.type).toBe("object");
@@ -126,7 +126,7 @@ describe("toolInputSchema", () => {
   });
 
   test("todo_write asks for objects with a constrained status", () => {
-    const todo = toolRegistery.find((entry) => entry.name === "todo_write");
+    const todo = toolRegistry.find((entry) => entry.name === "todo_write");
     expect(todo).toBeDefined();
 
     const items = toolInputSchema(todo!).properties.todos?.items;

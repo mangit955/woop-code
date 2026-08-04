@@ -44,6 +44,18 @@ export const editFileTool: Tool = {
     const oldText = args.oldText as string;
     const newText = args.newText as string;
 
+    // Checked by type, not by truthiness: "" is a legitimate newText — it is
+    // how a deletion is expressed — and the same distinction create_file draws
+    // for an empty file. An omitted one used to reach applyEdit, which builds
+    // the result with join(""), and join renders undefined as empty: the match
+    // was deleted and the tool reported success.
+    if (typeof oldText !== "string") {
+      throw new Error("Missing required argument: oldText");
+    }
+    if (typeof newText !== "string") {
+      throw new Error("Missing required argument: newText");
+    }
+
     let path: string;
     try {
       path = await resolveWorkspacePath(requestedPath, { mustExist: true });

@@ -14,7 +14,7 @@ process.env.XDG_CONFIG_HOME = configHome;
 const { registry } = await import("../../../commands/slash/registry");
 const { registerCommands } = await import("../../../commands/slash/commands");
 const { getConfig, saveConfig } = await import("../../../config/config");
-const { toolRegistery } = await import("../../../tools");
+const { toolRegistry } = await import("../../../tools");
 
 registerCommands();
 
@@ -190,7 +190,7 @@ describe("status and model reporting", () => {
       .get("status")!
       .execute(createContext(controllerOn("gemini-3.6-pro")), []);
 
-    expect(output).toContain(`Tools: ${toolRegistery.length} registered`);
+    expect(output).toContain(`Tools: ${toolRegistry.length} registered`);
     expect(output).not.toContain("Tools: 9 registered");
   });
 

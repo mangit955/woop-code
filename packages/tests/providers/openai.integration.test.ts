@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { buildOpenAIInput, openaiClient, openaiReasoning } from "../../../config/openaiClient";
-import { createProviderClient } from "../../../config/client";
-import { defaultModelForProvider } from "../../../config/modelCatalog";
+import { buildOpenAIInput, openaiClient, openaiReasoning } from "../../../providers/openaiClient";
+import { createProviderClient } from "../../../providers/client";
+import { defaultModelForProvider } from "../../../providers/modelCatalog";
 import { maxAttempts } from "../../../runtime/retry";
 import type { Message, StreamEvent } from "../../../config/types";
 import {

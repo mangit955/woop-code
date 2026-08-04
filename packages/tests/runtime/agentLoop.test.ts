@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, mock } from "bun:test";
-import { agentLoop } from "../../../config/runtime";
+import { agentLoop } from "../../../runtime/loop";
 import type { Message } from "../../../config/types";
 import {
   MockProviderClient,

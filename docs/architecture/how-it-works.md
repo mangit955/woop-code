@@ -28,7 +28,7 @@ cli.ts              argument parsing, subcommands
 ```
 
 Two things are worth noticing about that shape. **The agent loop lives in
-`config/runtime.ts`, not in `commands/`** — it is deliberately free of any
+`runtime/loop.ts`, not in `commands/`** — it is deliberately free of any
 knowledge of the interface, which is what lets the same loop drive both the TUI
 and the headless `--prompt` path. And **approval is split in two**:
 `runtime/approval/classifier.ts` decides how risky a command is,
@@ -45,10 +45,10 @@ in a table.
 3. **`buildRepositoryContext`** in `config/config.ts` assembles package
    metadata, README, and top-level structure, each capped, the whole capped
    again at 8,000 characters.
-4. **`agentLoop`** in `config/runtime.ts` runs the cycle: stream from the
+4. **`agentLoop`** in `runtime/loop.ts` runs the cycle: stream from the
    provider, collect tool calls, execute them, feed results back. Up to 20
    iterations.
-5. **Tools** resolve through `toolRegistery` in `tools/index.ts`. Writing tools
+5. **Tools** resolve through `toolRegistry` in `tools/index.ts`. Writing tools
    raise an approval request; shell tools are classified and checked against
    the policy.
 6. **Callbacks** (`AgentCallbacks`) carry text, tool starts, tool finishes, and
@@ -78,10 +78,10 @@ escape.
 
 ## Provider clients
 
-`config/client.ts` builds a client for the configured provider. The interface is
+`providers/client.ts` builds a client for the configured provider. The interface is
 `ProviderClient`, whose `stream()` yields `StreamEvent`s — `text`, `tool_call`,
 `done`. Adding a provider means implementing that interface and enabling the
-entry in `config/providerRegistry.ts`; the loop above does not change.
+entry in `providers/providerRegistry.ts`; the loop above does not change.
 
 Google, OpenAI and Anthropic are all enabled. `enabled: false` remains the way
 to list a provider the interface should show as planned rather than pretend
@@ -91,7 +91,7 @@ The clients differ in more than their request shape. Both Anthropic and OpenAI
 have to send the reasoning that preceded a tool call back with that call's
 result, and both fail quietly if it is missing — the request is accepted and the
 model simply reasons from less than it had, with nothing in the response to show
-for it. So `config/anthropicClient.ts` and `config/openaiClient.ts` each keep
+for it. So `providers/anthropicClient.ts` and `providers/openaiClient.ts` each keep
 those items for the length of a turn and replay them.
 
 The mechanics differ. Anthropic pauses mid-response to await the tool and

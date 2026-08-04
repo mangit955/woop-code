@@ -179,3 +179,100 @@ describe("dialogs float over the app", () => {
     app.unmount();
   });
 });
+
+/**
+ * The diff answers `a` and `r` as well as Enter and Esc. Ink reports a chord's
+ * letter as plain input with a modifier flag set — parse-keypress builds the
+ * name from the control byte and sets `ctrl` — so an unguarded comparison
+ * against `input` makes Ctrl+A apply the edit and Ctrl+R reject it. Ctrl+A is
+ * start-of-line in readline, which is a very ordinary thing to press.
+ *
+ * These render the real App and push the literal control byte, because the bug
+ * is about what reaches a mounted handler rather than about a decision.
+ */
+const CTRL_A = "";
+const CTRL_R = "";
+const ENTER = "\r";
+const ESC = "";
+
+function pendingEdit(id: string) {
+  return {
+    id,
+    filePath: "notes.txt",
+    oldContent: "before",
+    newContent: "after",
+    diff: "--- notes.txt\n+++ notes.txt\n@@ -1 +1 @@\n-before\n+after\n",
+    toolCallId: `call-${id}`,
+  };
+}
+
+describe("a chord never answers the diff", () => {
+  beforeEach(() => {
+    store.clearTimeline();
+    // The diff shares the screen with the transcript, and an empty timeline
+    // renders the home screen instead — where there is no DiffPreview to press
+    // a key at.
+    store.addUserMessage(TRANSCRIPT);
+  });
+
+  /**
+   * `clearPendingEdit` rejects the waiting promise with "Edit cancelled", so a
+   * test that deliberately leaves an edit unanswered has to absorb that or it
+   * surfaces as an unhandled rejection in whichever test runs next.
+   */
+  function leaveUnanswered(id: string) {
+    const decision = store.setPendingEdit(pendingEdit(id));
+    decision.catch(() => {});
+    return decision;
+  }
+
+  test("Ctrl+A leaves the edit pending instead of applying it", async () => {
+    const app = mount();
+    leaveUnanswered("ctrl-a");
+    await settle();
+
+    app.stdin.press(CTRL_A);
+    await settle();
+
+    expect(store.getState().pendingEdit).not.toBeNull();
+    app.unmount();
+    store.clearPendingEdit();
+  });
+
+  test("Ctrl+R leaves the edit pending instead of rejecting it", async () => {
+    const app = mount();
+    leaveUnanswered("ctrl-r");
+    await settle();
+
+    app.stdin.press(CTRL_R);
+    await settle();
+
+    expect(store.getState().pendingEdit).not.toBeNull();
+    app.unmount();
+    store.clearPendingEdit();
+  });
+
+  test("Enter still applies the edit", async () => {
+    const app = mount();
+    const decision = store.setPendingEdit(pendingEdit("enter"));
+    await settle();
+
+    app.stdin.press(ENTER);
+
+    expect(await decision).toBe(true);
+    expect(store.getState().pendingEdit).toBeNull();
+    app.unmount();
+  });
+
+  test("Esc still rejects the edit", async () => {
+    const app = mount();
+    const decision = store.setPendingEdit(pendingEdit("esc"));
+    await settle();
+
+    app.stdin.press(ESC);
+
+    expect(await decision).toBe(false);
+    expect(store.getState().pendingEdit).toBeNull();
+    app.unmount();
+  });
+});

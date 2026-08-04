@@ -62,12 +62,19 @@ export function DiffPreview({ pendingEdit }: DiffPreviewProps) {
       return;
     }
 
-    if (key.escape || input.toLowerCase() === "r") {
+    // Ink reports a chord's letter as plain input with a modifier flag, so
+    // Ctrl+A would otherwise apply the edit and Ctrl+R reject it. Ctrl+A is
+    // start-of-line in readline, which is an ordinary thing to press over a
+    // composer. Only an unmodified letter is an answer here; chords belong to
+    // the global handlers. Same guard as CommandApproval.
+    const letter = key.ctrl || key.meta ? "" : input.toLowerCase();
+
+    if (key.escape || letter === "r") {
       store.rejectPendingEdit();
       return;
     }
 
-    if (key.return || input.toLowerCase() === "a") {
+    if (key.return || letter === "a") {
       store.approvePendingEdit();
     }
   });

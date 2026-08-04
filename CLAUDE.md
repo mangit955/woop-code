@@ -68,6 +68,7 @@ Token counts do not mean the same thing across the two. Anthropic's `input_token
 
 - **Unrecognised shell commands are treated as destructive**, never as safe. Failing closed is the only defensible default for something with write access to a repo.
 - **Plan mode is gated twice, and both are load-bearing.** `runtime/planMode.ts` withholds the writing tools from the provider *and* the loop refuses any write that arrives regardless. The second is not belt-and-braces: `run_terminal` has to stay available for inspection, so `sed -i`, `cat > file` and an inline script that opens a file for writing all reach the disk through a tool the first gate must keep. Deleting either one leaves a mode that only looks safe. The mode is a session property owned by `AgentController`, cycled with Tab, mirrored into the UI store for rendering, and deliberately never persisted — one that survived a restart would swallow the next session's first edit. The loop reads it once per turn, so a Tab mid-turn lands on the next turn.
+- **A provider client sends the tool list it was given, never `toolRegistery` directly.** `stream()`'s last parameter is that list, and plan mode narrows it; a client that reads the registry itself offers the model `edit_file` while the session is planning. The OpenAI client shipped doing exactly that — branched before the parameter existed, merged after, no textual conflict — so `packages/tests/config/offeredTools.test.ts` is driven by `enabledProviderIds()`: a new provider with no probe entry fails the coverage test rather than being quietly exempt. Arguments go through `config/toolSchema.ts`, which is the only copy of that mapping.
 - **Tool errors are returned to the agent as results**, not thrown out of the turn, so it can correct a bad path and retry. Only the iteration budget ends a turn. Write error messages for the model (`File <path> does not exist`, not `ENOENT`).
 - **Persistence drops tool traffic.** Only user and assistant messages are saved; half of a call/result pair would make restored history invalid for the provider.
 - **Config failures never block startup.** A corrupt `providers.json` is moved aside and defaults recreated; a malformed approval mode falls back to the default, never to permissive.
@@ -134,6 +135,36 @@ test, and touching approval. Each ends in the command that checks it. Read the
 matching one before starting that kind of work.
 
 Before you do any work, mention how you could verify that work — the test, command, or observation that would show it actually worked. If a change can't be verified, say so before making it.
+
+### Never call work finished without a green run in the tree as it stands now
+
+"Done", "shipped" and "verified" are claims about the working tree at the moment
+you say them, not about a run from earlier in the session. Before any of those
+words, run the suite and quote what it actually printed:
+
+```bash
+bun install                # if package.json or bun.lock moved since your last install
+bun run verify --all       # tsc + bun test + docs; the whole gate whatever changed
+```
+
+Three ways a green run goes stale underneath a claim, all of which have happened
+here:
+
+- **`node_modules` is stale.** A dependency landed on `main` and was never
+  installed locally, so every file that imports it fails with
+  `Cannot find package '<x>'`. Twenty-four tests went red this way and it reads
+  exactly like a code break. `bun install` first when `package.json` has moved.
+- **`main` moved after your branch went green.** Two branches that each pass CI
+  can merge into a red `main`: git merges them without a textual conflict while
+  one silently fails to honour a parameter the other added. CI tested each side,
+  never the merge. After a fetch, merge or rebase — or when `origin/main` is
+  ahead — re-run the gate against the merged tree before saying anything.
+- **A bare `bun run verify` on a fully staged tree** prints "nothing to check"
+  and exits 0. That is not a pass; see the note under Commands.
+
+If a check was skipped or could not run, say which one and why, rather than a
+sentence that implies a green run. A verification that is reported but not run is
+worse than none, because it stops anyone else from looking.
 
 Conventional commits (`feat(tools):`, `fix(runtime):`, …), TypeScript strict mode, small focused functions.
 

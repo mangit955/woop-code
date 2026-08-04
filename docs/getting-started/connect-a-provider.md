@@ -15,9 +15,8 @@ since: 0.6.0
 Woopcode needs an API key before it can do anything.
 
 :::note
-Google Gemini and Anthropic Claude both run. `openai` appears in
-`woopcode providers list` so you can see it is planned, but selecting it will
-not give you a working session.
+Google Gemini, OpenAI and Anthropic Claude all run. Any provider
+`woopcode providers list` shows will give you a working session.
 :::
 
 ## Get a key

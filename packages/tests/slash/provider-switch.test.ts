@@ -128,34 +128,46 @@ describe("provider slash commands update the running session", () => {
     expect((await getConfig()).defaultProvider).toBe("");
   });
 
-  test("/provider refuses a provider with no runtime client", async () => {
+  /**
+   * The provider is in providers.json — a config written by hand, or by a
+   * build that knew a provider this one does not. Being configured is checked
+   * before being runnable, so it has to be present to reach the registry gate
+   * at all, which is the gate under test.
+   */
+  test("/provider refuses a configured provider the registry cannot run", async () => {
     await saveConfig({
       defaultProvider: "google",
       selectedModel: "gemini-3.5-flash-lite",
       providers: {
         google: { type: "api", apiKey: "google-key" },
-        openai: { type: "api", apiKey: "openai-key" },
+        mistral: { type: "api", apiKey: "mistral-key" },
       },
     });
     const controller = createController();
 
     const output = await registry
       .get("provider")!
-      .execute(createContext(controller), ["openai"]);
+      .execute(createContext(controller), ["mistral"]);
 
-    expect(output).toContain("not supported yet");
+    expect(output).toContain("Unknown provider");
     expect(controller.calls).toHaveLength(0);
     expect((await getConfig()).defaultProvider).toBe("google");
   });
 
-  test("/login refuses a provider with no runtime client", async () => {
+  /**
+   * The registry check runs before the key is verified, so this resolves
+   * without touching the network. That ordering is the point: a refused
+   * provider must not cost a round trip, and a test that reached a real API
+   * would be slow and offline-fragile for no coverage.
+   */
+  test("/login refuses a provider the registry does not know", async () => {
     const controller = createController();
 
     const output = await registry
       .get("login")!
-      .execute(createContext(controller), ["openai", "sk-test"]);
+      .execute(createContext(controller), ["mistral", "sk-test"]);
 
-    expect(output).toContain("not supported yet");
+    expect(output).toContain("Unknown provider");
     expect(controller.calls).toHaveLength(0);
   });
 });

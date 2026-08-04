@@ -56,6 +56,7 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   google: DEFAULT_MODEL_ID,
   gemini: DEFAULT_MODEL_ID,
   anthropic: "claude-opus-5",
+  openai: "gpt-5.5",
 };
 
 export function allModels(): Model[] {

@@ -77,6 +77,7 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "marked": "^18.0.7",
+    "openai": "^7.4.0",
     "react": "^19.2.7",
     "simplex-noise": "^4.0.3"
   },

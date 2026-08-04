@@ -14,7 +14,6 @@ export async function loginProvider(provider: string, apiKey: string) {
     case "google":
     case "gemini":
       return verifyGemini(apiKey);
-    // Reachable once these flip to enabled in the registry.
     case "openai":
       return verifyOpenai(apiKey);
     case "anthropic":

@@ -54,7 +54,7 @@ describe("environment credentials", () => {
     expect(() =>
       resolveEnvCredentials({
         WOOPCODE_API_KEY: "k5",
-        WOOPCODE_PROVIDER: "openai",
+        WOOPCODE_PROVIDER: "mistral",
       }),
     ).toThrow(/no runtime client/);
   });
@@ -72,7 +72,7 @@ describe("environment credentials", () => {
     expect(() =>
       resolveEnvCredentials({
         WOOPCODE_API_KEY: "k6",
-        WOOPCODE_PROVIDER: "openai",
+        WOOPCODE_PROVIDER: "mistral",
       }),
     ).toThrow(/WOOPCODE_API_KEY.*WOOPCODE_PROVIDER/s);
   });
@@ -80,8 +80,18 @@ describe("environment credentials", () => {
   // A vendor variable is not an instruction to Woopcode. It is almost always
   // exported for another tool that shares the shell, and refusing to start
   // over it stranded users whose own key was already in providers.json.
-  test("a vendor key for an unrunnable provider does not stop startup", () => {
-    expect(resolveEnvCredentials({ OPENAI_API_KEY: "k8" })).toBeNull();
+  //
+  // Every vendor variable in the table now names a provider that runs, so the
+  // skip path has no live example left to test through this surface. What
+  // stays testable is the half that did the stranding: a vendor variable never
+  // throws, whoever it was meant for.
+  test("a vendor key never stops startup", () => {
+    expect(() => resolveEnvCredentials({ OPENAI_API_KEY: "k8" })).not.toThrow();
+    expect(resolveEnvCredentials({ OPENAI_API_KEY: "k8" })).toEqual({
+      provider: "openai",
+      apiKey: "k8",
+      source: "OPENAI_API_KEY",
+    });
   });
 
   // The other half of that rule: a vendor variable for a provider that *does*
@@ -95,7 +105,10 @@ describe("environment credentials", () => {
     });
   });
 
-  test("an unrunnable vendor key does not shadow a usable one", () => {
+  // The table is ordered, and the first variable present wins: a shell with
+  // several vendor keys exported resolves predictably rather than by whichever
+  // provider happens to be enabled in this build.
+  test("the first vendor key in precedence order wins", () => {
     expect(
       resolveEnvCredentials({
         OPENAI_API_KEY: "other-tool",

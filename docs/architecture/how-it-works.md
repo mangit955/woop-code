@@ -83,16 +83,25 @@ escape.
 `done`. Adding a provider means implementing that interface and enabling the
 entry in `config/providerRegistry.ts`; the loop above does not change.
 
-Google and Anthropic are enabled. `openai` is listed with `enabled: false` so
-the interface can show it as planned rather than pretending it works.
+Google, OpenAI and Anthropic are all enabled. `enabled: false` remains the way
+to list a provider the interface should show as planned rather than pretend
+works; nothing is in that state today.
 
-The two clients differ in more than their request shape. Anthropic requires the
-reasoning that preceded a tool call to come back with that call's result — the
-model pauses mid-response to await the tool, and resumes the same response — so
-`config/anthropicClient.ts` keeps those blocks for the length of a turn and
-replays them. Omitting them is not an error: the API runs that request without
-thinking instead, which costs quality with nothing in the response to show for
-it.
+The clients differ in more than their request shape. Both Anthropic and OpenAI
+have to send the reasoning that preceded a tool call back with that call's
+result, and both fail quietly if it is missing — the request is accepted and the
+model simply reasons from less than it had, with nothing in the response to show
+for it. So `config/anthropicClient.ts` and `config/openaiClient.ts` each keep
+those items for the length of a turn and replay them.
+
+The mechanics differ. Anthropic pauses mid-response to await the tool and
+resumes the same response, so a modified thinking block is rejected outright.
+OpenAI is stateless here by choice — `store: false`, because the conversation is
+rebuilt from `Message[]` every turn — so its reasoning items are replayed in the
+request input. Its one trap is where the item is read from: `encrypted_content`
+is populated on `response.output_item.done` and not on the `.added` that
+announces the same item, so a client that captures too early replays an empty
+husk.
 
 ## Tests
 

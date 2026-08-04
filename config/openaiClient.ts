@@ -3,7 +3,8 @@ import { toolRegistery } from "../tools";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import { thinkingBudget } from "./client";
 import { defaultModelForProvider } from "./modelCatalog";
-import type { Message, ProviderClient, StreamEvent, TokenUsage } from "./types";
+import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "./types";
+import { toolInputSchema } from "./toolSchema";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 /** Only the surface this client uses, so a test can supply a fake. */
@@ -78,8 +79,11 @@ export function openaiClient(
       repoContext: string,
       signal?: AbortSignal,
       useTools = true,
+      offeredTools: readonly Tool[] = toolRegistery,
     ): AsyncGenerator<StreamEvent> {
-      const tools = toolRegistery.map(toolSchema);
+      // Not the whole registry: plan mode narrows this, and a client that reads
+      // the registry directly silently offers writing tools while planning.
+      const tools = offeredTools.map(toolSchema);
 
       // Read once per turn, for the same reason the loop reads its own budgets
       // once: two requests of one turn should not assemble to different rules.
@@ -300,33 +304,19 @@ function describeFailure(error: unknown): unknown {
 /**
  * A tool's arguments as JSON Schema.
  *
- * A third copy of a mapping the other two clients each carry their own of. It
- * is deliberate only in that the shared version — `config/toolSchema.ts` —
- * lands on another branch; fold this onto it when the two meet, rather than
- * letting a third copy settle in.
+ * The mapping itself lives in `config/toolSchema.ts` — the two branches this
+ * file's own note anticipated have now met, so the third copy is folded onto the
+ * shared one rather than left to settle in. Only the envelope is OpenAI's.
  */
-function toolSchema(tool: (typeof toolRegistery)[number]): OpenAI.Responses.FunctionTool {
+function toolSchema(tool: Tool): OpenAI.Responses.FunctionTool {
   return {
     type: "function",
     name: tool.name,
     description: tool.description,
-    parameters: {
-      type: "object",
-      properties: Object.fromEntries(
-        tool.parameters.map((param) => [
-          param.name,
-          {
-            type: param.type ?? "string",
-            description: param.description,
-            // The registry says "array" without saying of what; every array
-            // parameter in it is a list of strings, and JSON Schema requires
-            // the item type be stated.
-            ...(param.type === "array" ? { items: { type: "string" } } : {}),
-          },
-        ]),
-      ),
-      required: tool.parameters.filter((param) => param.required).map((param) => param.name),
-    },
+    // The SDK types `parameters` as an open record, so a closed interface does
+    // not satisfy it. Cast at the boundary rather than opening ours up, which
+    // would let a typo through everywhere else the schema is used.
+    parameters: toolInputSchema(tool) as unknown as Record<string, unknown>,
     // The registry marks optional parameters, and strict mode requires every
     // property be required. Enforcing it would make every optional argument
     // mandatory, so validation stays with the tools, which report to the model.

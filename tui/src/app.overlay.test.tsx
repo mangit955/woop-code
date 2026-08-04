@@ -105,6 +105,21 @@ function mount() {
   return { stdout, stdin, unmount: () => instance.unmount() };
 }
 
+/**
+ * Wait for the frame to contain what the test is about, rather than for a fixed
+ * duration. The 1000-item transcript took 83–117ms to draw against the old 120ms
+ * sleep, so a loaded CI runner read a half-drawn frame and went red.
+ */
+async function waitForFrame(app: { stdout: Capture }, needle: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (app.stdout.text().includes(needle)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`no ${JSON.stringify(needle)} in the frame after 10s`);
+}
+
+/** Only for asserting something did *not* happen, where there is no frame to wait for. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 120));
 const TRANSCRIPT = "explain the readme";
 
@@ -118,7 +133,7 @@ describe("dialogs float over the app", () => {
   test("keeps the transcript on screen behind the model picker", async () => {
     const app = mount();
     store.openModelPicker();
-    await settle();
+    await waitForFrame(app, "Select model");
 
     // Before, the dialog replaced the main content and the screen went black.
     expect(app.stdout.text()).toContain(TRANSCRIPT);
@@ -133,7 +148,7 @@ describe("dialogs float over the app", () => {
       command: "bun test",
       toolName: "run_tests",
     });
-    await settle();
+    await waitForFrame(app, "Run tests");
 
     expect(app.stdout.text()).toContain(TRANSCRIPT);
     expect(app.stdout.text()).toContain("Run tests");
@@ -146,7 +161,7 @@ describe("dialogs float over the app", () => {
   test("keeps the transcript on screen behind a question", async () => {
     const app = mount();
     const answer = store.setPendingQuestion({ id: "q-1", questions: ["Which database?"] });
-    await settle();
+    await waitForFrame(app, "Which database?");
 
     expect(app.stdout.text()).toContain(TRANSCRIPT);
     expect(app.stdout.text()).toContain("Which database?");
@@ -159,7 +174,7 @@ describe("dialogs float over the app", () => {
   test("draws the background faded and the panel lit", async () => {
     const app = mount();
     store.openModelPicker();
-    await settle();
+    await waitForFrame(app, "Select model");
 
     const emitted = app.stdout.foregrounds();
     // Both palettes on screen at once is the whole point: dimmed behind, lit in
@@ -171,7 +186,7 @@ describe("dialogs float over the app", () => {
 
   test("uses only the lit palette when no dialog is open", async () => {
     const app = mount();
-    await settle();
+    await waitForFrame(app, TRANSCRIPT);
 
     const emitted = app.stdout.foregrounds();
     expect(emitted).toContain(colors.textBase);
@@ -228,7 +243,9 @@ describe("a chord never answers the diff", () => {
   test("Ctrl+A leaves the edit pending instead of applying it", async () => {
     const app = mount();
     leaveUnanswered("ctrl-a");
-    await settle();
+    // The diff has to be on screen before the key is pressed, or there is no
+    // mounted handler to ignore it and the assertion below passes for no reason.
+    await waitForFrame(app, "notes.txt");
 
     app.stdin.press(CTRL_A);
     await settle();
@@ -241,7 +258,7 @@ describe("a chord never answers the diff", () => {
   test("Ctrl+R leaves the edit pending instead of rejecting it", async () => {
     const app = mount();
     leaveUnanswered("ctrl-r");
-    await settle();
+    await waitForFrame(app, "notes.txt");
 
     app.stdin.press(CTRL_R);
     await settle();
@@ -254,7 +271,7 @@ describe("a chord never answers the diff", () => {
   test("Enter still applies the edit", async () => {
     const app = mount();
     const decision = store.setPendingEdit(pendingEdit("enter"));
-    await settle();
+    await waitForFrame(app, "notes.txt");
 
     app.stdin.press(ENTER);
 
@@ -266,7 +283,7 @@ describe("a chord never answers the diff", () => {
   test("Esc still rejects the edit", async () => {
     const app = mount();
     const decision = store.setPendingEdit(pendingEdit("esc"));
-    await settle();
+    await waitForFrame(app, "notes.txt");
 
     app.stdin.press(ESC);
 
@@ -310,7 +327,8 @@ describe("the diff owns the screen while it is being judged", () => {
 
       const app = mount();
       const decision = store.setPendingEdit(longEdit());
-      await settle();
+      // The 1000-item case is the one that overran a fixed sleep on CI.
+      await waitForFrame(app, "added line 0");
 
       const frame = app.stdout.text();
       expect(frame).toContain("runtime/loop.ts");

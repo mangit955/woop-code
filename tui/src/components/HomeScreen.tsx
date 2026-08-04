@@ -13,10 +13,8 @@ export interface HomeScreenData {
   subtitle: string;
   promptExamples: readonly string[];
   capabilities: readonly string[];
-  repository: string;
   branch: string;
   providerName: string;
-  provider: string;
 }
 
 export interface HomeScreenProps extends HomeScreenData {
@@ -35,9 +33,6 @@ export function HomeScreen({
   subtitle,
   promptExamples,
   capabilities,
-  repository,
-  branch,
-  provider,
   renderPrompt,
   paletteOpen = false,
 }: HomeScreenProps) {

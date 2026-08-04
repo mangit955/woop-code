@@ -1,7 +1,6 @@
 import { Box } from "ink";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { colors } from "../styles/theme";
 
 const PLACEHOLDER_ROTATION_MS = 3500;
 const TYPEWRITER_FRAME_MS = 24;

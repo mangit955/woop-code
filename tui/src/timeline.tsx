@@ -17,7 +17,6 @@ import { TodoList } from "./components/TodoList";
 
 interface TimelineProps {
   items: TimeLineItem[];
-  isThinking: boolean;
   activeTurn: ActiveTurn | null;
 }
 
@@ -33,7 +32,7 @@ interface TimelineProps {
  */
 const MAX_RENDERED_ITEMS = 300;
 
-export function Timeline({ items, isThinking, activeTurn }: TimelineProps) {
+export function Timeline({ items, activeTurn }: TimelineProps) {
   return (
     <Box flexDirection="column" flexShrink={0}>
       <TimelineHistory items={items} />

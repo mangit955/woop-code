@@ -1,5 +1,4 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import React from "react";
 import chalk from "chalk";
 import { render } from "ink";
 import { Writable } from "node:stream";

@@ -1,5 +1,4 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import React from "react";
 import { render } from "ink";
 import { Writable } from "node:stream";
 import { EventEmitter } from "node:events";
@@ -60,10 +59,8 @@ const homeScreen: HomeScreenData = {
   subtitle: "AI software engineering agent",
   promptExamples: ["Explain this repository"],
   capabilities: ["Build"],
-  repository: "woop-code",
   branch: "main",
   providerName: "Gemini",
-  provider: "Gemini 2.5 Flash Lite",
 };
 
 function mountApp({ busy }: { busy: boolean }) {

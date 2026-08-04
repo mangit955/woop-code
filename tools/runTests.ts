@@ -1,5 +1,4 @@
 import type { Tool } from "../config/types";
-import { store } from "../tui/src/store/ui-store";
 import { formatCommandResult, runCommand } from "./command";
 import { requestCommandApproval } from "./approval";
 

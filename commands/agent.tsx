@@ -4,7 +4,7 @@ import type { AgentCallbacks, TurnSummary } from "../config/types";
 import { App, store } from "../tui/src";
 import { render } from "ink";
 import { AgentController } from "./agentController";
-import { ACTIVE_PROVIDER_MODELS, DEFAULT_MODEL_ID, getModelDisplayName } from "../providers/client";
+import { DEFAULT_MODEL_ID } from "../providers/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
 import { registerCommands } from "./slash";
@@ -317,7 +317,7 @@ async function runInteractive(modelOverride?: string) {
   };
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
   await controller.initialize();
-  const homeScreen = await buildHomeScreen(provider, selectedModel);
+  const homeScreen = await buildHomeScreen(provider);
 
   const customStdin = new PassThrough() as any;
   customStdin.ref = () => {
@@ -437,9 +437,7 @@ async function runInteractive(modelOverride?: string) {
   });
 }
 
-async function buildHomeScreen(provider: string, model: string): Promise<HomeScreenData> {
-  const repository =
-    process.cwd().split("/").filter(Boolean).at(-1) ?? "workspace";
+async function buildHomeScreen(provider: string): Promise<HomeScreenData> {
   const branch = await getBranch();
   const providerLabel = provider === "google" ? "Gemini" : titleCase(provider);
 
@@ -464,13 +462,8 @@ async function buildHomeScreen(provider: string, model: string): Promise<HomeScr
       "Test",
       "Document",
     ],
-    repository,
     branch,
     providerName: providerLabel,
-    // getModelDisplayName resolves through the whole catalog now, so every
-    // provider's models name themselves; the Google-only branch this replaced
-    // fell back to a hardcoded label for anything else.
-    provider: getModelDisplayName(model) ?? providerLabel,
   };
 }
 

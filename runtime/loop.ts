@@ -1,5 +1,4 @@
 import { getTool, toolRegistry } from "../tools";
-import { classifyCommand, commandOf, toolEffect } from "./toolEffects";
 import { blockedInPlanMode, planModeRefusal, planModeTools } from "./planMode";
 import { isRetryableError } from "./retry";
 import { compactToolHistory, toolHistoryBudget } from "./compaction";

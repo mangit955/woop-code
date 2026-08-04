@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box } from "ink";
 import type { Token } from "marked";
 import { lexMarkdown } from "../markdown-lexer";
 import { Markdown } from "./Markdown";

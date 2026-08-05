@@ -3,9 +3,14 @@ import TextInput from "ink-text-input";
 import { useState } from "react";
 import type { PendingQuestion } from "../types";
 import { store } from "../store/ui-store";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
+import { planLayout } from "../layout";
+import { useTerminalSize } from "../hooks/useTerminalSize";
 
 export function QuestionDialog({ question }: { question: PendingQuestion }) {
+  const colors = usePalette();
+  const { width, height } = useTerminalSize();
+  const layout = planLayout(width, height);
   const [index, setIndex] = useState(0);
   const [value, setValue] = useState("");
   const [answers, setAnswers] = useState<string[]>([]);
@@ -32,9 +37,9 @@ export function QuestionDialog({ question }: { question: PendingQuestion }) {
       <Box
         flexDirection="column"
         width="80%"
-        borderStyle="single"
-        borderColor={colors.primary}
-        backgroundColor="#101010"
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
+        backgroundColor={colors.bgElevated}
         paddingX={1}
       >
         <Text bold color={colors.primary}>Question {index + 1} of {question.questions.length}</Text>

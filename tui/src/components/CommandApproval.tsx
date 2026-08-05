@@ -41,7 +41,9 @@ export function CommandApproval({ command }: { command: PendingCommand }) {
         width={layout.dialogWidth}
         paddingX={layout.dialogWidth < 40 ? 1 : 3}
         paddingY={1}
-        backgroundColor="#101010"
+        backgroundColor={colors.bgElevated}
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>
@@ -51,7 +53,7 @@ export function CommandApproval({ command }: { command: PendingCommand }) {
         </Box>
 
         {/* The command itself, as it will be run. */}
-        <Box paddingX={1} backgroundColor="#1a1a1a" flexShrink={0}>
+        <Box paddingX={1} backgroundColor={colors.bgInset} flexShrink={0}>
           <Text color={colors.textFaint}>{"$ "}</Text>
           <Box flexShrink={1} minWidth={0}>
             <Text color={colors.textBase} wrap="truncate-end">

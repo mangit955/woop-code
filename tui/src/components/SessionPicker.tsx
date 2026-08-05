@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listSessions, type SessionSummary } from "../../../config/sessions";
 import type { AgentController } from "../../../commands/agentController";
 import { store } from "../store/ui-store";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 import { planLayout, windowAround } from "../layout";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 import { relativeTime } from "../relative-time";
@@ -14,6 +14,7 @@ interface SessionPickerProps {
 }
 
 export function SessionPicker({ controller }: SessionPickerProps) {
+  const colors = usePalette();
   const [query, setQuery] = useState("");
   const [showCursor, setShowCursor] = useState(true);
   const [switching, setSwitching] = useState(false);
@@ -142,7 +143,9 @@ export function SessionPicker({ controller }: SessionPickerProps) {
         width={layout.dialogWidth}
         paddingX={layout.dialogWidth < 40 ? 1 : 3}
         paddingY={1}
-        backgroundColor="#101010"
+        backgroundColor={colors.bgElevated}
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>Resume session</Text>
@@ -187,15 +190,15 @@ export function SessionPicker({ controller }: SessionPickerProps) {
                   <Box
                     key={session.id}
                     paddingX={1}
-                    backgroundColor={selected ? "#fb923c" : undefined}
+                    backgroundColor={selected ? colors.selectionBg : undefined}
                   >
-                    <Text color={selected ? "#000000" : colors.textMuted}>
+                    <Text color={selected ? colors.selectionFg : colors.textMuted}>
                       {session.id === activeId ? "● " : selected ? "› " : "  "}
                     </Text>
                     <Box flexShrink={1} minWidth={0}>
                       <Text
                         bold={selected}
-                        color={selected ? "#000000" : colors.textBase}
+                        color={selected ? colors.selectionFg : colors.textBase}
                         wrap="truncate-end"
                       >
                         {label}
@@ -203,7 +206,7 @@ export function SessionPicker({ controller }: SessionPickerProps) {
                     </Box>
                     <Box flexGrow={1} />
                     {layout.dialogWidth >= 40 && (
-                      <Text color={selected ? "#000000" : colors.textFaint}>
+                      <Text color={selected ? colors.selectionFg : colors.textFaint}>
                         {relativeTime(session.updated)}
                       </Text>
                     )}

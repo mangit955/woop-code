@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { usePalette } from "../styles/palette";
 import { useClock } from "../hooks/useClock";
-import type { Palette } from "../styles/theme";
+import { primaryRamp, type Palette } from "../styles/theme";
 import { getModelDisplayName } from "../../../providers/client";
 import type { TurnIdentity, TurnOutcome } from "../types";
 import { planLayout } from "../layout";
@@ -17,8 +17,18 @@ import { useTerminalSize } from "../hooks/useTerminalSize";
  */
 const PULSE_EVERY_FRAMES = 2;
 
-/** Breathes the marker while the turn is in flight. */
-const pulseColors = ["#453B82", "#7263CE", "#8F83E0", "#ACA3EC", "#8F83E0", "#7263CE"] as const;
+/**
+ * Breathes the marker while the turn is in flight: up the theme's accent ramp
+ * and back down, so the pulse cannot drift away from the spinner beside it.
+ */
+const pulseColors = [
+  primaryRamp[5],
+  primaryRamp[3],
+  primaryRamp[2],
+  primaryRamp[1],
+  primaryRamp[2],
+  primaryRamp[3],
+] as const;
 
 /**
  * Takes the palette as an argument so it fades with the layer it renders in.

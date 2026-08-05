@@ -6,9 +6,18 @@ import { useTerminalSize } from "./hooks/useTerminalSize";
 interface HeaderProps {
   branch: string;
   provider: string;
+  /**
+   * True while the home screen is showing the ASCII wordmark.
+   *
+   * The header then drops its own "Woopcode / coding agent", which was printing
+   * the app's name in small type directly above the same name in six-row figlet.
+   * The branch and provider stay — those are the only things the header says
+   * that the wordmark does not.
+   */
+  wordmarkShowing?: boolean;
 }
 
-export function Header({ branch, provider }: HeaderProps) {
+export function Header({ branch, provider, wordmarkShowing = false }: HeaderProps) {
   const colors = usePalette();
 
   const { width, height } = useTerminalSize();
@@ -20,13 +29,17 @@ export function Header({ branch, provider }: HeaderProps) {
   return (
     <Box justifyContent="space-between" width="100%" flexWrap="nowrap">
       <Box flexShrink={1} minWidth={0}>
-        <Text bold color={colors.primary} wrap="truncate-end">
-          Woopcode
-        </Text>
-        {layout.showHeaderTagline && (
-          <Text color={colors.textMuted} wrap="truncate-end">
-            {" / coding agent"}
-          </Text>
+        {!wordmarkShowing && (
+          <>
+            <Text bold color={colors.primary} wrap="truncate-end">
+              Woopcode
+            </Text>
+            {layout.showHeaderTagline && (
+              <Text color={colors.textMuted} wrap="truncate-end">
+                {" / coding agent"}
+              </Text>
+            )}
+          </>
         )}
       </Box>
 

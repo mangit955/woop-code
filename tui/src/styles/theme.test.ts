@@ -10,19 +10,25 @@ import {
 
 describe("colour dimming", () => {
   test("moves a colour toward the terminal background", () => {
-    // #e5e5e5 at 0.6 toward #0a0a0a lands on #626262.
-    expect(dimHex("#e5e5e5")).toBe("#626262");
-    expect(dimHex("#a3a3a3")).toBe("#474747");
+    // #e5e5e5 at 0.6 toward #000000 lands on #5c5c5c.
+    expect(dimHex("#e5e5e5")).toBe("#5c5c5c");
+    expect(dimHex("#a3a3a3")).toBe("#414141");
   });
 
   test("respects the endpoints", () => {
     expect(dimHex("#3b82f6", 0)).toBe("#3b82f6");
-    expect(dimHex("#3b82f6", 1)).toBe(colors.bgBase);
+    expect(dimHex("#3b82f6", 1)).toBe(colors.bgCanvas);
   });
 
   test("clamps an out-of-range amount instead of overshooting", () => {
     expect(dimHex("#3b82f6", -1)).toBe("#3b82f6");
-    expect(dimHex("#3b82f6", 5)).toBe(colors.bgBase);
+    expect(dimHex("#3b82f6", 5)).toBe(colors.bgCanvas);
+  });
+
+  test("fades toward the colour the app actually paints", () => {
+    // Not bgBase. Fading toward a surface that is never drawn leaves every
+    // dimmed layer a shade brighter than the background behind it.
+    expect(dimHex("#ffffff", 1)).toBe("#000000");
   });
 
   test("expands shorthand hex", () => {

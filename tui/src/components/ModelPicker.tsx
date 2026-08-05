@@ -5,7 +5,7 @@ import { getConfig, saveConfig } from "../../../config/config";
 import { allModels, isRunnable, providerLabel } from "../../../providers/modelCatalog";
 import type { AgentController } from "../../../commands/agentController";
 import { store } from "../store/ui-store";
-import { colors } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 import { planLayout, windowAround } from "../layout";
 import { useTerminalSize } from "../hooks/useTerminalSize";
 import { applyModelSelection } from "../model-selection";
@@ -16,6 +16,7 @@ interface ModelPickerProps {
 }
 
 export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
+  const colors = usePalette();
   const [query, setQuery] = useState("");
   const [showCursor, setShowCursor] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,7 +114,9 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
         width={layout.dialogWidth}
         paddingX={layout.dialogWidth < 40 ? 1 : 3}
         paddingY={1}
-        backgroundColor="#101010"
+        backgroundColor={colors.bgElevated}
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>Select model</Text>
@@ -147,16 +150,16 @@ export function ModelPicker({ controller, selectedModel }: ModelPickerProps) {
                 const index = visible.start + offset;
                 const selected = index === selectedIndex;
                 return (
-                  <Box key={model.id} paddingX={1} backgroundColor={selected ? "#fb923c" : undefined}>
-                    <Text color={selected ? "#000000" : colors.textMuted}>{selected ? "● " : "  "}</Text>
+                  <Box key={model.id} paddingX={1} backgroundColor={selected ? colors.selectionBg : undefined}>
+                    <Text color={selected ? colors.selectionFg : colors.textMuted}>{selected ? "● " : "  "}</Text>
                     <Box flexShrink={1} minWidth={0}>
-                      <Text bold={selected} color={selected ? "#000000" : colors.textBase} wrap="truncate-end">
+                      <Text bold={selected} color={selected ? colors.selectionFg : colors.textBase} wrap="truncate-end">
                         {model.name}
                       </Text>
                     </Box>
                     <Box flexGrow={1} />
                     {layout.dialogWidth >= 40 && (
-                      <Text color={selected ? "#000000" : colors.textFaint}>
+                      <Text color={selected ? colors.selectionFg : colors.textFaint}>
                         {providerLabel(model.provider)}
                       </Text>
                     )}

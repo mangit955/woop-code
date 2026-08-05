@@ -70,7 +70,7 @@ function StatusIcon({ status }: { status: StatusState }) {
   if (status === "thinking" || status === "tool") {
     return <StatusSpinner />;
   }
-  if (status === "ready") return <Text color="green">●</Text>;
+  if (status === "ready") return <Text color={colors.successBase}>●</Text>;
   if (status === "error") return <Text color={colors.dangerBase}>●</Text>;
   // cancelled
   return <Text color={colors.textMuted}>●</Text>;

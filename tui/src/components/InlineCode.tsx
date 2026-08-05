@@ -1,23 +1,18 @@
 import { Text } from "ink";
-import { useDimmed } from "../styles/palette";
-import { dimHex } from "../styles/theme";
+import { usePalette } from "../styles/palette";
 
 interface InlineCodeProps {
   text: string;
 }
 
-const CODE_COLOR = "#7fd88f";
-const CODE_BACKGROUND = "#1e1e1e";
-
 export function InlineCode({ text }: InlineCodeProps) {
-  // Its own colours rather than the theme's, so they need fading explicitly.
-  const dimmed = useDimmed();
+  // Read through the palette rather than from two module constants of its own,
+  // which is what removes the manual dimHex this used to need: behind a dialog
+  // the span now fades with everything around it.
+  const colors = usePalette();
 
   return (
-    <Text
-      color={dimmed ? dimHex(CODE_COLOR) : CODE_COLOR}
-      backgroundColor={dimmed ? dimHex(CODE_BACKGROUND) : CODE_BACKGROUND}
-    >
+    <Text color={colors.accent} backgroundColor={colors.bgCode}>
       {` ${text} `}
     </Text>
   );

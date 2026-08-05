@@ -95,6 +95,7 @@ function renderComposer() {
       placeholder="Find duplicate code"
       onValueChange={() => {}}
       modelName="Gemini 3.5 Flash Lite"
+      providerName="Anthropic"
       variant="block"
       showProvider
       inputActive
@@ -141,6 +142,23 @@ describe("the composer card", () => {
       // block would read as a different component.
       expect(line[1]).not.toBe("│");
     }
+
+    composer.unmount();
+  });
+
+  test("names the provider it was given, not a hardcoded one", async () => {
+    // The meta row read `<Text> Google</Text>`: the prop was accepted and
+    // ignored, so the composer claimed Google on Anthropic and OpenAI alike —
+    // and with no separator, which ran it into the model name as
+    // "Gemini 3.5 Flash Lite Google".
+    const composer = renderComposer();
+    await settle();
+
+    const meta = composer.stdout.lines().at(-1)!;
+
+    expect(meta).toContain("Anthropic");
+    expect(meta).not.toContain("Google");
+    expect(meta).toContain("Gemini 3.5 Flash Lite · Anthropic");
 
     composer.unmount();
   });

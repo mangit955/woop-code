@@ -51,13 +51,25 @@ export function rendersItself(name: string) {
   return SELF_RENDERING_TOOLS.includes(name);
 }
 
-export function toolGlyph(name: string) {
-  if (SEARCH_TOOLS.includes(name)) return "*";
-  if (READ_TOOLS.includes(name)) return "→";
-  if (WRITE_TOOLS.includes(name)) return "±";
-  if (RUN_TOOLS.includes(name)) return "$";
-  if (name === "ask_user") return "?";
-  return "•";
+/**
+ * The mark in a settled tool call's rail.
+ *
+ * One mark for every kind, deliberately. This returned five — `*` for a search,
+ * `→` for a read, `±` for a write, `$` for a run, `•` for anything else — which
+ * put ASCII punctuation, an arrow and a maths operator in the same column of the
+ * same list, alongside the `⊘`, `✗`, `▪` and `⊙` used elsewhere. Nine families
+ * of mark on one screen reads as clutter, not as information.
+ *
+ * Nothing is lost: the row already names the tool beside the glyph, and "Read"
+ * says what `→` was meant to. Marks are kept for the three things a glyph is
+ * genuinely better at than a word — running, blocked, failed — where the state
+ * is not otherwise written anywhere on the row. `ToolStatus` owns those.
+ *
+ * Still a function of the name so this stays the one place the rule lives, and
+ * so a tool that earns a mark of its own has somewhere to declare it.
+ */
+export function toolGlyph(_name: string) {
+  return "·";
 }
 
 export function toolLabel(name: string) {

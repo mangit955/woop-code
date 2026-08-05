@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import chalk from "chalk";
 import { render } from "ink";
 import { Writable } from "node:stream";
+import { EventEmitter } from "node:events";
 import { Timeline } from "./timeline";
 import { TRANSCRIPT_GUTTER } from "./layout";
 import type { TimeLineItem } from "./types";
@@ -40,6 +41,18 @@ class Capture extends Writable {
     }
     return [];
   }
+}
+
+/** Ink puts stdin in raw mode when interactive; the timeline reads no input. */
+class FakeStdin extends EventEmitter {
+  isTTY = true;
+  setRawMode() { return this; }
+  setEncoding() { return this; }
+  resume() { return this; }
+  pause() { return this; }
+  read() { return null; }
+  ref() {}
+  unref() {}
 }
 
 const STARTED = 1_700_000_000_000;
@@ -93,11 +106,27 @@ const items: TimeLineItem[] = [
   },
 ] as TimeLineItem[];
 
+/**
+ * `interactive: true` is load-bearing, and its absence is invisible locally.
+ *
+ * Ink decides interactivity as `interactive ?? (!isInCi && stdout.isTTY)`. The
+ * capture above reports `isTTY`, so on a developer machine the frame is written
+ * on every render and reading it before unmount works. Under CI the `isInCi`
+ * half flips, ink batches, and nothing reaches the stream until unmount — so
+ * every assertion here saw an empty frame and all four tests failed on both
+ * runners while passing locally, including under the reverse-order sweep and
+ * four concurrent suites. Passing the flag explicitly short-circuits the `??`
+ * and makes the harness say what it means. `prompt.shape.test.tsx` already did
+ * this; reproduce with `CI=true bun test`.
+ */
 function renderTimeline() {
   const stdout = new Capture();
   const instance = render(<Timeline items={items} activeTurn={null} />, {
     stdout: stdout as unknown as NodeJS.WriteStream,
+    stdin: new FakeStdin() as unknown as NodeJS.ReadStream,
     patchConsole: false,
+    exitOnCtrlC: false,
+    interactive: true,
   });
   const lines = stdout.lines();
   instance.unmount();

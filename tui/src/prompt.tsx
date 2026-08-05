@@ -198,7 +198,6 @@ export function Prompt({
     // neither is a prompt the user would want ↑ to bring back.
     history.current.push(prompt);
 
-    // 🔥 Slash command interception
     const context = {
       controller,
       onExit,
@@ -207,6 +206,8 @@ export function Prompt({
       },
     };
 
+    // Every slash command, `/exit` included, is resolved by the registry. What
+    // reaches the agent below is what the registry did not claim.
     const result = await handleSlashCommand(prompt, context);
 
     if (result.handled) {
@@ -214,20 +215,13 @@ export function Prompt({
       return;
     }
 
-    // Original flow
-    if (prompt === "/exit") {
-      await onExit();
-      return;
-    }
-
     onValueChange("");
-    
-    // Run the agent with error handling to keep app alive
+
     try {
       await controller.run(prompt);
     } catch (error) {
-      // Error already displayed via callbacks.onError
-      // Just catch it here to prevent app crash
+      // The failure has already been rendered by callbacks.onError. Swallowed
+      // here only so a provider error cannot unmount the app mid-session.
       if (process.env.DEBUG) {
         console.error("Prompt handler caught error:", error);
       }

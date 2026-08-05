@@ -1,11 +1,18 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach, afterAll, mock } from "bun:test";
 import { AgentController } from "../../../commands/agentController";
 import {
-  getConversation,
   MAX_PERSISTED_MESSAGES,
   prepareConversationForDisk,
-  saveConversation,
 } from "../../../config/config";
+import {
+  createSession,
+  latestSession,
+  loadSession,
+  projectRoot,
+  projectSlug,
+  resetSessionStoreForTests,
+  saveSession,
+} from "../../../config/sessions";
 import { MockProviderClient, CallbackSpy } from "../shared/mocks";
 import {
   createTextEvent,
@@ -40,6 +47,34 @@ afterAll(() => {
   }
   rmSync(temporaryConfigHome, { recursive: true, force: true });
 });
+
+/**
+ * What a fresh controller would restore in this project.
+ *
+ * History is now a session rather than one global file, so "what is on disk"
+ * means the newest session here. These two helpers stand in for the
+ * `getConversation`/`saveConversation` pair the file was written against, so
+ * every assertion below keeps meaning exactly what it meant.
+ */
+async function getConversation(): Promise<Message[]> {
+  const latest = await latestSession();
+  if (!latest) return [];
+  return (await loadSession(latest.id, latest.slug))?.messages ?? [];
+}
+
+/** Replaces this project's history with `messages`, or clears it when empty. */
+async function saveConversation(messages: Message[]): Promise<void> {
+  rmSync(joinPath(temporaryConfigHome, "woopcode", "sessions", projectSlug(projectRoot())), {
+    recursive: true,
+    force: true,
+  });
+  resetSessionStoreForTests();
+
+  if (messages.length === 0) return;
+
+  const session = await createSession();
+  await saveSession({ ...session, messages });
+}
 
 /**
  * End-to-End Persistence Workflow Tests
@@ -93,6 +128,91 @@ mock.module("../../../providers/client", () => ({
   },
 }));
 
+
+describe("E2E Persistence - Adopting migrated history", () => {
+  test("a turn taken in migrated history moves it into this project", async () => {
+    // Migrated history belongs to no project. Working in it here should make it
+    // this project's, or an hour's work stays in the `legacy` bucket and is
+    // absent from the list of the repository it actually happened in.
+    const { migrateLegacyConversation, listSessions, LEGACY_SLUG } = await import(
+      "../../../config/sessions"
+    );
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+
+    const configDir = joinPath(temporaryConfigHome, "woopcode");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      joinPath(configDir, "conversation.json"),
+      JSON.stringify([{ role: "user", content: "legacy work" }]),
+    );
+    resetSessionStoreForTests();
+    const imported = (await migrateLegacyConversation())!;
+    expect(imported.cwd).toBeNull();
+
+    mockClient = new MockProviderClient([
+      createTextEvent("continuing that work"),
+      createDoneEvent(),
+    ]);
+
+    const controller = new AgentController("test", "key", new CallbackSpy());
+    await controller.initialize({ sessionRef: imported.id });
+    await controller.run("carry on");
+    await controller.dispose();
+
+    const scoped = await listSessions();
+    expect(scoped.map((session) => session.id)).toContain(imported.id);
+
+    const all = await listSessions({ scope: "all" });
+    const rows = all.filter((session) => session.id === imported.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.slug).not.toBe(LEGACY_SLUG);
+
+    // And the original conversation is still in it.
+    expect(
+      controller
+        .currentSession()!
+        .messages.some((message) => message.role === "user" && message.content === "legacy work"),
+    ).toBe(true);
+  });
+});
+
+describe("E2E Persistence - Two windows on one session", () => {
+  test("a second window branches rather than overwriting the first's turn", async () => {
+    // Two terminals in one repository both continue the newest session. Each
+    // writes the whole record, so the later save used to discard the earlier
+    // turn outright — the single conversation file did this too. Now the
+    // clobber is detected and this turn is kept under a new id.
+    const { listSessions } = await import("../../../config/sessions");
+    await saveConversation([]);
+
+    mockClient = new MockProviderClient([createTextEvent("A"), createDoneEvent()]);
+    const windowA = new AgentController("test", "key", new CallbackSpy());
+    await windowA.initialize();
+    await windowA.run("from window A");
+
+    mockClient = new MockProviderClient([createTextEvent("B"), createDoneEvent()]);
+    const windowB = new AgentController("test", "key", new CallbackSpy());
+    await windowB.initialize();
+
+    // A takes another turn, moving the record on disk underneath B.
+    mockClient = new MockProviderClient([createTextEvent("A again"), createDoneEvent()]);
+    await windowA.run("A again");
+
+    mockClient = new MockProviderClient([createTextEvent("B"), createDoneEvent()]);
+    await windowB.run("from window B");
+
+    const everything = await listSessions();
+    const allMessages = [];
+    for (const summary of everything) {
+      const record = await loadSession(summary.id, summary.slug);
+      allMessages.push(...record!.messages.map((message: any) => message.content));
+    }
+
+    // Neither window's work is gone.
+    expect(allMessages).toContain("A again");
+    expect(allMessages).toContain("from window B");
+  });
+});
 
 describe("E2E Persistence - Save and Load", () => {
   let originalConversation: Message[];

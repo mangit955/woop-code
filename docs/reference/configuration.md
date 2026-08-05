@@ -21,12 +21,14 @@ The directory is created on first run.
 
 | File | Contents |
 | --- | --- |
-| `providers.json` | Provider keys, the default provider, the selected model, the approval mode |
-| `conversation.json` | Saved conversation history |
+| `providers.json` | Provider keys, the default provider, the selected model, the approval mode, session retention |
+| `sessions/` | Saved conversations, one directory per project |
 | `models.json` | The model list |
 
 Configuration is global, not per-repository. Conversation history is the one
-thing scoped to where you are working.
+thing scoped to where you are working: it lives under
+`sessions/<project>/<session-id>.json`, keyed by the repository root. See
+[Sessions & history](/docs/guides/sessions-and-history).
 
 ## `providers.json`
 
@@ -35,6 +37,7 @@ thing scoped to where you are working.
   "defaultProvider": "google",
   "selectedModel": "gemini-3.6-flash",
   "approvalMode": "auto-read-only",
+  "retentionDays": 30,
   "providers": {
     "google": { "type": "api", "apiKey": "..." }
   }
@@ -46,6 +49,7 @@ thing scoped to where you are working.
 | `defaultProvider` | `string` | `"google"` | Which provider a session starts with |
 | `selectedModel` | `string` | first model of the provider | Model id, as listed by `woopcode models` |
 | `approvalMode` | `string` | `"auto-read-only"` | One of the four [approval modes](/docs/guides/approval-modes) |
+| `retentionDays` | `number` | `30` | Days a session survives after its last turn; `0` keeps them forever |
 | `providers` | `object` | three entries | Keyed by provider id |
 | `providers.<id>.type` | `string` | `"api"` | How the provider authenticates |
 | `providers.<id>.apiKey` | `string` | `""` | The stored key |
@@ -71,7 +75,7 @@ widen what runs without asking.
 
 ## When the file is corrupt
 
-A `providers.json` or `conversation.json` that is not valid JSON — a truncated
+A `providers.json` or a session file that is not valid JSON — a truncated
 write, a bad hand edit — is moved aside rather than crashing every command that
 touches it:
 
@@ -168,5 +172,5 @@ rather than honoured.
 
 - [Configuring providers](/docs/guides/configuring-providers) — the task, not
   the schema
-- [Sessions & history](/docs/guides/sessions-and-history) — what
-  `conversation.json` holds
+- [Sessions & history](/docs/guides/sessions-and-history) — what a session
+  holds, and how to resume one

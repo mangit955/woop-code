@@ -9,6 +9,7 @@ import { HomeScreen, type HomeScreenData } from "./components/HomeScreen";
 import { DiffPreview } from "./components/DiffPreview";
 import { ModelPicker } from "./components/ModelPicker";
 import { ApprovalPicker } from "./components/ApprovalPicker";
+import { SessionPicker } from "./components/SessionPicker";
 import { CommandApproval } from "./components/CommandApproval";
 import { ContinueTurn } from "./components/ContinueTurn";
 import { QuestionDialog } from "./components/QuestionDialog";
@@ -48,6 +49,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
   const dialogOpen =
     state.modelPickerOpen ||
     state.approvalPickerOpen ||
+    state.sessionPickerOpen ||
     hasPendingCommand ||
     hasPendingQuestion ||
     hasPendingContinuation;
@@ -164,6 +166,8 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
               <ModelPicker controller={controller} selectedModel={state.selectedModel} />
             ) : state.approvalPickerOpen ? (
               <ApprovalPicker mode={state.approvalMode} />
+            ) : state.sessionPickerOpen ? (
+              <SessionPicker controller={controller} />
             ) : hasPendingCommand ? (
               <CommandApproval command={state.pendingCommand!} />
             ) : hasPendingContinuation ? (

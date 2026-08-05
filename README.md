@@ -89,9 +89,13 @@ The conversation, provider configuration, and local state are stored in:
 
 ### Session history
 
-Conversation history is written after every turn using an atomic write, so an interrupted session does not leave a half-written transcript behind. Restarting Woopcode in the same repository resumes from that history; `/new` clears it.
+A session is one saved conversation, belonging to the project it happened in. It is written after every turn using an atomic write, so an interrupted session does not leave a half-written transcript behind. Restarting Woopcode in the same repository resumes the newest one; starting it somewhere else does not, because sessions live under `sessions/<project>/` rather than in one file shared by every repository.
+
+`/new` starts a fresh session and keeps the old one — `/resume` goes back to it, `/rename` gives it a name, `/branch` copies it to try a second approach, and `woopcode --continue` / `--resume` do the same from the command line. Sessions are deleted 30 days after their last turn; `retentionDays` changes that and `0` keeps them forever.
 
 Only user and assistant messages are persisted, capped at the most recent messages. Tool calls and their results are dropped: they are the bulk of a long transcript, they only mean something to the turn that produced them, and persisting half of a call/result pair would make the restored history invalid for the provider.
+
+History written by a version before sessions existed is imported once into a `legacy` bucket, reachable from the `/resume` picker with <kbd>Ctrl</kbd>+<kbd>A</kbd>. Resume it and take a turn and it becomes that project's session; open it only to read and it stays put.
 
 ## Built-in tools
 
@@ -146,7 +150,11 @@ Type `/` in the prompt to browse and autocomplete commands.
 | Command                       | Description                                                              |
 | ----------------------------- | ------------------------------------------------------------------------ |
 | `/help`                       | Show all available commands.                                             |
-| `/new`                        | Start a new conversation.                                                |
+| `/new`                        | Start a new conversation, keeping the current one.                       |
+| `/resume [name-or-id]`        | Switch to a previous conversation, or pick one from a list.              |
+| `/sessions`                   | List saved conversations for this project.                               |
+| `/rename <name>`              | Name the current conversation so it can be resumed by name.              |
+| `/branch [name]`              | Copy this conversation and continue in the copy.                         |
 | `/provider [name]`            | View or switch the configured provider.                                  |
 | `/login <provider> <api-key>` | Authenticate from inside the app.                                        |
 | `/logout [provider]`          | Remove a saved provider key.                                             |
@@ -157,7 +165,7 @@ Type `/` in the prompt to browse and autocomplete commands.
 | `/version`                    | Show the Woopcode version.                                               |
 | `/exit`                       | Quit Woopcode.                                                           |
 
-Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` for `/new`, `/p` for provider, `/m` or `/model` for models, `/v` for version, `/q` or `/quit` for exit.
+Most commands have short aliases: `/h` or `/?` for help, `/clear` or `/reset` for `/new`, `/r` for resume, `/ls` for sessions, `/fork` for branch, `/p` for provider, `/m` or `/model` for models, `/v` for version, `/q` or `/quit` for exit.
 
 | Key                     | Action                                                                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |

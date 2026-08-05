@@ -83,18 +83,24 @@ answered one at a time.
 
 ## Pickers
 
-`/models` and `/approval` open a picker. `/provider` does not — it prints the
-configured providers as text.
+`/models`, `/approval` and `/resume` open a picker. `/provider` does not — it
+prints the configured providers as text.
 
 | Key | Action |
 | --- | --- |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Move the selection |
 | <kbd>Enter</kbd> | Choose it, and save |
 | <kbd>Esc</kbd> | Close without changing anything |
+| <kbd>Ctrl</kbd><kbd>A</kbd> | Session picker only: widen to every project on this machine |
 
-The two differ in one way: the model picker has a search field, so typing
-narrows the list. The approval picker has a short fixed list and no search, so
-typing does nothing there.
+They differ in one way: the model and session pickers have a search field, so
+typing narrows the list. The approval picker has a short fixed list and no
+search, so typing does nothing there.
+
+The session picker starts scoped to the current project, which is what you
+almost always want. <kbd>Ctrl</kbd><kbd>A</kbd> is also the only way to reach
+history migrated from a version before sessions existed, which belongs to no
+project.
 
 ## Ctrl+C
 

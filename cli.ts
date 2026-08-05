@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 import { program } from "commander";
 import { modelsCommand } from "./commands/models";
-import { agentCommand, runAgent } from "./commands/agent";
+import { addSessionOptions, agentCommand, runAgent } from "./commands/agent";
 import { providerCommand } from "./commands/providers";
+import { sessionsCommand } from "./commands/sessions";
 import { VERSION } from "./config/version";
 
-program
+addSessionOptions(program)
   .name("woopcode")
   .description("Coding agent cli")
   .version(VERSION)
@@ -20,7 +21,8 @@ program
   .action(runAgent)
   .addCommand(modelsCommand)
   .addCommand(agentCommand)
-  .addCommand(providerCommand);
+  .addCommand(providerCommand)
+  .addCommand(sessionsCommand);
 
 // A configuration failure (no provider, unusable key) is a normal outcome for
 // an automated caller, not a crash. Reporting it as a one-line message with a

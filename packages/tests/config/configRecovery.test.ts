@@ -12,20 +12,31 @@ process.env.XDG_CONFIG_HOME = configHome;
 const {
   MAX_PERSISTED_MESSAGES,
   getConfig,
-  getConversation,
   normalizeConfig,
   prepareConversationForDisk,
   saveConfig,
-  saveConversation,
-  getExecutionLog,
-  saveExecutionLog,
   MAX_PERSISTED_RECORDS,
 } = await import("../../../config/config");
 
+const {
+  createSession,
+  loadSession,
+  saveSession,
+  projectRoot,
+  projectSlug,
+  resetSessionStoreForTests,
+} = await import("../../../config/sessions");
+
 const configDir = join(configHome, "woopcode");
 const providersPath = join(configDir, "providers.json");
-const conversationPath = join(configDir, "conversation.json");
-const executionLogPath = join(configDir, "execution-log.json");
+const sessionsDir = join(configDir, "sessions");
+
+/** Round-trips a conversation through a session, the way a turn does. */
+async function storeConversation(messages: Parameters<typeof prepareConversationForDisk>[0]) {
+  const session = await createSession();
+  const saved = await saveSession({ ...session, messages });
+  return (await loadSession(saved.id))!;
+}
 
 afterAll(() => {
   if (previousConfigHome === undefined) {
@@ -106,41 +117,37 @@ describe("corrupt file recovery", () => {
     expect(config.providers.google?.apiKey).toBeUndefined();
   });
 
-  test("a corrupt conversation is quarantined and the transcript starts fresh", async () => {
-    await getConfig(); // ensures the config dir exists
-    writeFileSync(conversationPath, '[{"role":"user"');
+  test("a corrupt session is skipped rather than crashing the store", async () => {
+    const stored = await storeConversation([{ role: "user", content: "hi" }]);
+    const sessionPath = join(sessionsDir, projectSlug(projectRoot()), `${stored.id}.json`);
+    writeFileSync(sessionPath, '[{"role":"user"');
 
-    await expect(getConversation()).resolves.toEqual([]);
-    expect(corruptFiles("conversation.json")).toHaveLength(1);
-  });
-
-  test("a conversation that is not a list starts fresh", async () => {
-    await getConfig();
-    writeFileSync(conversationPath, '{"role":"user"}');
-
-    await expect(getConversation()).resolves.toEqual([]);
+    // Null, not a throw: one unreadable session must not make the picker
+    // unopenable or stop a launch.
+    await expect(loadSession(stored.id)).resolves.toBeNull();
   });
 
   test("malformed messages are dropped, valid ones kept", async () => {
-    await getConfig();
-    writeFileSync(
-      conversationPath,
-      JSON.stringify([{ role: "user", content: "hi" }, null, "junk", { content: "no role" }]),
-    );
+    const stored = await storeConversation([{ role: "user", content: "hi" }]);
+    const sessionPath = join(sessionsDir, projectSlug(projectRoot()), `${stored.id}.json`);
+    const raw = JSON.parse(await Bun.file(sessionPath).text());
+    raw.messages = [{ role: "user", content: "hi" }, null, "junk", { content: "no role" }];
+    writeFileSync(sessionPath, JSON.stringify(raw));
 
-    await expect(getConversation()).resolves.toEqual([
-      { role: "user", content: "hi" },
-    ]);
+    const loaded = await loadSession(stored.id);
+
+    expect(loaded!.messages).toEqual([{ role: "user", content: "hi" }]);
   });
 });
 
 describe("conversation persistence", () => {
   beforeEach(() => {
     rmSync(configDir, { recursive: true, force: true });
+    resetSessionStoreForTests();
   });
 
   test("does not persist tool calls or their results", async () => {
-    await saveConversation([
+    const stored = await storeConversation([
       { role: "user", content: "hi" },
       {
         role: "assistant_tool_call",
@@ -152,9 +159,7 @@ describe("conversation persistence", () => {
       { role: "assistant", content: "done" },
     ]);
 
-    const stored = await getConversation();
-
-    expect(stored.map((message) => message.role)).toEqual(["user", "assistant"]);
+    expect(stored.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
   });
 
   test("keeps only the most recent messages", async () => {
@@ -163,11 +168,10 @@ describe("conversation persistence", () => {
       content: `message ${index}`,
     }));
 
-    await saveConversation(messages);
-    const stored = await getConversation();
+    const stored = await storeConversation(messages);
 
-    expect(stored).toHaveLength(MAX_PERSISTED_MESSAGES);
-    expect(stored.at(-1)).toEqual(messages.at(-1)!);
+    expect(stored.messages).toHaveLength(MAX_PERSISTED_MESSAGES);
+    expect(stored.messages.at(-1)).toEqual(messages.at(-1)!);
   });
 
   test("prepareConversationForDisk leaves a short conversation alone", () => {
@@ -180,32 +184,41 @@ describe("conversation persistence", () => {
   });
 
   test("writes atomically, leaving no partial file behind", async () => {
-    await saveConversation([{ role: "user", content: "hi" }]);
+    const stored = await storeConversation([{ role: "user", content: "hi" }]);
+    const projectDir = join(sessionsDir, projectSlug(projectRoot()));
 
-    expect(readdirSync(configDir).filter((name) => name.endsWith(".tmp"))).toHaveLength(0);
-    expect(await getConversation()).toEqual([{ role: "user", content: "hi" }]);
+    expect(readdirSync(projectDir).filter((name) => name.endsWith(".tmp"))).toHaveLength(0);
+    expect(stored.messages).toEqual([{ role: "user", content: "hi" }]);
   });
 });
 
 describe("execution log persistence", () => {
   beforeEach(() => {
-    rmSync(executionLogPath, { force: true });
+    rmSync(configDir, { recursive: true, force: true });
+    resetSessionStoreForTests();
   });
 
   test("records survive a restart", async () => {
     // Without this the log would survive a turn but not a restart, which is
     // the same forgetting one level up.
-    await saveExecutionLog([
-      { iteration: 1, tool: "read_file", subject: "a.ts", outcome: "12 lines" },
-    ]);
+    const session = await createSession();
+    const saved = await saveSession({
+      ...session,
+      executionLog: [
+        { iteration: 1, tool: "read_file", subject: "a.ts", outcome: "12 lines" },
+      ],
+    });
 
-    expect(await getExecutionLog()).toEqual([
+    const reopened = await loadSession(saved.id);
+
+    expect(reopened!.executionLog).toEqual([
       { iteration: 1, tool: "read_file", subject: "a.ts", outcome: "12 lines" },
     ]);
   });
 
-  test("a fresh install starts with an empty log", async () => {
-    expect(await getExecutionLog()).toEqual([]);
+  test("a fresh session starts with an empty log", async () => {
+    const session = await createSession();
+    expect(session.executionLog).toEqual([]);
   });
 
   test("the log is capped so a long-lived session cannot grow it forever", async () => {
@@ -215,27 +228,22 @@ describe("execution log persistence", () => {
       subject: `f${i}.ts`,
       outcome: "1 line",
     }));
-    await saveExecutionLog(many);
+    const session = await createSession();
+    const saved = await saveSession({ ...session, executionLog: many });
 
-    const loaded = await getExecutionLog();
-    expect(loaded).toHaveLength(MAX_PERSISTED_RECORDS);
+    expect(saved.executionLog).toHaveLength(MAX_PERSISTED_RECORDS);
     // The most recent survive: what was done last is what must not be redone.
-    expect(loaded.at(-1)!.subject).toBe(`f${many.length - 1}.ts`);
-  });
-
-  test("a corrupt log is quarantined rather than crashing startup", async () => {
-    writeFileSync(executionLogPath, "{not json");
-
-    expect(await getExecutionLog()).toEqual([]);
-    expect(corruptFiles("execution-log.json.corrupt-").length).toBeGreaterThan(0);
+    expect(saved.executionLog.at(-1)!.subject).toBe(`f${many.length - 1}.ts`);
   });
 
   test("entries that are not records are discarded", async () => {
-    writeFileSync(
-      executionLogPath,
-      JSON.stringify([null, 42, { tool: "read_file", outcome: "3 lines" }]),
-    );
+    const session = await createSession();
+    const saved = await saveSession({ ...session, messages: [{ role: "user", content: "x" }] });
+    const sessionPath = join(sessionsDir, projectSlug(projectRoot()), `${saved.id}.json`);
+    const raw = JSON.parse(await Bun.file(sessionPath).text());
+    raw.executionLog = [null, 42, { tool: "read_file", outcome: "3 lines" }];
+    writeFileSync(sessionPath, JSON.stringify(raw));
 
-    expect(await getExecutionLog()).toHaveLength(1);
+    expect((await loadSession(saved.id))!.executionLog).toHaveLength(1);
   });
 });

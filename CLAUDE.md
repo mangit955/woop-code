@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 Woopcode is a terminal-native coding agent (React Ink TUI + streaming agent loop) published to npm as `woopcode`. TypeScript throughout, running on Bun.
 
 ## Commands
@@ -51,8 +49,6 @@ tools/              the tool registry
 ```
 
 The agent loop is `runtime/loop.ts`. It knows nothing about the interface, which is what lets the same loop drive both the TUI and the headless `--prompt` path; everything flows back out through `AgentCallbacks` (text, tool start, tool finish, error).
-
-One structural fact to know before editing:
 
 - **Approval is split in two.** `runtime/approval/classifier.ts` decides how risky a shell command is; `runtime/approval/policy.ts` decides whether that risk needs asking. Adding an approval mode is one entry in a table.
 
@@ -139,35 +135,59 @@ matching one before starting that kind of work.
 
 Before you do any work, mention how you could verify that work — the test, command, or observation that would show it actually worked. If a change can't be verified, say so before making it.
 
-### Never call work finished without a green run in the tree as it stands now
+### Never call work finished without checking the tree as it stands now
 
 "Done", "shipped" and "verified" are claims about the working tree at the moment
-you say them, not about a run from earlier in the session. Before any of those
-words, run the suite and quote what it actually printed:
+you say them, not a run from earlier. Before any of those words, run this and
+quote what it printed:
 
 ```bash
 bun install                # if package.json or bun.lock moved since your last install
 bun run verify --all       # tsc + bun test + docs; the whole gate whatever changed
 ```
 
-Three ways a green run goes stale underneath a claim, all of which have happened
-here:
+Three ways a green run goes stale underneath a claim, all of which happened here:
 
-- **`node_modules` is stale.** A dependency landed on `main` and was never
-  installed locally, so every file that imports it fails with
-  `Cannot find package '<x>'`. Twenty-four tests went red this way and it reads
-  exactly like a code break. `bun install` first when `package.json` has moved.
-- **`main` moved after your branch went green.** Two branches that each pass CI
-  can merge into a red `main`: git merges them without a textual conflict while
-  one silently fails to honour a parameter the other added. CI tested each side,
-  never the merge. After a fetch, merge or rebase — or when `origin/main` is
-  ahead — re-run the gate against the merged tree before saying anything.
-- **A bare `bun run verify` on a fully staged tree** prints "nothing to check"
-  and exits 0. That is not a pass; see the note under Commands.
+- **`node_modules` is stale** — a dependency landed on `main`, never installed
+  locally, and every import of it fails with `Cannot find package '<x>'`. It went
+  red across twenty-four tests, reading exactly like a code break.
+- **`main` moved after your branch went green** — two branches that each pass CI
+  can merge into a red `main`, git finding no textual conflict while one silently
+  fails to honour a parameter the other added. After any fetch, merge or rebase,
+  or whenever `origin/main` is ahead, re-run the gate on the merged tree.
+- **A bare `bun run verify` on a staged tree** reports a pass it did not run; see Commands.
 
-If a check was skipped or could not run, say which one and why, rather than a
-sentence that implies a green run. A verification that is reported but not run is
-worse than none, because it stops anyone else from looking.
+**But a green suite is not a review.** It says the cases you thought of hold and
+nothing about the rest — and "I checked everything" is a claim about the rest.
+The sessions work went green on every gate and sweep; reading the diff afterwards
+found seven defects, one of which wrote into the session `--fork-session` exists
+to protect. Walk the diff and ask, per changed file:
+
+- **Every default argument** is an assumption about the caller (`forkSession`
+  defaulted to the current project; sessions elsewhere silently failed to fork).
+- **Every `?? fallback` on a failure path** — what does it *do* when it fires?
+  (`fork() ?? original` turned a failed copy into a write to the original.)
+- **Every read-modify-write** — two windows, two processes (the index lost a row
+  and the session stopped being listed at all).
+- **Every counter or flag in a loop** — per-iteration or cumulative? (Prune's was
+  cumulative across projects.)
+- **Every write recording that something happened** — does it create state where
+  the feature promises none? (`pruneIfDue` created the directory lazy creation
+  exists to avoid.)
+- **Every optional CLI value** — what does the bare flag do? (`--resume` was
+  indistinguishable from `--continue`.)
+- **Every empty string, empty array and zero** reaching a renderer.
+- **Every caller you did not write** — a new signature is only as sound as the
+  stubs standing in for it elsewhere.
+
+Then about the checking itself:
+
+- **A regression test that has never failed proves nothing.** Revert the fix,
+  watch it go red, restore it — and confirm the revert actually applied. Twice a
+  mutation silently did not match, the suite stayed green, and the claim was void.
+- **Name what you did not check.** Interactive input, live providers and other
+  processes are outside the suite's reach. Say so rather than letting a green run
+  imply them: a verification reported but not run stops anyone else looking.
 
 Conventional commits (`feat(tools):`, `fix(runtime):`, …), TypeScript strict mode, small focused functions.
 

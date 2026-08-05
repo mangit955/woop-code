@@ -275,7 +275,6 @@ function renderInline(tokens: Token[], md: MarkdownPalette): ReactNode[] {
 
       case "link": {
         const t = token as Tokens.Link;
-        // Render link text with accent color
         return (
           <Text key={i} color={md.linkText}>
             {renderInline(t.tokens, md)}

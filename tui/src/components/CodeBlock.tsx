@@ -29,7 +29,6 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   }
 
   const lines = highlighted.split("\n");
-  // Use theme colors for borders
   const borderColor = chalk.hex(colors.borderBase);
 
   const termWidth = Math.max((process.stdout.columns || 80) - 6, 30);
@@ -49,7 +48,6 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   // ╰────────────────────╯
   const bottom = borderColor(`╰${"─".repeat(boxWidth - 2)}╯`);
 
-  // empty padding row
   const empty = borderColor("│") + " ".repeat(boxWidth - 2) + borderColor("│");
 
   // code rows — truncate long lines at inner width so the box never breaks

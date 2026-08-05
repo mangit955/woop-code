@@ -24,7 +24,8 @@ export const runTestsTool: Tool = {
       return "Command rejected by user. It was not run.";
     }
 
-    // Warn about server commands
+    // A server never exits, so it would hold the tool open until the timeout
+    // rather than failing. Refused here instead, with the reason.
     if (command.includes("run src/index") || command.includes("run index") || command.includes("start")) {
       return "Error: This command appears to start a server. Use run_tests only for test suites, not for starting servers. Servers run indefinitely and will cause timeouts.";
     }

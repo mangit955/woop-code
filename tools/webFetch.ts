@@ -43,7 +43,6 @@ Default timeout: 30 seconds`,
     const format = (args.format as string) || "markdown";
     const timeoutSeconds = Math.min((args.timeout as number) || 30, 120);
 
-    // Validation
     if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
       throw new Error("URL must start with http:// or https://");
     }
@@ -81,27 +80,23 @@ Default timeout: 30 seconds`,
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Check content length
       const contentLength = response.headers.get("content-length");
       if (contentLength && parseInt(contentLength) > MAX_SIZE) {
         throw new Error("Response too large (exceeds 5MB limit)");
       }
 
       const contentType = response.headers.get("content-type") || "";
-      
-      // Handle images
+
       if (contentType.includes("image/")) {
         return `Image fetched from ${url}\nContent-Type: ${contentType}\n\nNote: Image content cannot be displayed in text format.`;
       }
 
-      // Get content
       const text = await response.text();
 
       if (text.length > MAX_SIZE) {
         throw new Error("Response too large (exceeds 5MB limit)");
       }
 
-      // Process based on format
       let output = text;
 
       if (format === "text" && contentType.includes("text/html")) {
@@ -152,13 +147,9 @@ function extractTextFromHTML(html: string): string {
     .replace(/<\/li>/gi, "\n")
     .replace(/<\/tr>/gi, "\n");
 
-  // Remove all remaining HTML tags
   text = text.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
   text = decodeHTMLEntities(text);
 
-  // Clean up whitespace
   text = text
     .replace(/\n\s*\n\s*\n/g, "\n\n") // Remove excessive newlines
     .replace(/[ \t]+/g, " ") // Normalize spaces
@@ -167,10 +158,12 @@ function extractTextFromHTML(html: string): string {
   return text;
 }
 
+/**
+ * A deliberately small subset of HTML, not a conformant converter: the output is
+ * read by a model, so an unhandled tag costs a little fidelity rather than
+ * breaking anything. `turndown` is the upgrade if that stops being true.
+ */
 function convertHTMLToMarkdown(html: string): string {
-  // Basic HTML to Markdown conversion
-  // For production, consider using a library like 'turndown'
-  
   let md = html;
 
   // Remove script, style tags
@@ -211,13 +204,9 @@ function convertHTMLToMarkdown(html: string): string {
   md = md.replace(/<\/p>/gi, "\n\n");
   md = md.replace(/<br\s*\/?>/gi, "\n");
 
-  // Remove remaining HTML tags
   md = md.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
   md = decodeHTMLEntities(md);
 
-  // Clean up whitespace
   md = md
     .replace(/\n\s*\n\s*\n/g, "\n\n")
     .replace(/[ \t]+/g, " ")

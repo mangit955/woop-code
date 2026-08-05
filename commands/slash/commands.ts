@@ -346,7 +346,6 @@ const loginCommand: SlashCommand = {
       return unsupportedProviderMessage(provider);
     }
 
-    // Validate API key
     const { loginProvider } = await import("../../config/authProvider");
     const isValid = await loginProvider(provider, apiKey);
 
@@ -358,7 +357,6 @@ const loginCommand: SlashCommand = {
       return `Cannot change provider while the agent is running. Press Esc to cancel first.`;
     }
 
-    // Save the API key
     config.providers[provider].apiKey = apiKey;
     config.defaultProvider = provider;
 
@@ -408,12 +406,11 @@ const logoutCommand: SlashCommand = {
       return `Cannot log out of the active provider while the agent is running. Press Esc to cancel first.`;
     }
 
-    // Remove API key
     delete config.providers[provider].apiKey;
 
-    // If logging out from default provider, clear default
+    // Leaving a logged-out provider as the default would send the next turn at
+    // a provider with no key, so hand the default to one that still has one.
     if (config.defaultProvider === provider) {
-      // Find another logged-in provider
       const otherProvider = Object.entries(config.providers).find(
         ([name, details]: [string, any]) =>
           name !== provider && details.apiKey && isProviderEnabled(name)

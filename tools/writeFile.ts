@@ -51,7 +51,6 @@ export const writeFileTool: Tool = {
       throw new Error(`File not found: ${path}`);
     }
 
-    // Read current content
     const oldContent = await file.text();
 
     // If content is identical, skip diff preview
@@ -59,12 +58,10 @@ export const writeFileTool: Tool = {
       return `No changes needed for ${path}`;
     }
 
-    // Generate unified diff
     const diff = createTwoFilesPatch(path, path, oldContent, content, "", "", {
       context: 3,
     });
 
-    // Create pending edit
     const pendingEdit: PendingEdit = {
       id: crypto.randomUUID(),
       filePath: path,
@@ -74,7 +71,6 @@ export const writeFileTool: Tool = {
       toolCallId: crypto.randomUUID(),
     };
 
-    // Request approval from UI
     let approved: boolean;
     try {
       approved = await store.setPendingEdit(pendingEdit);
@@ -90,7 +86,8 @@ export const writeFileTool: Tool = {
       return outcome;
     }
 
-    // Write file after approval
+    // The only write in this tool, and it sits below both exits above. Nothing
+    // may move above them: the diff review is the product's whole guarantee.
     await Bun.write(path, content);
 
     return `Updated ${path}`;

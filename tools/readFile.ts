@@ -96,7 +96,6 @@ export const readFileTool: Tool = {
       throw Error(`File ${path} does not exist`);
     }
 
-    // Check if path is a directory
     try {
       const stats = statSync(path);
       if (stats.isDirectory()) {

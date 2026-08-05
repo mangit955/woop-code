@@ -27,7 +27,6 @@ export class SlashCommandRegistry {
     return this.getAll().filter((cmd) => cmd.category === category);
   }
 
-  // Auto-generated help
   generateHelp(): string {
     const categories = {
       session: "Session",
@@ -55,7 +54,6 @@ export class SlashCommandRegistry {
     return output.trim();
   }
 
-  // Discovery list
   generateDiscoveryList(): string {
     return this.getAll()
       .map((cmd) => `/${cmd.name}`)

@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
 import path from "path";
+import { statSync } from "fs";
 import { resolveWorkspacePath } from "./workspace";
 
 export const globTool: Tool = {
@@ -35,32 +36,27 @@ Returns up to 100 matching file paths.`,
       throw new Error("Pattern is required");
     }
 
-    // Resolve search path
     const resolvedPath = await resolveWorkspacePath(searchPath, { mustExist: true });
 
-    // Check if path is a file (not a directory)
     try {
-      const { statSync } = await import("fs");
-      const stats = statSync(resolvedPath);
-      
-      if (stats.isFile()) {
+      if (statSync(resolvedPath).isFile()) {
         throw new Error(`glob path must be a directory: ${resolvedPath}`);
       }
     } catch (err: any) {
-      // If error is "glob path must be a directory", re-throw it
+      // Only the directory check is worth failing on. Anything else stat can
+      // raise means the path is not readable yet, which Glob reports itself as
+      // an empty scan.
       if (err.message?.includes("glob path must be a directory")) {
         throw err;
       }
-      // Otherwise, path might not exist yet, which is okay - Glob will handle it
     }
 
-    // Perform glob search with limit
     const LIMIT = 100;
     const files: string[] = [];
-    
+
     try {
       const glob = new Bun.Glob(pattern);
-      
+
       for await (const file of glob.scan({
         cwd: resolvedPath,
         onlyFiles: true,
@@ -68,23 +64,21 @@ Returns up to 100 matching file paths.`,
         if (files.length >= LIMIT) {
           break;
         }
-        
-        // Resolve to absolute path
-        const absolutePath = path.resolve(resolvedPath, file);
-        files.push(absolutePath);
+
+        files.push(path.resolve(resolvedPath, file));
       }
     } catch (error) {
       throw new Error(`Glob search failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    // Format output
     const output: string[] = [];
-    
+
     if (files.length === 0) {
       output.push("No files found");
     } else {
       output.push(...files);
-      
+
+
       if (files.length === LIMIT) {
         output.push("");
         output.push(

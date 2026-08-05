@@ -51,7 +51,6 @@ context. If something matters, restate it.
 | Platform | Path |
 | --- | --- |
 | macOS, Linux | `~/.config/woopcode/conversation.json` |
-| Windows | `%LOCALAPPDATA%\woopcode\conversation.json` |
 
 :::warning
 There is one history file, not one per repository. Starting Woopcode in a

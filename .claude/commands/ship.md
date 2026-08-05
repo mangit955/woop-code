@@ -80,11 +80,12 @@ The subject must be conventional (`.githooks/commit-msg` rejects anything
 else): `<type>(<scope>): <imperative summary>`, lowercase, no trailing period.
 Scopes in use: `tools`, `runtime`, `provider`, `tests`, `ci`, `replay`, `docs`.
 
-The body says why, not what — the diff already says what. End it with:
+The body says why, not what — the diff already says what.
 
-```
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-```
+**No attribution trailers.** No `Co-Authored-By`, no tool or model name, no
+"generated with" line — not in commits, PR bodies, issues or review comments.
+The commit history is the maintainer's, and a trailer naming a tool says nothing
+about why the change exists.
 
 Write the message to a temp file and use `git commit -F <file>`, so backticks
 and newlines survive.
@@ -140,11 +141,9 @@ Either way:
 - **Verified means verified.** List the checks that actually ran and what they
   actually printed. If something was skipped or could not be tested, say that
   plainly rather than writing a sentence that implies a green run.
-- End with:
-
-```
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-```
+- End on the verification. No attribution footer, no tool or model name, no
+  "generated with" line — see the rule under **Commit**, which applies to PR
+  bodies, issues and review comments too.
 
 ## 7. Report
 

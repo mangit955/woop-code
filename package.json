@@ -1,7 +1,7 @@
 {
   "name": "woopcode",
-  "version": "0.8.2",
-  "description": "An autonomous AI coding assistant built for the terminal",
+  "version": "0.9.0",
+  "description": "A terminal coding agent that shows every edit as a diff before it writes, and asks before running a shell command it cannot vouch for",
   "license": "MIT",
   "author": {
     "name": "Manas Raghuwanshi",
@@ -11,7 +11,7 @@
     "type": "git",
     "url": "git+https://github.com/mangit955/woop-code.git"
   },
-  "homepage": "https://github.com/mangit955/woop-code#readme",
+  "homepage": "https://woop-code.vercel.app",
   "bugs": {
     "url": "https://github.com/mangit955/woop-code/issues"
   },

@@ -9,6 +9,17 @@ import { existsSync, mkdirSync } from "fs";
  * Location:
  * - macOS/Linux: ~/.config/woopcode/
  * - Windows: %LOCALAPPDATA%\woopcode\
+ *
+ * The Windows branch is correct and unreachable in practice, and the
+ * documentation no longer advertises the platform. `runCommand` in
+ * tools/command.ts spawns `sh -c`, which Windows does not have, so
+ * `run_terminal` and `run_tests` cannot run there — and the approval classifier
+ * knows only POSIX command names, so every Windows command falls to its
+ * fail-closed default and asks. Supporting the platform is a port, not a fix.
+ *
+ * Kept rather than deleted because it costs nothing, it is what WSL and any
+ * later port would want, and removing it would make the gap harder to find
+ * than this comment does.
  */
 export function getConfigDir(): string {
   const home = homedir();

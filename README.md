@@ -4,11 +4,13 @@
 [![TypeScript](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg)](LICENSE)
 
+[Documentation](https://woop-code.vercel.app) · [Install](https://woop-code.vercel.app/docs/getting-started/install) · [How a turn works](https://woop-code.vercel.app/docs/introduction/how-a-turn-works)
+
 **A terminal-native coding agent that understands your repository, shows its work, and keeps you in control of code changes.**
 
 Woopcode runs where you work: in the terminal and inside the current repository. Ask it to investigate, explain, implement, review, or test a change; it streams progress, uses focused tools, and presents edits as a readable diff before it writes to an existing file.
 
-> **Status:** an early-stage project. Google Gemini, OpenAI, and Anthropic are all implemented and usable. Gemini is the most heavily exercised path — it is what the benchmark suite runs against — so treat it as the best-tested option rather than the only one.
+Google Gemini, OpenAI, and Anthropic are all implemented. Gemini is the most heavily exercised path — it is what the benchmark suite runs against — so treat it as the best-tested option rather than the only one. Runs on macOS and Linux; on Windows, use WSL.
 
 ## Demo
 
@@ -16,13 +18,13 @@ Woopcode runs where you work: in the terminal and inside the current repository.
 
 ## Why Woopcode
 
-|                             |                                                                                                                                                                                                                                         |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Repository-aware**        | Starts with your package metadata, README, and top-level project structure, then discovers deeper context only when needed. Repository context is budgeted per request rather than dumped, since the agent can read any file on demand. |
-| **Terminal-first**          | A focused React Ink interface with a pinned header, scrollable conversation, keyboard navigation, and no browser tab required.                                                                                                          |
-| **Visible execution**       | Streams assistant output and tool activity so you can follow the work instead of waiting behind an opaque progress screen.                                                                                                              |
-| **Review before overwrite** | Existing-file edits and overwrites pause on a unified diff for approval.                                                                                                                                                                |
-| **Practical guardrails**    | Detects duplicate tool calls, limits tool iterations, supports cancellation, and returns recoverable tool errors to the agent.                                                                                                          |
+|                               |                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nothing is overwritten unreviewed** | Every edit to an existing file stops on a unified diff and waits. A tool that writes raises an approval request rather than touching the disk itself, so there is no path around the review.                                                                                    |
+| **Shell commands fail closed** | Commands are classified by risk before they run, and a command the classifier does not recognise is treated as destructive. A line is judged by its riskiest part, so `git status && rm -rf build` asks — and so does anything hidden inside `$(...)`.                                  |
+| **Plan mode is enforced twice** | The provider is not offered the writing tools, *and* the loop refuses a write that arrives anyway. Both are load-bearing: `run_terminal` has to stay available for inspection, so `sed -i` and `cat > file` reach the disk through a tool the first gate must keep.                     |
+| **Provider reasoning is replayed correctly** | Anthropic and OpenAI both require the reasoning that preceded a tool call to be sent back with that call's result, and both fail silently without it — the request succeeds and the model simply reasons from less. Each client handles its own rules; the agent loop stays neutral. |
+| **Tested against a real filesystem** | Tools are exercised on real files in temporary directories rather than behind mocks. Only the provider and the approval prompt are faked, because one would make network calls and the other needs a human.                                                                    |
 
 ## Quick start
 
@@ -84,7 +86,6 @@ Prompt → repository context → streaming agent → focused tools → review d
 The conversation, provider configuration, and local state are stored in:
 
 - macOS and Linux: `~/.config/woopcode/`
-- Windows: `%LOCALAPPDATA%\\woopcode\\`
 
 ### Session history
 

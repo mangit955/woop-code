@@ -1,7 +1,7 @@
 {
   "name": "woopcode",
   "version": "0.8.2",
-  "description": "An autonomous AI coding assistant built for the terminal",
+  "description": "A terminal coding agent that shows every edit as a diff before it writes, and asks before running a shell command it cannot vouch for",
   "license": "MIT",
   "author": {
     "name": "Manas Raghuwanshi",

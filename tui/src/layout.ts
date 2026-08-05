@@ -17,6 +17,18 @@ const WORDMARK_FULL_MIN_COLUMNS = 77;
 /** Below this even "WOOPCODE" in plain text crowds out everything else. */
 const WORDMARK_COMPACT_MIN_COLUMNS = 24;
 
+/**
+ * Columns every transcript row spends before its content starts: one for the
+ * rail or the state glyph, one blank.
+ *
+ * A constant because the transcript had four conventions at once — the user row
+ * at column 1, the assistant's label at column 1 with its own body at column 3,
+ * tool rows at column 3, a command block's rail back at column 1 — so nothing
+ * shared a left edge and the speaker floated free of its own text. One number
+ * gives the transcript a single vertical spine.
+ */
+export const TRANSCRIPT_GUTTER = 2;
+
 /** Rows the bordered composer occupies: border, padding, input, meta line. */
 export const BLOCK_COMPOSER_ROWS = 6;
 /** Rows the single-line `❯ ` composer occupies. */
@@ -55,6 +67,13 @@ const COMMAND_POPUP_HEADER_MIN_ROWS = 14;
 const DIALOG_SCROLL_INDICATOR_ROWS = 2;
 const DIALOG_LABEL_MIN_ROWS = 12;
 const DIALOG_HINTS_MIN_ROWS = 18;
+/**
+ * The dialog border costs two rows, and it is decoration: it exists to lift a
+ * panel off a canvas it differs from by 6% luminance. In a window too short to
+ * afford it the border goes, the way the hints and the label already do —
+ * a bordered dialog with no room for its own list is the worse of the two.
+ */
+const DIALOG_BORDER_MIN_ROWS = 10;
 
 export type Wordmark = "full" | "compact" | "hidden";
 export type ComposerVariant = "block" | "inline";
@@ -93,6 +112,8 @@ export interface LayoutPlan {
   dialogRhythm: number;
   showDialogLabel: boolean;
   showDialogHints: boolean;
+  /** The border lifting a dialog off the canvas; dropped in a short window. */
+  showDialogBorder: boolean;
   /**
    * False when the window is so short that the "↑ n more" rows would cost more
    * than the list rows they describe.
@@ -138,11 +159,15 @@ export function planLayout(width: number, height: number): LayoutPlan {
 
   // A dialog has to fit its own chrome before it can offer list rows, and the
   // scroll indicators are part of that chrome. Budgeting for them is what stops
-  // a long list from pushing its own title off the top of the screen.
+  // a long list from pushing its own title off the top of the screen. The border
+  // is chrome too: it was added to lift the panel off a canvas it differed from
+  // by 6% luminance, and two unbudgeted rows would cost the title it protects.
   const dialogRhythm = height >= DIALOG_LABEL_MIN_ROWS ? 1 : 0;
   const showDialogLabel = height >= DIALOG_LABEL_MIN_ROWS;
   const showDialogHints = height >= DIALOG_HINTS_MIN_ROWS;
+  const showDialogBorder = height >= DIALOG_BORDER_MIN_ROWS;
   const dialogFixedRows =
+    (showDialogBorder ? 2 : 0) + // the border, top and bottom
     2 + // vertical padding
     1 + dialogRhythm + // title and its gap
     1 + dialogRhythm + // search field and its gap
@@ -194,6 +219,7 @@ export function planLayout(width: number, height: number): LayoutPlan {
     dialogRhythm,
     showDialogLabel,
     showDialogHints,
+    showDialogBorder,
     showDialogScrollIndicators,
   };
 }

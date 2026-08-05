@@ -67,7 +67,9 @@ export function ApprovalPicker({ mode }: ApprovalPickerProps) {
         width={layout.dialogWidth}
         paddingX={layout.dialogWidth < 40 ? 1 : 3}
         paddingY={1}
-        backgroundColor="#101010"
+        backgroundColor={colors.bgElevated}
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>
@@ -83,14 +85,14 @@ export function ApprovalPicker({ mode }: ApprovalPickerProps) {
 
             return (
               <Box key={entry.mode} flexDirection="column">
-                <Box paddingX={1} backgroundColor={selected ? "#fb923c" : undefined}>
-                  <Text color={selected ? "#000000" : colors.textMuted}>
+                <Box paddingX={1} backgroundColor={selected ? colors.selectionBg : undefined}>
+                  <Text color={selected ? colors.selectionFg : colors.textMuted}>
                     {active ? "● " : "  "}
                   </Text>
                   <Box flexShrink={1} minWidth={0}>
                     <Text
                       bold={selected}
-                      color={selected ? "#000000" : colors.textBase}
+                      color={selected ? colors.selectionFg : colors.textBase}
                       wrap="truncate-end"
                     >
                       {entry.label}
@@ -98,7 +100,7 @@ export function ApprovalPicker({ mode }: ApprovalPickerProps) {
                   </Box>
                   <Box flexGrow={1} />
                   {entry.unsafe && (
-                    <Text color={selected ? "#7c2d12" : colors.warningBase}>unsafe</Text>
+                    <Text color={selected ? colors.selectionFgWarn : colors.warningBase}>unsafe</Text>
                   )}
                 </Box>
                 {/* The description only for the highlighted row: four of them at

@@ -1,29 +1,32 @@
 import { Box, Text } from "ink";
+import { usePalette } from "../styles/palette";
 
 export function ApprovalFooter() {
+  const colors = usePalette();
+
   return (
     <Box
       borderStyle="round"
-      borderColor="yellow"
+      borderColor={colors.warningBase}
       paddingX={1}
       marginTop={1}
       flexDirection="row"
       gap={2}
     >
-      <Text color="green" bold>
+      <Text color={colors.successBase} bold>
         [A]
       </Text>
-      <Text dimColor>Apply</Text>
+      <Text color={colors.textFaint}>Apply</Text>
 
-      <Text color="red" bold>
+      <Text color={colors.dangerBase} bold>
         [R]
       </Text>
-      <Text dimColor>Reject</Text>
+      <Text color={colors.textFaint}>Reject</Text>
 
-      <Text color="gray" bold>
+      <Text color={colors.textMuted} bold>
         [Esc]
       </Text>
-      <Text dimColor>Cancel</Text>
+      <Text color={colors.textFaint}>Cancel</Text>
     </Box>
   );
 }

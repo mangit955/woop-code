@@ -20,6 +20,9 @@ import { useTerminalSize } from "./hooks/useTerminalSize";
 import { useCancelKey } from "./hooks/useCancelKey";
 import { planLayout } from "./layout";
 import { PaletteProvider, usePalette } from "./styles/palette";
+// The canvas never dims — it is the background a dialog is dimmed *toward* —
+// so it reads the lit palette directly rather than through usePalette().
+import { colors as theme } from "./styles/theme";
 import { ClockProvider } from "./hooks/useClock";
 import { Scrollbar } from "./components/Scrollbar";
 import { getModelDisplayName } from "../../providers/client";
@@ -76,7 +79,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       flexDirection="column"
       width={width}
       height={height}
-      backgroundColor="#000000"
+      backgroundColor={theme.bgCanvas}
     >
       {/* One interval drives every animation below. See useClock for what the
           four independent timers this replaced were costing. */}
@@ -86,11 +89,17 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
       <PaletteProvider dimmed={dialogOpen}>
         {/* Header — pinned at top */}
         <Box flexShrink={0} paddingX={1}>
-          <Header branch={homeScreen.branch} provider={homeScreen.providerName} />
+          <Header
+            branch={homeScreen.branch}
+            provider={homeScreen.providerName}
+            // The same condition HomeScreen draws the wordmark on, so the two
+            // cannot disagree about whether the name is already on screen.
+            wordmarkShowing={showHome && layout.wordmark !== "hidden" && !paletteOpen}
+          />
         </Box>
 
       {/* Main content */}
-      <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} backgroundColor="#000000">
+      <Box flexDirection="column" flexGrow={1} minHeight={0} paddingX={1} backgroundColor={theme.bgCanvas}>
         {showHome ? (
           <HomeScreen
             {...homeScreen}
@@ -111,7 +120,7 @@ export function App({ controller, onExit, homeScreen }: AppProps) {
             flexGrow={1}
             flexShrink={1}
             minHeight={0}
-            backgroundColor="#000000"
+            backgroundColor={theme.bgCanvas}
           >
             <DiffPreview pendingEdit={state.pendingEdit!} />
           </Box>

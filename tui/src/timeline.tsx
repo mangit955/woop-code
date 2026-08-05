@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import type { ActiveTurn, TimeLineItem } from "./types";
 import { MessageRenderer } from "./components/MessageRenderer";
 import { ToolStatus } from "./components/ToolStatus";
@@ -14,6 +14,7 @@ import {
 } from "./tool-display";
 import { CommandBlock } from "./components/CommandBlock";
 import { TodoList } from "./components/TodoList";
+import { TRANSCRIPT_GUTTER } from "./layout";
 
 interface TimelineProps {
   items: TimeLineItem[];
@@ -72,7 +73,7 @@ const TimelineHistory = memo(function TimelineHistory({
   return (
     <>
       {hidden > 0 && (
-        <Box marginBottom={1} paddingLeft={2} flexShrink={0}>
+        <Box marginBottom={1} paddingLeft={TRANSCRIPT_GUTTER} flexShrink={0}>
           <Text color={colors.textFaint}>
             {`… ${hidden} earlier item${hidden === 1 ? "" : "s"}`}
           </Text>
@@ -85,48 +86,68 @@ const TimelineHistory = memo(function TimelineHistory({
   );
 });
 
+/**
+ * The shape every transcript row takes: a one-column rail, a blank column, then
+ * the content.
+ *
+ * Rows used to each choose their own indent, so a reader's eye had no single
+ * left edge to follow down the transcript. Routing them through one component is
+ * what makes the spine a property of the timeline rather than a coincidence
+ * between six components — and `timeline.shape.test.tsx` asserts it by rendering
+ * a frame, because it is invisible in a diff.
+ */
+function TimelineRow({
+  rail,
+  children,
+  marginBottom = 1,
+}: {
+  rail?: ReactNode;
+  children: ReactNode;
+  marginBottom?: number;
+}) {
+  return (
+    <Box flexDirection="row" marginBottom={marginBottom} flexShrink={0}>
+      <Box flexShrink={0} width={TRANSCRIPT_GUTTER}>
+        {rail}
+      </Box>
+      <Box flexDirection="column" flexShrink={1} minWidth={0}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }) {
   const colors = usePalette();
 
   switch (item.type) {
     case "user":
       return (
-        <Box flexDirection="row" marginBottom={1} flexShrink={0}>
-          {/* Left accent bar — OpenCode style */}
-          <Box flexShrink={0} marginRight={1}>
-            <Text color={colors.primary}>│</Text>
-          </Box>
-          <Box flexDirection="column">
-            <Text color={colors.textBase}>{item.content}</Text>
-          </Box>
-        </Box>
+        <TimelineRow rail={<Text color={colors.primary}>│</Text>}>
+          <Text color={colors.textBase}>{item.content}</Text>
+        </TimelineRow>
       );
 
     case "assistant":
+      // The label now sits inside the gutter with the prose it introduces,
+      // rather than two columns outside its own body.
       return (
-        <Box flexDirection="column" marginBottom={1} flexShrink={0}>
-          <Box gap={1} marginBottom={0}>
+        <TimelineRow rail={<Text color={colors.borderMuted}>│</Text>}>
+          <Box gap={1}>
             <Text bold color={colors.primary}>
               Woopcode
             </Text>
-            {item.streaming && (
-              <Text color={colors.textMuted}> · thinking</Text>
-            )}
+            {item.streaming && <Text color={colors.textMuted}>· thinking</Text>}
           </Box>
-          <Box paddingLeft={2}>
-            <MessageRenderer content={item.content} />
-          </Box>
-        </Box>
+          <MessageRenderer content={item.content} />
+        </TimelineRow>
       );
 
     case "system":
       return (
-        <Box marginBottom={1} paddingLeft={2} flexShrink={0}>
-          <Box gap={1}>
-            <Text color={colors.textMuted}>⊙</Text>
-            <Text color={colors.textMuted}>{item.content}</Text>
-          </Box>
-        </Box>
+        <TimelineRow rail={<Text color={colors.textMuted}>⊙</Text>}>
+          <Text color={colors.textMuted}>{item.content}</Text>
+        </TimelineRow>
       );
 
     case "todo":
@@ -162,25 +183,30 @@ const TimelineItem = memo(function TimelineItem({ item }: { item: TimeLineItem }
 
       const argument = formatToolArgument(item.arguments);
 
-      // One quiet line: glyph, tool, the argument worth reading, and what came
-      // back. The whole row stays muted — it is a record of work, not the work.
+      // One quiet line: the state glyph in the rail, then tool, the argument
+      // worth reading, and what came back. The whole row stays muted — it is a
+      // record of work, not the work.
       return (
-        <Box marginBottom={0} paddingLeft={2} flexShrink={0} gap={1}>
-          <ToolStatus status={item.status} glyph={toolGlyph(item.name)} />
-          <Text color={colors.textMuted}>{toolLabel(item.name)}</Text>
-          {argument && (
-            <Box flexShrink={1} minWidth={0}>
-              <Text color={colors.textFaint} wrap="truncate-end">
-                {argument.quoted ? `"${argument.text}"` : argument.text}
-              </Text>
-            </Box>
-          )}
-          {item.summary && (
-            <Box flexShrink={0}>
-              <Text color={colors.textFaint}>{`(${item.summary})`}</Text>
-            </Box>
-          )}
-        </Box>
+        <TimelineRow
+          marginBottom={0}
+          rail={<ToolStatus status={item.status} glyph={toolGlyph(item.name)} />}
+        >
+          <Box gap={1}>
+            <Text color={colors.textMuted}>{toolLabel(item.name)}</Text>
+            {argument && (
+              <Box flexShrink={1} minWidth={0}>
+                <Text color={colors.textFaint} wrap="truncate-end">
+                  {argument.quoted ? `"${argument.text}"` : argument.text}
+                </Text>
+              </Box>
+            )}
+            {item.summary && (
+              <Box flexShrink={0}>
+                <Text color={colors.textFaint}>{`(${item.summary})`}</Text>
+              </Box>
+            )}
+          </Box>
+        </TimelineRow>
       );
     }
   }

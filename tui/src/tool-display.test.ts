@@ -7,19 +7,31 @@ import {
 } from "./tool-display";
 
 describe("tool glyphs", () => {
-  test("groups tools by the kind of work they do", () => {
-    expect(toolGlyph("glob")).toBe("*");
-    expect(toolGlyph("grep")).toBe("*");
-    expect(toolGlyph("list_files")).toBe("*");
-    expect(toolGlyph("read_file")).toBe("→");
-    expect(toolGlyph("web_fetch")).toBe("→");
-    expect(toolGlyph("edit_file")).toBe("±");
-    expect(toolGlyph("run_tests")).toBe("$");
-    expect(toolGlyph("ask_user")).toBe("?");
+  test("marks every settled call the same way, whatever the tool", () => {
+    // The label beside it already says which kind of work it was. Five marks in
+    // one column said it twice, in five different visual families.
+    const marks = [
+      "glob",
+      "grep",
+      "list_files",
+      "read_file",
+      "web_fetch",
+      "edit_file",
+      "run_tests",
+      "ask_user",
+    ].map(toolGlyph);
+
+    expect(new Set(marks)).toEqual(new Set(["·"]));
   });
 
-  test("falls back rather than rendering nothing for an unknown tool", () => {
-    expect(toolGlyph("some_new_tool")).toBe("•");
+  test("marks an unknown tool rather than rendering nothing", () => {
+    expect(toolGlyph("some_new_tool")).toBe("·");
+  });
+
+  test("stays one column wide", () => {
+    // It renders into a fixed two-column gutter. A wider mark would push every
+    // tool row's content out of line with the rest of the transcript.
+    expect([...toolGlyph("grep")]).toHaveLength(1);
   });
 });
 

@@ -1,45 +1,53 @@
 import chalk from "chalk";
 import type { Theme } from "cli-highlight";
+import { colors } from "./theme";
 
 /**
  * Syntax colours for code shown in the TUI — diff rows and fenced code blocks.
  *
  * cli-highlight defaults to the 16-colour ANSI palette, which renders as flat
- * primary red/green/blue and reads nothing like the rest of the interface. These
- * are the same hues the markdown renderer already uses, so highlighted code and
- * prose belong to one palette.
+ * primary red/green/blue and reads nothing like the rest of the interface.
+ *
+ * Every entry is a theme token, so highlighted code and the chrome around it are
+ * one system. This file used to say that and not do it: it carried thirty of its
+ * own hex literals on a third palette, One Dark's, which agreed with neither the
+ * interface nor the markdown renderer it claimed to match.
+ *
+ * Six roles, drawn from the tokens: periwinkle for keywords, indigo for the
+ * names of things, teal for built-ins and attributes, emerald for strings, amber
+ * for literals, neutrals for everything else.
  */
 export const syntaxTheme: Theme = {
-  keyword: chalk.hex("#9d7cd8"),
-  built_in: chalk.hex("#56b6c2"),
-  type: chalk.hex("#e5c07b"),
-  literal: chalk.hex("#d19a66"),
-  number: chalk.hex("#d19a66"),
-  regexp: chalk.hex("#7fd88f"),
-  string: chalk.hex("#7fd88f"),
-  subst: chalk.hex("#e5e5e5"),
-  symbol: chalk.hex("#56b6c2"),
-  class: chalk.hex("#e5c07b"),
-  function: chalk.hex("#61afef"),
-  title: chalk.hex("#61afef"),
-  params: chalk.hex("#e5e5e5"),
-  comment: chalk.hex("#6b7280").italic,
-  doctag: chalk.hex("#9d7cd8"),
-  meta: chalk.hex("#a3a3a3"),
-  "meta-keyword": chalk.hex("#9d7cd8"),
-  "meta-string": chalk.hex("#7fd88f"),
-  section: chalk.hex("#61afef").bold,
-  tag: chalk.hex("#9d7cd8"),
-  name: chalk.hex("#61afef"),
-  attr: chalk.hex("#56b6c2"),
-  attribute: chalk.hex("#56b6c2"),
-  variable: chalk.hex("#e5e5e5"),
-  bullet: chalk.hex("#fab283"),
-  quote: chalk.hex("#e5c07b"),
-  link: chalk.hex("#56b6c2").underline,
+  keyword: chalk.hex(colors.primary),
+  built_in: chalk.hex(colors.accent),
+  type: chalk.hex(colors.secondary),
+  literal: chalk.hex(colors.warningBase),
+  number: chalk.hex(colors.warningBase),
+  regexp: chalk.hex(colors.successBase),
+  string: chalk.hex(colors.successBase),
+  subst: chalk.hex(colors.textBase),
+  symbol: chalk.hex(colors.accent),
+  class: chalk.hex(colors.secondary),
+  function: chalk.hex(colors.secondary),
+  title: chalk.hex(colors.secondary),
+  params: chalk.hex(colors.textBase),
+  comment: chalk.hex(colors.textFaint).italic,
+  doctag: chalk.hex(colors.primary),
+  meta: chalk.hex(colors.textMuted),
+  "meta-keyword": chalk.hex(colors.primary),
+  "meta-string": chalk.hex(colors.successBase),
+  section: chalk.hex(colors.secondary).bold,
+  tag: chalk.hex(colors.primary),
+  name: chalk.hex(colors.secondary),
+  attr: chalk.hex(colors.accent),
+  attribute: chalk.hex(colors.accent),
+  variable: chalk.hex(colors.textBase),
+  bullet: chalk.hex(colors.primary),
+  quote: chalk.hex(colors.borderStrong),
+  link: chalk.hex(colors.accent).underline,
   emphasis: chalk.italic,
   strong: chalk.bold,
-  addition: chalk.hex("#7dd3fc"),
-  deletion: chalk.hex("#f0a6bb"),
-  default: chalk.hex("#e5e5e5"),
+  addition: chalk.hex(colors.diffAdd),
+  deletion: chalk.hex(colors.diffRemove),
+  default: chalk.hex(colors.textBase),
 };

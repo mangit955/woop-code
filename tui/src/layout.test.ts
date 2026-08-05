@@ -112,6 +112,7 @@ describe("width fitting", () => {
     for (let height = 6; height <= 40; height++) {
       const layout = planLayout(80, height);
       const fixed =
+        (layout.showDialogBorder ? 2 : 0) + // border, top and bottom
         2 + // padding
         1 + layout.dialogRhythm + // title
         1 + layout.dialogRhythm + // search
@@ -123,6 +124,19 @@ describe("width fitting", () => {
       expect(fixed + layout.dialogListRows + indicators).toBeLessThanOrEqual(height);
       expect(layout.dialogListRows).toBeGreaterThanOrEqual(1);
     }
+  });
+
+  test("drops the dialog border before it drops the list", () => {
+    // The border is decoration and costs two rows. In a window short enough that
+    // paying for it would leave nothing to list, it goes — the same order the
+    // hints and the label already degrade in. Adding it unconditionally made a
+    // 6-row terminal unable to fit a dialog at all.
+    expect(planLayout(80, 30).showDialogBorder).toBe(true);
+    expect(planLayout(80, 6).showDialogBorder).toBe(false);
+
+    // And it is genuinely paid for where it is drawn: two rows the list gives up.
+    const withBorder = planLayout(80, 30);
+    expect(withBorder.dialogListRows).toBe(30 - 15);
   });
 });
 

@@ -275,9 +275,9 @@ export function Prompt({
           showHeader={layout.showCommandPopupHeader}
         />
       )}
-      <Box 
-        backgroundColor="#1a1a1a" 
-        flexDirection="row" 
+      <Box
+        backgroundColor={colors.bgInset}
+        flexDirection="row"
         width="100%" 
         position="relative"
         borderStyle="single"
@@ -321,9 +321,13 @@ export function Prompt({
                 {modelName ?? "Model"}
               </Text>
             </Box>
-            {showProvider && (
+            {/* The provider it is actually talking to. This was the literal
+                " Google" — the prop was passed in and ignored, so the composer
+                claimed Google on every provider — and with no separator, which
+                ran it into the model name as "Gemini 3 Pro Google". */}
+            {showProvider && providerName && (
               <Box flexShrink={0}>
-                <Text color={colors.textFaint}> Google</Text>
+                <Text color={colors.textFaint}>{` · ${providerName}`}</Text>
               </Box>
             )}
           </Box>

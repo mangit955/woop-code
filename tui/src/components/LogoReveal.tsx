@@ -146,7 +146,7 @@ function renderScanReveal(
       </Text>
       {/* Scan line character (if not at end) */}
       {scanIndex < text.length && (
-        <Text bold={bold} color={color} backgroundColor="gray">
+        <Text bold={bold} color={color} backgroundColor={colors.borderBase}>
           {text[scanIndex]}
         </Text>
       )}

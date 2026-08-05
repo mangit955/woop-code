@@ -1,7 +1,16 @@
 /**
- * Theme configuration inspired by OpenCode's dark design system.
- * Uses a near-black base with a soft-periwinkle primary, indigo secondary, and
- * muted grays.
+ * The one place a colour literal appears.
+ *
+ * The interface is a single periwinkle accent over neutrals, with amber, emerald
+ * and red reserved for meaning — plan mode, success, failure — and teal for
+ * code. Everything else in `tui/` reads a token from here, so a hue cannot enter
+ * the interface without being named first. `styles/tokens.test.ts` enforces that:
+ * it fails on a raw hex or a named ANSI colour anywhere outside this directory.
+ *
+ * The rule is worth the test. The palette had fractured into five sources — this
+ * file, a separate markdown palette on One Dark hues, a syntax theme on a third
+ * set, an orange selection row hardcoded into all four pickers, and bare
+ * `color="green"` ANSI — so one screen could show ten hues from four systems.
  */
 
 export const colors = {
@@ -10,25 +19,62 @@ export const colors = {
   textMuted: "#a3a3a3", // Neutral 400
   textFaint: "#737373", // Neutral 500
   textStrong: "#ffffff",
-  textAccent: "#ACA3EC",
+  textAccent: "#aca3ec",
   textCode: "#2dd4bf", // Teal 400
 
-  // Background colors
+  // ─── Surfaces ──────────────────────────────────────────────────────────────
+  //
+  // Named for what they are in the stack rather than for a neutral step, and
+  // these are the values actually painted. The app used to draw #000000,
+  // #101010, #1a1a1a and #1e1e1e as literals while the tokens described a
+  // different set entirely — which meant `dimHex` faded toward a colour nothing
+  // ever drew.
+  /** What the app paints edge to edge. Every layer below sits on this. */
+  bgCanvas: "#000000",
   bgBase: "#0a0a0a", // Neutral 950
   bgLayer01: "#171717", // Neutral 900
   bgLayer02: "#262626", // Neutral 800
+  /** A dialog floating over the app. Paired with a border — see bgElevated's use. */
+  bgElevated: "#141414",
+  /** Recessed strips: the composer card, the command popup, a quoted command. */
+  bgInset: "#1a1a1a",
+  /** Behind an inline code span. */
+  bgCode: "#1e1e1e",
 
   // Border colors
   borderBase: "#404040", // Neutral 700
   borderMuted: "#262626", // Neutral 800
   borderStrong: "#525252", // Neutral 600
-  borderActive: "#ACA3EC", // Periwinkle
+  borderActive: "#aca3ec", // Periwinkle
+  /**
+   * The edge of a floating panel, and the one border that carries real meaning.
+   *
+   * Brighter than `borderBase` on purpose. `bgElevated` sits only 1.14:1 above
+   * `bgCanvas`, so the fill cannot say where the dialog stops — the border is
+   * the separation, and a border below 3:1 against the surfaces on either side
+   * of it is one nobody sees on a dim display. Measured, this is 3.11:1 against
+   * the panel and 3.55:1 against the canvas, clearing WCAG 1.4.11 on both sides;
+   * `borderBase` managed 1.78 and 2.03. `styles/contrast.test.ts` holds the bar.
+   */
+  borderElevated: "#646464",
+
+  // ─── Selection ─────────────────────────────────────────────────────────────
+  //
+  // The highlighted row in every picker. It is the accent, not a hue of its own:
+  // this was #fb923c orange in four separate components, a colour that appeared
+  // in no token and belonged to no part of the identity.
+  selectionBg: "#aca3ec",
+  selectionFg: "#0a0a0a",
+  /** Secondary text on a selected row — a description, a timestamp. */
+  selectionFgMuted: "#3d3866",
+  /** A warning on a selected row, dark enough to read on periwinkle. */
+  selectionFgWarn: "#6d3a06",
 
   // Primary and accent
-  primary: "#ACA3EC", // Periwinkle
+  primary: "#aca3ec", // Periwinkle
   // The WOOP half of the wordmark. Its own token rather than `primary` so the
   // logo can be tuned without recolouring every accent in the interface.
-  logo: "#ACA3EC",
+  logo: "#aca3ec",
   secondary: "#818cf8", // Indigo 400
   accent: "#2dd4bf", // Teal 400
 
@@ -57,6 +103,23 @@ export const colors = {
   diffRemoveBg: "#3a1e2b",
   diffModified: "#fbbf24",
 };
+
+/**
+ * The accent as a six-step ramp, lightest to darkest, stepped around `primary`.
+ *
+ * One ramp because there was already one written twice: the status spinner's
+ * head/bloom/trail and the turn footer's pulse were the same six periwinkles in
+ * different orders, in two files, free to drift apart. Anything that animates in
+ * the accent reads it from here.
+ */
+export const primaryRamp = [
+  "#c6c0f4", // bloom — one step lighter than the accent
+  "#aca3ec", // primary
+  "#8f83e0",
+  "#7263ce",
+  "#5a4cab",
+  "#453b82",
+] as const;
 
 export const spacing = {
   xs: 0.5,
@@ -88,7 +151,8 @@ export type Palette = typeof colors;
 /** How far background colours travel toward the terminal background. */
 export const DIM_AMOUNT = 0.6;
 
-function parseHex(hex: string): [number, number, number] | null {
+/** A hex colour as RGB channels, for anything that interpolates between two. */
+export function parseHex(hex: string): [number, number, number] | null {
   const value = hex.trim().replace(/^#/, "");
   const full =
     value.length === 3
@@ -116,7 +180,10 @@ export function dimHex(hex: string, amount = DIM_AMOUNT): string {
   const parsed = parseHex(hex);
   if (!parsed) return hex;
 
-  const background = parseHex(colors.bgBase) ?? [0, 0, 0];
+  // bgCanvas, not bgBase: the target has to be the colour actually painted
+  // behind the thing being faded, or "dimmed" lands short of the background and
+  // the layer keeps a faint glow the rest of the frame does not have.
+  const background = parseHex(colors.bgCanvas) ?? [0, 0, 0];
   const ratio = Math.min(Math.max(amount, 0), 1);
   const channel = (index: 0 | 1 | 2) =>
     Math.round(parsed[index] + (background[index] - parsed[index]) * ratio)
@@ -132,22 +199,24 @@ export const dimmedColors: Palette = Object.fromEntries(
 ) as Palette;
 
 /**
- * Markdown body colours. Separate from `colors` because they are a syntax
- * palette rather than a UI one, but they dim the same way — assistant prose is
- * most of what sits behind a dialog.
+ * Markdown body colours. Its own object because prose has roles the chrome does
+ * not — a heading is not a "primary", it is a heading — and because it dims the
+ * same way, assistant prose being most of what sits behind a dialog. But every
+ * value is a token: these were One Dark purple, orange and peach, so the model's
+ * reply was painted in a palette the interface around it did not share.
  */
 export const markdownColors = {
-  text: "#eeeeee",
-  heading: "#9d7cd8",
-  strong: "#f5a742",
-  emph: "#e5c07b",
-  code: "#7fd88f",
-  link: "#fab283",
-  linkText: "#56b6c2",
-  blockQuote: "#e5c07b",
-  listItem: "#fab283",
-  listEnum: "#56b6c2",
-  hr: "#808080",
+  text: colors.textBase,
+  heading: colors.primary,
+  strong: colors.textStrong,
+  emph: colors.secondary,
+  code: colors.accent,
+  link: colors.secondary,
+  linkText: colors.accent,
+  blockQuote: colors.borderStrong,
+  listItem: colors.primary,
+  listEnum: colors.secondary,
+  hr: colors.borderBase,
 } as const;
 
 export type MarkdownPalette = { -readonly [K in keyof typeof markdownColors]: string };

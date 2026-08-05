@@ -118,7 +118,7 @@ export function CommandPreview({
   const { hiddenAbove, hiddenBelow, showIndicators: useIndicators } = visible;
 
   return (
-    <Box flexDirection="column" flexShrink={0} paddingX={1} backgroundColor="#1a1a1a">
+    <Box flexDirection="column" flexShrink={0} paddingX={1} backgroundColor={colors.bgInset}>
       {visible.showHeader && (
         <Box marginBottom={1}>
           <Text color={colors.textFaint} bold>
@@ -145,15 +145,15 @@ export function CommandPreview({
             height={1}
             flexShrink={0}
             paddingX={1}
-            backgroundColor={isSelected ? "#fb923c" : undefined}
+            backgroundColor={isSelected ? colors.selectionBg : undefined}
           >
             <Box width={NAME_COLUMN_WIDTH} flexShrink={0}>
-              <Text color={isSelected ? "#000000" : colors.primary}>/</Text>
-              <Text bold color={isSelected ? "#000000" : colors.textBase}>
+              <Text color={isSelected ? colors.selectionFg : colors.primary}>/</Text>
+              <Text bold color={isSelected ? colors.selectionFg : colors.textBase}>
                 {cmd.name}
               </Text>
             </Box>
-            <Text color={isSelected ? "#431407" : colors.textMuted} wrap="truncate-end">
+            <Text color={isSelected ? colors.selectionFgMuted : colors.textMuted} wrap="truncate-end">
               {cmd.description}
               {aliases}
             </Text>

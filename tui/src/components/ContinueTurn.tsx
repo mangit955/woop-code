@@ -41,7 +41,9 @@ export function ContinueTurn({ continuation }: { continuation: PendingContinuati
         width={layout.dialogWidth}
         paddingX={layout.dialogWidth < 40 ? 1 : 3}
         paddingY={1}
-        backgroundColor="#101010"
+        backgroundColor={colors.bgElevated}
+        borderStyle={layout.showDialogBorder ? "round" : undefined}
+        borderColor={colors.borderElevated}
       >
         <Box justifyContent="space-between" marginBottom={layout.dialogRhythm}>
           <Text bold color={colors.textStrong}>

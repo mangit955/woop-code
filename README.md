@@ -89,7 +89,7 @@ The conversation, provider configuration, and local state are stored in:
 
 ### Session history
 
-A session is one saved conversation, belonging to the project it happened in. It is written after every turn using an atomic write, so an interrupted session does not leave a half-written transcript behind. Restarting Woopcode in the same repository resumes the newest one; starting it somewhere else does not, because sessions live under `sessions/<project>/` rather than in one file shared by every repository.
+A session is one saved conversation, belonging to the project it happened in. It is written after every turn using an atomic write, so an interrupted session does not leave a half-written transcript behind. Restarting Woopcode opens a fresh session rather than reopening the last one, because a conversation restored without being asked for is state nothing on screen accounts for. Sessions live under `sessions/<project>/` rather than in one file shared by every repository, so a resume only ever offers you that repository's own.
 
 `/new` starts a fresh session and keeps the old one — `/resume` goes back to it, `/rename` gives it a name, `/branch` copies it to try a second approach, and `woopcode --continue` / `--resume` do the same from the command line. Sessions are deleted 30 days after their last turn; `retentionDays` changes that and `0` keeps them forever.
 

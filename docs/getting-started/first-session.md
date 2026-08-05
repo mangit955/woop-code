@@ -99,14 +99,13 @@ A few commands are worth knowing on day one:
 | `/new` | Clear the conversation and start fresh |
 | `/workspace` | Show the repository Woopcode thinks it is in |
 
-Your conversation is saved after every turn, so quitting and restarting resumes
-where you left off. `/new` is how you deliberately drop that history.
+Your conversation is saved after every turn, so nothing is lost when you quit.
+Starting Woopcode again opens a fresh session rather than reopening it —
+`woopcode --continue` goes back to the newest one, and `/resume` picks from a
+list. `/new` starts a fresh one without leaving the session you are in.
 
-:::warning
-There is one history file, not one per repository. Starting Woopcode in a
-different project resumes the same conversation, so run `/new` when you switch
-— otherwise the agent begins with context from somewhere else entirely.
-:::
+Sessions belong to the project they happened in, so a repository only ever shows
+you its own. See [Sessions & history](/docs/guides/sessions-and-history).
 
 ## When it does not work
 

@@ -27,7 +27,7 @@ directory.
 | `-m, --model <model>` | Model id for this run only; the saved selection is left alone |
 | `-c, --continue` | Reopen the newest session in this project |
 | `--resume <session>` | Reopen a session by name, id or id prefix |
-| `--new` | Start a fresh session instead of continuing |
+| `--new` | Start a fresh session — what a bare launch already does |
 | `--fork-session` | With `--continue` or `--resume`, branch instead of writing into it |
 | `-n, --name <name>` | Name a new session so it can be resumed by name |
 | `--no-session-persistence` | With `--prompt`, do not save the session |
@@ -57,14 +57,15 @@ woopcode
 
 ### Sessions
 
-A bare launch reopens the newest session in that project. The flags pick a
-different one:
+A bare launch starts a fresh session, keeping whatever was saved before. The
+flags go back to one:
 
 ```bash
-woopcode --continue                 # explicit about the default
+woopcode --continue                 # the newest session in this project
 woopcode --resume auth-refactor     # by name
 woopcode --resume 3f9c1a2b          # by id prefix
-woopcode --new                      # start fresh, keeping the old one
+woopcode --resume                   # pick from a list
+woopcode --new                      # explicit about the default
 woopcode --continue --fork-session  # branch rather than continue in place
 woopcode -n auth-refactor           # name the session as it starts
 ```

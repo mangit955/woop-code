@@ -45,11 +45,13 @@ export interface RunAgentOptions {
 /**
  * Turns the session flags into what `AgentController.initialize` takes.
  *
- * The two entry points differ in one default and it matters: the TUI continues
- * where you left off, because that is what Woopcode has always done and what
- * the documentation promises, while `-p` starts clean. A headless run used to
- * inherit whatever the interactive session had been doing, which is a surprise
- * for a scripted caller and impossible to opt out of.
+ * Both entry points start clean, and resuming is something you ask for. The TUI
+ * used to continue the newest session in the project on a bare launch, which is
+ * invisible state: nothing on screen says a conversation was restored, and the
+ * home screen — which renders only on an empty timeline — silently stopped
+ * appearing from the second launch onwards. `-p` already worked this way,
+ * because inheriting whatever the interactive session had been doing is a
+ * surprise a scripted caller cannot see coming.
  */
 export function sessionOptionsFrom(
   options: RunAgentOptions,
@@ -66,10 +68,7 @@ export function sessionOptionsFrom(
 
   return {
     ...(resumeRef ? { sessionRef: resumeRef } : {}),
-    continueLatest:
-      !options.new &&
-      !resumeRef &&
-      (options.continue === true || mode === "interactive"),
+    continueLatest: !options.new && !resumeRef && options.continue === true,
     fork: options.forkSession === true,
     ...(options.name ? { name: options.name } : {}),
     persist: options.sessionPersistence !== false,
@@ -85,7 +84,7 @@ export function addSessionOptions(command: Command): Command {
   return command
     .option("-c, --continue", "resume the newest session in this project")
     .option("--resume [session]", "resume a session by name or id")
-    .option("--new", "start a fresh session instead of continuing")
+    .option("--new", "start a fresh session (the interactive default)")
     .option("--fork-session", "with --continue or --resume, branch instead of writing into it")
     .option("-n, --name <name>", "name a new session so it can be resumed by name")
     .option("--no-session-persistence", "with --prompt, do not save the session");
@@ -409,8 +408,10 @@ async function runInteractive(
     store.hydrateTimeline(resumed.messages);
   }
 
-  // A bare `--resume` asks to choose. The newest session is loaded above so
-  // there is something behind the dialog and something to fall back to on Esc.
+  // A bare `--resume` asks to choose. Nothing is loaded behind it — a launch no
+  // longer continues anything on its own — so the dialog opens over the home
+  // screen and Esc leaves you in the fresh session rather than in whichever one
+  // happened to be newest.
   if (session.openPicker) store.openSessionPicker();
 
   const homeScreen = await buildHomeScreen(provider);

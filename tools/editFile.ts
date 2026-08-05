@@ -102,12 +102,10 @@ export const editFileTool: Tool = {
       return `No changes needed for ${path}`;
     }
 
-    // Generate unified diff
     const diff = createTwoFilesPatch(path, path, content, updated, "", "", {
       context: 3,
     });
 
-    // Create pending edit
     const pendingEdit: PendingEdit = {
       id: crypto.randomUUID(),
       filePath: path,
@@ -117,7 +115,6 @@ export const editFileTool: Tool = {
       toolCallId: crypto.randomUUID(),
     };
 
-    // Request approval from UI
     let approved: boolean;
     try {
       approved = await store.setPendingEdit(pendingEdit);
@@ -133,7 +130,8 @@ export const editFileTool: Tool = {
       return message;
     }
 
-    // Write file after approval
+    // The only write in this tool, and it sits below both exits above. Nothing
+    // may move above them: the diff review is the product's whole guarantee.
     await Bun.write(path, updated);
 
     return outcome.replacements > 1

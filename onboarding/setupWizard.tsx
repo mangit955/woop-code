@@ -71,7 +71,6 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
         return;
       }
 
-      // Save configuration
       const config = await getConfig();
       config.defaultProvider = selectedProvider.id;
       // A provider chosen in the wizard may have no entry yet.

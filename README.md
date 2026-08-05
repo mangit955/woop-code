@@ -97,6 +97,47 @@ Only user and assistant messages are persisted, capped at the most recent messag
 
 History written by a version before sessions existed is imported once into a `legacy` bucket, reachable from the `/resume` picker with <kbd>Ctrl</kbd>+<kbd>A</kbd>. Resume it and take a turn and it becomes that project's session; open it only to read and it stays put.
 
+## How it is measured
+
+Woopcode is benchmarked on [Harbor](https://github.com/laude-institute/harbor)'s
+`terminal-bench-2` as an installed agent: the harness installs the published CLI
+into the task container and runs `woopcode -p` once per task, so what is measured
+is the thing users get rather than a bespoke harness build. `harbor_woopcode/`
+holds the integration.
+
+Context changes are measured before they ship, against ten recorded benchmark
+trajectories rather than against intuition:
+
+```bash
+bun run replay:baseline
+```
+
+The harness replays each trajectory's prompt assembly and reports peak size and
+what a given budget would have done — 932 iterations, no API calls, nothing spent.
+
+**The measurements decide the defaults, including against the obvious answer.**
+Tool history is the only part of the prompt that grows: across the corpus, peak
+prompt size ran from 22,639 to 219,179 characters while the system prompt,
+repository context and conversation stayed flat. Compacting it works by the
+character count — 36–43% off peak prompts at matched depth, confirmed live — and
+it is **off by default**, because the same benchmark run cost a task that had
+been passing. Reading the provider's own token counts back out of both runs
+explained why: implicit caching stopped entirely, 18.1M cached tokens of 23.2M
+becoming 1.1M of 11.6M, because rewriting the older messages moves the cache
+prefix on every request. At iteration 200, uncompacted, only 16k of a 96k prompt
+was billed at full rate; compacted, all 29k was. Peak characters fell by two
+thirds for roughly no saving.
+
+The code, its tests and the measurements all stay — `WOOPCODE_TOOL_HISTORY_BUDGET`
+enables it — but the default follows the billing, not the character count.
+`runtime/compaction.ts` carries the full numbers and the two variants worth
+trying next.
+
+What the harness cannot tell you is stated where it runs: it reports cache rates
+observed for the original recordings, and a modified prompt assembly cannot
+inherit them. The fixtures reconstruct prompt *sizes* faithfully; they are not a
+conversation that can be replayed against a live provider.
+
 ## Built-in tools
 
 Woopcode ships with a fixed set of tools, grouped by what they touch.

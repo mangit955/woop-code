@@ -138,6 +138,51 @@ describe("UIStore edit approvals", () => {
     expect(store.getState().pendingEdit).toBeNull();
   });
 
+  /**
+   * Cancelling and declining are two different answers, and only the rejection
+   * distinguishes them. `editFile` catches it to report "Edit cancelled"; a
+   * resolved false takes the other branch and tells the model "Edit rejected
+   * ... Do not claim this edit was completed". Collapsing the two would report
+   * an interrupted turn as a refusal the user never made.
+   *
+   * The dismissal test below covers `dismissTopModal`, which declines. Nothing
+   * covered this path: the overlay tests call `clearPendingEdit` only as
+   * teardown and swallow the rejection, so resolving false here stayed green.
+   */
+  test("cancelling a turn rejects the waiting edit rather than declining it", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingEdit({
+      id: "edit-cancel",
+      filePath: "src/example.ts",
+      oldContent: "old",
+      newContent: "new",
+      diff: "@@ -1 +1 @@\n-old\n+new",
+      toolCallId: "tool-1",
+    });
+
+    store.clearPendingEdit();
+
+    await expect(decision).rejects.toThrow("Edit cancelled");
+    expect(store.getState().pendingEdit).toBeNull();
+  });
+
+  test("clearing the timeline cancels an edit left waiting on the screen", async () => {
+    const store = new UIStore();
+    const decision = store.setPendingEdit({
+      id: "edit-clear",
+      filePath: "src/example.ts",
+      oldContent: "old",
+      newContent: "new",
+      diff: "@@ -1 +1 @@\n-old\n+new",
+      toolCallId: "tool-1",
+    });
+
+    store.clearTimeline();
+
+    await expect(decision).rejects.toThrow("Edit cancelled");
+    expect(store.getState().pendingEdit).toBeNull();
+  });
+
   test("marks a failed tool instead of leaving a spinner running", () => {
     const store = new UIStore();
     store.startTool({ id: "tool-1", name: "edit_file", arguments: {} });

@@ -36,7 +36,6 @@ export function getConfigDir(): string {
     configDir = join(xdgConfigHome, "woopcode");
   }
 
-  // Ensure directory exists
   if (!existsSync(configDir)) {
     mkdirSync(configDir, { recursive: true });
   }

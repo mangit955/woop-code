@@ -3,7 +3,8 @@ import type { ParsedCommand } from "./types";
 export function parseInput(input: string): ParsedCommand {
   const trimmed = input.trim();
 
-  //discovery mode
+  // A bare slash lists what is available rather than failing as an unknown
+  // command, which is what makes the commands discoverable at all.
   if (trimmed === "/") {
     return { type: "discovery", originalInput: input };
   }

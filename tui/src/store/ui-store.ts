@@ -503,7 +503,6 @@ export class UIStore {
     this.emit();
   }
 
-  // Pending Edit Management
   setPendingEdit(edit: PendingEdit): Promise<boolean> {
     if (this.nonInteractive) {
       return Promise.resolve(this.nonInteractiveApproval);
@@ -523,48 +522,37 @@ export class UIStore {
   }
 
   approvePendingEdit() {
-    const edit = this.state.pendingEdit;
-    if (!edit) return;
-
-    const resolver = this.editResolvers.get(edit.id);
-    if (resolver) {
-      resolver.resolve(true);
-      this.editResolvers.delete(edit.id);
-    }
-
-    this.state = {
-      ...this.state,
-      pendingEdit: null,
-      pendingEditScrollOffset: 0,
-    };
-    this.emit();
+    this.resolvePendingEdit("approved");
   }
 
   rejectPendingEdit() {
-    const edit = this.state.pendingEdit;
-    if (!edit) return;
-
-    const resolver = this.editResolvers.get(edit.id);
-    if (resolver) {
-      resolver.resolve(false);
-      this.editResolvers.delete(edit.id);
-    }
-
-    this.state = {
-      ...this.state,
-      pendingEdit: null,
-      pendingEditScrollOffset: 0,
-    };
-    this.emit();
+    this.resolvePendingEdit("rejected");
   }
 
   clearPendingEdit() {
+    this.resolvePendingEdit("cancelled");
+  }
+
+  /**
+   * Settles the pending edit and takes it off the screen.
+   *
+   * Cancelling rejects where rejecting resolves false, and the two are not
+   * interchangeable: `editFile` catches the rejection to report that the edit
+   * was cancelled, and returns the rather firmer "Edit rejected ... Do not
+   * claim this edit was completed" on a false. Collapsing them would tell the
+   * model a dismissed dialog was a refusal.
+   */
+  private resolvePendingEdit(outcome: "approved" | "rejected" | "cancelled") {
     const edit = this.state.pendingEdit;
     if (!edit) return;
 
     const resolver = this.editResolvers.get(edit.id);
     if (resolver) {
-      resolver.reject(new Error("Edit cancelled"));
+      if (outcome === "cancelled") {
+        resolver.reject(new Error("Edit cancelled"));
+      } else {
+        resolver.resolve(outcome === "approved");
+      }
       this.editResolvers.delete(edit.id);
     }
 

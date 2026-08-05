@@ -35,7 +35,6 @@ Examples:
       throw new Error("At least one question is required");
     }
 
-    // Validate questions
     const validQuestions = questions.filter(
       (q) => typeof q === "string" && q.trim().length > 0
     );

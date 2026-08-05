@@ -100,7 +100,6 @@ function runOnboarding(): Promise<void> {
       }),
     );
 
-    // Handle Ctrl+C gracefully
     const handleExit = () => {
       if (!hasCompleted) {
         unmount();

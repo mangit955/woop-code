@@ -293,10 +293,10 @@ async function runInteractive(
   modelOverride?: string,
   session: InitializeOptions = { continueLatest: true },
 ) {
-  // Register slash commands
   registerCommands();
 
-  // Ensure provider is configured (launches onboarding if needed)
+  // Launches onboarding when nothing is configured, so this may not return
+  // immediately on a first run.
   const { provider, apiKey } = await ensureProviderConfigured();
 
   const config = await getConfig();
@@ -375,7 +375,6 @@ async function runInteractive(
     },
 
     onDone() {
-      //console.log("onDone received");
       store.finishAssistantMessage();
       store.setStatus("Ready");
     },

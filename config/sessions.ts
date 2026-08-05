@@ -361,6 +361,44 @@ async function writeIndex(slug: string, index: SessionIndex): Promise<void> {
   await writeJsonAtomic(getSessionIndexPath(slug), index);
 }
 
+/**
+ * What a caller means when the index it wanted to change is not there.
+ *
+ * Not a detail to default: saving a record rebuilds from the files on disk so
+ * the new row joins the existing ones rather than replacing them; pruning
+ * starts from empty because it is about to write the rows it kept; and removing
+ * a session does nothing at all, since there is no row to take out and writing
+ * an index here would create the directory lazy creation exists to avoid.
+ */
+type MissingIndex = "rebuild" | "empty" | "skip";
+
+/**
+ * Reads a project's index, applies `mutate`, writes the result back.
+ *
+ * Every caller wants those three steps and no caller wants two of them, but
+ * each spelled the sequence out itself — five copies of a read-modify-write
+ * that has already lost a row once. This does not close the window between the
+ * read and the write; two processes still interleave, which is why
+ * `summariesFor` compares the row count against the files on disk and rebuilds
+ * when they disagree. It puts the pattern in one place, so the next change to
+ * it is one edit rather than five.
+ */
+async function updateIndex(
+  slug: string,
+  onMissing: MissingIndex,
+  mutate: (index: SessionIndex) => SessionIndex,
+): Promise<void> {
+  const existing = await readIndex(slug);
+  if (!existing && onMissing === "skip") return;
+
+  const index = existing ?? {
+    version: SESSION_VERSION,
+    sessions: onMissing === "rebuild" ? await rebuildIndex(slug) : [],
+  };
+
+  await writeIndex(slug, mutate(index));
+}
+
 /** Session files on disk for a project, ignoring the index entirely. */
 function sessionFileCount(slug: string): number {
   const directory = getProjectSessionsDir(slug);
@@ -481,16 +519,15 @@ async function writeSessionRecord(record: SessionRecord): Promise<SessionRecord>
   mkdirSync(getProjectSessionsDir(slug), { recursive: true });
   await writeJsonAtomic(getSessionPath(slug, trimmed.id), trimmed);
 
-  const index = (await readIndex(slug)) ?? {
-    version: SESSION_VERSION,
-    sessions: await rebuildIndex(slug),
-  };
   const summary = summarize(trimmed, slug);
-  const sessions = [
-    summary,
-    ...index.sessions.filter((session) => session.id !== trimmed.id),
-  ].sort(byRecency);
-  await writeIndex(slug, { ...index, version: SESSION_VERSION, sessions });
+  await updateIndex(slug, "rebuild", (index) => ({
+    ...index,
+    version: SESSION_VERSION,
+    sessions: [
+      summary,
+      ...index.sessions.filter((session) => session.id !== trimmed.id),
+    ].sort(byRecency),
+  }));
 
   return trimmed;
 }
@@ -540,13 +577,10 @@ async function removeFromProject(slug: string, id: string): Promise<void> {
     const path = getSessionPath(slug, id);
     if (existsSync(path)) rmSync(path, { force: true });
 
-    const index = await readIndex(slug);
-    if (!index) return;
-
-    await writeIndex(slug, {
+    await updateIndex(slug, "skip", (index) => ({
       ...index,
       sessions: index.sessions.filter((session) => session.id !== id),
-    });
+    }));
   } catch {
     // See above: leaving it listed is the safer failure.
   }
@@ -666,13 +700,12 @@ export async function pruneSessions(
     }
 
     if (removedHere > 0) {
-      const index = (await readIndex(slug)) ?? { version: SESSION_VERSION, sessions: [] };
-      await writeIndex(slug, {
+      await updateIndex(slug, "empty", (index) => ({
         ...index,
         version: SESSION_VERSION,
         lastPrunedAt: now,
         sessions: kept,
-      });
+      }));
     }
   }
 
@@ -709,8 +742,7 @@ export async function pruneIfDue(
 
   // Stamped even when nothing was removed, or a store with no expired sessions
   // would rescan every launch.
-  const current = (await readIndex(slug)) ?? { version: SESSION_VERSION, sessions: [] };
-  await writeIndex(slug, { ...current, lastPrunedAt: now });
+  await updateIndex(slug, "empty", (index) => ({ ...index, lastPrunedAt: now }));
 
   return removed;
 }

@@ -59,9 +59,14 @@ export async function ensureProviderConfigured(): Promise<ProviderCredentials> {
   // never arrive, so an unconfigured non-interactive run must fail with a
   // message that names the fix rather than hanging until the caller's timeout.
   if (!canPromptInteractively()) {
+    // Every supported vendor variable is named, not just Gemini's. This
+    // message is the only instruction a headless caller gets, and pointing a
+    // user who holds an OpenAI key at GEMINI_API_KEY sends them to buy a
+    // credential they already have the equivalent of.
     throw new Error(
       "No provider is configured and there is no terminal to run setup in.\n" +
-        "Set GEMINI_API_KEY (or WOOPCODE_API_KEY with WOOPCODE_PROVIDER) in the environment.",
+        "Set one of GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY in the\n" +
+        "environment, or WOOPCODE_API_KEY together with WOOPCODE_PROVIDER.",
     );
   }
 

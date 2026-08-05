@@ -80,7 +80,7 @@ export interface PendingEdit {
 export interface PendingCommand {
   id: string;
   command: string;
-  toolName: "run_terminal" | "run_tests";
+  toolName: "run_terminal" | "run_tests" | "repl" | "process_start";
   /** Why it needs approval, from the classifier. */
   risk?: CommandRisk;
 }

@@ -22,6 +22,7 @@ import {
   type SessionRecord,
 } from "../config/sessions";
 import { agentLoop } from "../runtime/loop";
+import { stopAllProcesses } from "../tools/process";
 import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
 import {
   nextSessionMode,
@@ -463,6 +464,16 @@ export class AgentController {
   }
 
   async dispose() {
+    // Background processes are the one thing here that outlives a turn by
+    // design — a server started while answering one question has to still be
+    // up for the next. This is where that ends: both the TUI's exit handler
+    // and the headless path come through dispose, so a session cannot end
+    // leaving a spawned process holding its port.
+    //
+    // Before the persist below rather than after, because persisting can fail
+    // and must not be what decides whether the processes are cleaned up.
+    stopAllProcesses();
+
     if (this.wasCancelled) {
       this.pendingAssistantText = null;
       this.removePendingUserMessage();

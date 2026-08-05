@@ -77,7 +77,12 @@ export const terminalTool: Tool = {
     }
     
     if (startsBackgroundProcess(command)) {
-      return "Error: Background processes (&) are not supported. Use run_terminal for quick commands only (tests, builds, installs), not for starting servers.";
+      return (
+        "Error: this tool waits for the command to finish, so a trailing & has " +
+        "nothing to return. Use process_start to run it in the background — it " +
+        "returns an id you can read with process_output and end with process_stop. " +
+        "Keep run_terminal for commands that exit on their own."
+      );
     }
 
     try {
@@ -87,7 +92,12 @@ export const terminalTool: Tool = {
         return "Command cancelled before completion.";
       }
       if (error instanceof Error && error.message.includes("timed out")) {
-        return `Error: ${error.message}\n\nNote: For long-running processes like servers, the agent cannot verify them. Just create/edit the code and inform the user to test manually.`;
+        return (
+          `Error: ${error.message}\n\nIf this command was never going to exit on ` +
+          `its own — a server, a watcher — start it with process_start instead and ` +
+          `read it with process_output. If it was simply slow, run it again with a ` +
+          `larger timeout.`
+        );
       }
       throw error;
     }

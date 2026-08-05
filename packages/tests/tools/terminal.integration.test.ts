@@ -26,6 +26,45 @@ describe("terminal Tool - Integration Tests", () => {
   const stdoutOf = (result: string) =>
     result.split("STDOUT:\n")[1]?.split("\n\nSTDERR:")[0] ?? "";
 
+  describe("The shell commands run under", () => {
+    /**
+     * Commands used to run under `sh`, which is dash on Debian — and the
+     * benchmark containers are Debian. A recorded run lost six commands to
+     * `sh: 1: Syntax error: Bad for loop variable` and nothing in the message
+     * told the model the shell was the problem rather than its command.
+     *
+     * These are bash constructs dash does not have. They are skipped where
+     * bash is genuinely absent, which is a real configuration rather than a
+     * failure — the fallback to sh is deliberate.
+     */
+    const hasBash = Bun.which("bash") !== null;
+
+    test.skipIf(!hasBash)("runs a C-style for loop", async () => {
+      const result = await terminalTool.execute({
+        command: "for ((i=0; i<3; i++)); do echo n$i; done",
+      });
+
+      expect(result).toContain("Exit code: 0");
+      expect(stdoutOf(result)).toBe("n0\nn1\nn2\n");
+    });
+
+    test.skipIf(!hasBash)("runs a [[ ]] test", async () => {
+      const result = await terminalTool.execute({
+        command: '[[ "abc" == a* ]] && echo matched',
+      });
+
+      expect(stdoutOf(result)).toBe("matched\n");
+    });
+
+    test.skipIf(!hasBash)("expands an array", async () => {
+      const result = await terminalTool.execute({
+        command: "arr=(one two three); echo ${arr[1]}",
+      });
+
+      expect(stdoutOf(result)).toBe("two\n");
+    });
+  });
+
   describe("Basic Execution", () => {
     test("executes simple command", async () => {
       const result = await terminalTool.execute({
@@ -296,7 +335,9 @@ describe("terminal Tool - Integration Tests", () => {
     });
 
     test("rejects unquoted background operators without rejecting && or redirection", async () => {
-      await expect(terminalTool.execute({ command: "echo ready &" })).resolves.toContain("Background processes");
+      // Still refused, and now pointed at the tool that does this instead of
+      // told to give up — process_start is what a trailing & was reaching for.
+      await expect(terminalTool.execute({ command: "echo ready &" })).resolves.toContain("process_start");
       await expect(terminalTool.execute({ command: "echo ready && echo done" })).resolves.toContain("done");
       await expect(terminalTool.execute({ command: "echo warning >&2" })).resolves.toContain("warning");
     });

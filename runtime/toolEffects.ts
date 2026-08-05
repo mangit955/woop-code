@@ -26,6 +26,17 @@ export const TOOL_EFFECTS: Record<string, Exclude<ToolEffect, "unclassified">> =
   edit_file: "write",
   run_terminal: "shell",
   run_tests: "shell",
+  // Runs arbitrary source in a live interpreter, which reaches the disk exactly
+  // as `python3 -c` does. Graded as shell so that plan mode judges it per call
+  // from the code rather than letting the tool name decide.
+  repl: "shell",
+  process_start: "shell",
+  // Reading a started process's output and stopping it change nothing. They are
+  // still shell rather than read: both name a process this session spawned, and
+  // a mode that refuses to start one has no reason to allow steering it.
+  process_output: "shell",
+  process_stop: "shell",
+  read_image: "read",
   ask_user: "ask",
   // Records the agent's own task list. It reaches the UI and nothing else — no
   // file, no command — which is why it is neither a write nor a read of the
@@ -212,4 +223,75 @@ export function commandOf(args: Record<string, unknown>): string {
     if (typeof value === "string") return value;
   }
   return "";
+}
+
+/** The argument a REPL call carries interpreter source in. */
+export function codeOf(args: Record<string, unknown>): string {
+  const value = args.code;
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * What a block of interpreter source does.
+ *
+ * Separate from `classifyCommand` because shell syntax read over Python or
+ * JavaScript is actively wrong, not merely imprecise. `segmentsOf` splits on
+ * `;` and `|`, which are statement and bitwise-or in both languages, and the
+ * redirect test `/>>?\s*[^&\s>]/` matches `value >> 16` — so `int.from_bytes`
+ * arithmetic would be classified as writing to a file. The benchmark run is
+ * full of exactly that shift: judging it with the shell rules would refuse
+ * half of plan mode's reads.
+ *
+ * So only two things are asked of source, both failing closed:
+ *
+ *  - Does it call a file-writing API? `INLINE_WRITE` is the same pattern the
+ *    shell path already uses for `python3 -c`, which is what a REPL call is a
+ *    longer-lived version of.
+ *  - Does it shell out? A `subprocess.run`, `os.system` or `execSync` can run
+ *    anything at all, and the argument is usually built at runtime, so there is
+ *    nothing here to read. Unrecognised means destructive, as everywhere else.
+ */
+const CODE_SUBPROCESS =
+  /(\bsubprocess\b|\bos\.system\s*\(|\bos\.popen\s*\(|\bchild_process\b|\bexecSync\s*\(|\bspawnSync\s*\(|Bun\.\$)/;
+
+/**
+ * Source that checks something works.
+ *
+ * `assert` counts: in a REPL it is how a check is written, and a turn that
+ * verified its edit that way should not be reported as unverified.
+ */
+const CODE_VERIFIES = /(\bassert\b|\bunittest\b|\bpytest\b)/;
+
+/**
+ * Does this source hand work to another program?
+ *
+ * Asked separately from `classifyCode` because approval grades it differently
+ * from an ordinary write. `open(p, "w")` writes one named file and reads as a
+ * workspace write; `subprocess.run(argv)` builds its argument at runtime and
+ * can do anything at all, so it is graded destructive and asked about.
+ */
+export function codeShellsOut(code: string): boolean {
+  return CODE_SUBPROCESS.test(code);
+}
+
+export function classifyCode(code: string): CommandEffect {
+  if (!code.trim()) return { writes: false, verifies: false };
+
+  return {
+    writes: INLINE_WRITE.test(code) || CODE_SUBPROCESS.test(code),
+    verifies: CODE_VERIFIES.test(code),
+  };
+}
+
+/**
+ * What a tool call does to the workspace, judged from whatever it carries.
+ *
+ * One entry point because there are two callers — plan mode's second gate and
+ * the turn's write/verify marks — and a REPL that only one of them understood
+ * would either be refused while planning or silently allowed through it.
+ */
+export function classifyInvocation(args: Record<string, unknown>): CommandEffect {
+  const code = codeOf(args);
+  if (code) return classifyCode(code);
+  return classifyCommand(commandOf(args));
 }

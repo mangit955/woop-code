@@ -38,6 +38,10 @@ export function parameterSchema(parameter: ToolParameter): JsonSchema {
   const type: JsonSchemaType = parameter.type ?? "string";
   const schema: JsonSchema = { type, description: parameter.description };
 
+  // Emitted for any type, including array, where it constrains the array's own
+  // value rather than its elements — the element case is `items[].enum` below.
+  if (parameter.enum) schema.enum = parameter.enum;
+
   if (type !== "array") return schema;
 
   // An array has to state what it holds. Objects when the parameter describes

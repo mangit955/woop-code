@@ -5,6 +5,7 @@ import { thinkingBudget } from "./client";
 import { defaultModelForProvider } from "./modelCatalog";
 import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "../config/types";
 import { toolInputSchema } from "../config/toolSchema";
+import { imageParts, imageText } from "./images";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 
 /** Only the surface this client uses, so a test can supply a fake. */
@@ -355,9 +356,29 @@ export function buildOpenAIInput(
     emitted.add(i);
 
     switch (message.role) {
-      case "user":
-        input.push({ role: "user", content: message.content });
+      case "user": {
+        const images = imageParts(message.images);
+        const text = imageText(message.content, message.images?.length ?? 0, images);
+        input.push(
+          images.length === 0
+            ? { role: "user", content: text }
+            : {
+                role: "user",
+                content: [
+                  { type: "input_text", text },
+                  // A data URL rather than an uploaded file id: the client is
+                  // stateless by choice (`store: false`), so there is nothing
+                  // to hang an uploaded file's lifetime on.
+                  ...images.map((image) => ({
+                    type: "input_image" as const,
+                    image_url: `data:${image.mediaType};base64,${image.base64}`,
+                    detail: "auto" as const,
+                  })),
+                ],
+              },
+        );
         break;
+      }
 
       case "assistant":
         // A turn that streamed nothing but tool calls leaves an empty assistant

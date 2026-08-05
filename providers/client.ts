@@ -4,6 +4,7 @@ import { SYSTEM_PROMPT } from "../config/systemPrompt";
 import type { Message, ProviderClient, StreamEvent, TokenUsage, Tool } from "../config/types";
 import { toolInputSchema, type JsonSchema, type JsonSchemaType } from "../config/toolSchema";
 import { unsupportedProviderMessage } from "./providerRegistry";
+import { imageParts, imageText } from "./images";
 import { classifyFailure, delay, maxAttempts } from "../runtime/retry";
 import {
   DEFAULT_MODEL_ID,
@@ -372,9 +373,19 @@ export function buildContents(messages: Message[]) {
     const message = messages[i]!;
 
     switch (message.role) {
-      case "user":
-        contents.push({ role: "user", parts: [{ text: message.content }] });
+      case "user": {
+        const images = imageParts(message.images);
+        contents.push({
+          role: "user",
+          parts: [
+            { text: imageText(message.content, message.images?.length ?? 0, images) },
+            ...images.map((image) => ({
+              inlineData: { mimeType: image.mediaType, data: image.base64 },
+            })),
+          ],
+        });
         break;
+      }
 
       case "assistant":
         contents.push({ role: "model", parts: [{ text: message.content }] });

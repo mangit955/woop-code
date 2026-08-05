@@ -13,6 +13,9 @@ import { webSearchTool } from "./webSearch";
 import { webFetchTool } from "./webFetch";
 import { questionTool } from "./question";
 import { todoWriteTool } from "./todo";
+import { replTool } from "./repl";
+import { processStartTool, processOutputTool, processStopTool } from "./process";
+import { readImageTool } from "./readImage";
 
 export const toolRegistry: Tool[] = [
   listFilesTool,
@@ -29,6 +32,11 @@ export const toolRegistry: Tool[] = [
   webFetchTool,
   questionTool,
   todoWriteTool,
+  replTool,
+  processStartTool,
+  processOutputTool,
+  processStopTool,
+  readImageTool,
 ];
 
 // Providers occasionally vary casing or use the singular form while selecting a

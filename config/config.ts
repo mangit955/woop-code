@@ -431,6 +431,24 @@ export async function buildRepositoryContext() {
   );
 }
 
+/**
+ * Is this a real turn of the conversation, or an image the loop attached?
+ *
+ * `read_image` returns text and the loop follows it with a user message
+ * carrying the picture, because that is the only shape all three providers
+ * accept. Those messages are not turns — nobody typed them — and counting them
+ * as turns silently shortens the window to the point of losing the question:
+ * with `MAX_TURNS` at 6, an agent that reads five frames of a video keeps one
+ * real user turn and five copies of "The image requested above:".
+ *
+ * That is the case `read_image` exists for, so it is not an edge case. The
+ * message is still *kept* when it falls inside the window — only the counting
+ * skips it.
+ */
+function isConversationTurn(message: Message | undefined): boolean {
+  return message?.role === "user" && !message.images?.length;
+}
+
 export function recentMessages(
   message: Message[],
   maxTurns: number,
@@ -443,7 +461,7 @@ export function recentMessages(
   let startIndex = 0;
 
   for (let i = message.length - 1; i >= 0; i--) {
-    if (message[i]?.role === "user") {
+    if (isConversationTurn(message[i])) {
       userTurn++;
 
       if (userTurn == maxTurns) {

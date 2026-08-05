@@ -1,6 +1,6 @@
 {
   "counts": {
-    "tools": 14,
+    "tools": 19,
     "commands": 15,
     "approvalModes": 4
   },
@@ -288,6 +288,100 @@
           "type": "array",
           "required": true,
           "description": "The complete task list, in the order the steps will be done. Replaces the previous list."
+        }
+      ]
+    },
+    {
+      "name": "repl",
+      "description": "Runs code in an interpreter that stays alive between calls, so variables, imports and loaded data persist.\n\nUse it instead of `run_terminal` with `python3 -c` or `node -e` whenever the work takes more than one step over the same data. Load a file, parse an archive or decode a video once, then keep querying what is already in memory — re-reading the same input on every call is the single most expensive habit available here.\n\nState lasts for the current turn and is discarded when the turn ends.\n\npython: the value of a trailing expression is printed, as in a notebook.\nnode: a top-level `var` persists between calls; `const` and `let` are scoped to the single call, so assign to `globalThis` for anything that must outlive it.\n\nThis runs real code. It can write files and shell out, and is subject to the same approval and plan-mode rules as run_terminal.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "language",
+          "type": "string",
+          "required": true,
+          "description": "Which interpreter to use."
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true,
+          "description": "Source to evaluate in the session. May be several statements; it runs in the same namespace as previous calls."
+        },
+        {
+          "name": "restart",
+          "type": "boolean",
+          "required": false,
+          "description": "Discard the existing session and start an empty one before running this code. Use after leaving the interpreter in a bad state, not routinely — restarting throws away the loaded data that makes this tool worth using."
+        },
+        {
+          "name": "timeout",
+          "type": "number",
+          "required": false,
+          "description": "Seconds this evaluation may run (default: 120). Exceeding it discards the session and its variables."
+        }
+      ]
+    },
+    {
+      "name": "process_start",
+      "description": "Starts a command in the background and returns immediately with an id.\n\nUse it for anything that does not exit on its own — a development server, a watcher, a long build you want to follow. For a command that finishes and whose output you need, use run_terminal instead; it waits and returns the result in one call.\n\nThe process keeps running after this turn ends. Read what it has printed with process_output and end it with process_stop.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "string",
+          "required": true,
+          "description": "Command to start"
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Directory to run it in. Defaults to the project root."
+        }
+      ]
+    },
+    {
+      "name": "process_output",
+      "description": "Returns what a background process has printed since the last time this was called for it, along with whether it is still running. Output already returned is not repeated.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "The id returned by process_start"
+        }
+      ]
+    },
+    {
+      "name": "process_stop",
+      "description": "Stops a background process and returns any output it had not yet shown. Use it as soon as a process is no longer needed — one left running holds its port and its files.",
+      "effect": "shell",
+      "gate": "Gated by the approval mode.",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "The id returned by process_start"
+        }
+      ]
+    },
+    {
+      "name": "read_image",
+      "description": "Shows you an image. Use it to look at a screenshot, a diagram, a rendered figure or a video frame rather than inferring their contents from pixel statistics.\n\nThe image arrives with the next message, so describe what you are looking for and then read what you actually see. To inspect a frame of a video, extract it to a file first (ffmpeg, or cv2 in the repl) and read that file.\n\nAccepts PNG, JPEG, GIF and WebP.",
+      "effect": "read",
+      "gate": "Runs without asking. Reads only; never changes the workspace.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "required": true,
+          "description": "Path to the image file"
         }
       ]
     }

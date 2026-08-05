@@ -12,6 +12,38 @@ const EXIT_GRACE_MS = 750;
 /** How long SIGTERM is given to work before SIGKILL follows. */
 const FORCE_KILL_AFTER_MS = 500;
 
+/**
+ * The shell commands run under.
+ *
+ * `sh` is dash on Debian, which is what the benchmark containers are, and dash
+ * has no `for ((i=0;;))`, no `[[`, no arrays and no process substitution. A
+ * benchmark run failed six commands on that alone —
+ * `sh: 1: Syntax error: Bad for loop variable` — and the model has no way to
+ * learn from the message that the shell is the problem rather than its command.
+ *
+ * Resolved once: `Bun.which` stats the PATH, and this is on the path of every
+ * command the agent runs. Falls back to `sh`, which is the only shell POSIX
+ * guarantees, so a container without bash still runs commands rather than none.
+ */
+export const SHELL = Bun.which("bash") ?? "sh";
+
+/**
+ * The argv that runs a command in its own process group where possible.
+ *
+ * Shared with `tools/process.ts` rather than copied, because getting it wrong
+ * is invisible until something is left running: a `bash -c "npm run dev"` that
+ * is killed without its group takes down the shell and leaves the server
+ * holding the port. macOS has no `setsid` and falls back to the descendant walk
+ * in `terminateProcessTree`, which is why both halves have to travel together.
+ */
+export function shellArgv(command: string): { cmd: string[]; processGroup: boolean } {
+  const setsid = Bun.which("setsid");
+  return {
+    cmd: setsid ? [setsid, SHELL, "-c", command] : [SHELL, "-c", command],
+    processGroup: Boolean(setsid),
+  };
+}
+
 function childPids(pid: number): number[] {
   // `Bun.spawnSync` throws outright when the executable is missing, and `pgrep`
   // is not installed everywhere — a minimal container is enough to lose it. This
@@ -134,7 +166,7 @@ function signalEverything(
  * running. Killing is best-effort by nature; failing to kill must stay a
  * best-effort failure rather than becoming a hang.
  */
-function terminateProcessTree(proc: ReturnType<typeof Bun.spawn>, processGroup: boolean) {
+export function terminateProcessTree(proc: ReturnType<typeof Bun.spawn>, processGroup: boolean) {
   if (proc.exitCode !== null) return;
 
   try {
@@ -166,10 +198,9 @@ export async function runCommand(
 
   // On platforms with setsid, give the command a dedicated process group so
   // all children can be stopped together. macOS uses the tree-kill fallback.
-  const setsid = Bun.which("setsid");
-  const processGroup = Boolean(setsid);
+  const { cmd, processGroup } = shellArgv(command);
   const proc = Bun.spawn({
-    cmd: processGroup ? [setsid!, "sh", "-c", command] : ["sh", "-c", command],
+    cmd,
     stdout: "pipe",
     stderr: "pipe",
   });

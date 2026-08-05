@@ -1,4 +1,6 @@
 import { getTool, toolRegistry } from "../tools";
+import { closeReplSessions } from "../tools/replSession";
+import { takePendingImages } from "../tools/readImage";
 import { blockedInPlanMode, planModeRefusal, planModeTools } from "./planMode";
 import { isRetryableError } from "./retry";
 import { compactToolHistory, toolHistoryBudget } from "./compaction";
@@ -519,6 +521,23 @@ async function executeToolCall(
   });
 
   pushToolResult(messages, toolCall, toolResult);
+
+  // Images ride on a user message after the tool result, because that is the
+  // only shape all three providers accept — see `ImageAttachment`. Pushed here,
+  // after the result and before the next request, so the model sees the tool's
+  // description of the file and the file itself in the order it asked for them.
+  const images = takePendingImages();
+  if (images.length > 0) {
+    messages.push({
+      role: "user",
+      content:
+        images.length === 1
+          ? "The image requested above:"
+          : `The ${images.length} images requested above:`,
+      images,
+    });
+  }
+
   return { kind: "continue" };
 }
 
@@ -787,6 +806,22 @@ export async function agentLoop(
     callbacks.onError?.(agentError);
     throw agentError;
   } finally {
+    // Interpreter sessions are scoped to the turn, and this is the only place
+    // that runs on every one of its exits — completion, cancellation, an
+    // exhausted budget, a provider failure. A session that outlived its turn
+    // would answer the next one with variables nobody in that conversation set.
+    //
+    // Background processes deliberately do not end here: a server started this
+    // turn has to still be up for the user in the next one, so `process_stop`
+    // and session exit are what end those.
+    closeReplSessions();
+
+    // An image read on the last call before a cancellation is never attached,
+    // because the path that attaches them returns before reaching it. Dropping
+    // it here is what stops it arriving in the next turn, where it would be
+    // introduced as "the image requested above" with no such request in sight.
+    takePendingImages();
+
     // Every exit is a turn that ended and is worth a record: a normal
     // completion, a rejected edit, cancellation, an exhausted budget, a
     // provider failure. A finally is what makes that exactly one record per

@@ -8,7 +8,7 @@
  * site that needed them.
  */
 
-import { classifyCommand, commandOf, toolEffect } from "./toolEffects";
+import { classifyInvocation, toolEffect } from "./toolEffects";
 import type { TurnSummary } from "../config/types";
 
 export class TurnState {
@@ -91,11 +91,12 @@ export class TurnState {
         break;
 
       case "shell": {
-        // Judged from the command, not the tool name. A benchmark run showed
+        // Judged from the call, not the tool name. A benchmark run showed
         // the agent doing its real editing through run_terminal — `sed -i`,
         // `cat >> file` — which name-only classification recorded as
-        // verification, the opposite of what it is.
-        const { writes, verifies } = classifyCommand(commandOf(args));
+        // verification, the opposite of what it is. A `repl` call is judged
+        // from its source for the same reason.
+        const { writes, verifies } = classifyInvocation(args);
 
         // Order matters when a command does both: `sed -i f.c && make` edited
         // and then checked, and the check has to land afterwards for the edit

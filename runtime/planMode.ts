@@ -24,7 +24,7 @@
  */
 
 import type { Tool } from "../config/types";
-import { classifyCommand, commandOf, toolEffect } from "./toolEffects";
+import { classifyInvocation, toolEffect } from "./toolEffects";
 
 /** Which mode a session is in. Cycled with Tab; never written to config. */
 export type SessionMode = "build" | "plan";
@@ -98,10 +98,13 @@ export function planModeTools(registry: readonly Tool[]): Tool[] {
 /**
  * Would this call change the repository?
  *
- * Judged from the effects table for a tool, and from the command itself for a
- * shell tool — the same `classifyCommand` the runtime already uses to tell an
+ * Judged from the effects table for a tool, and from the call itself for a
+ * shell tool — the same `classifyInvocation` the runtime already uses to tell an
  * edit from a verification, so there is no second table of command names to keep
- * in step with the first.
+ * in step with the first. That covers `repl` as well as `run_terminal`: a
+ * `code` argument is read as source and a `command` argument as a shell line,
+ * because a persistent interpreter reaches the disk exactly as `python3 -c`
+ * does and this gate is the only one that can see the difference.
  */
 export function blockedInPlanMode(
   name: string,
@@ -109,7 +112,7 @@ export function blockedInPlanMode(
 ): boolean {
   const effect = toolEffect(name);
 
-  if (effect === "shell") return classifyCommand(commandOf(args)).writes;
+  if (effect === "shell") return classifyInvocation(args).writes;
 
   return !PLANNABLE_EFFECTS.has(effect);
 }

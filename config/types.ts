@@ -148,10 +148,38 @@ export interface IterationUsage {
   durationMs: number;
 }
 
+/**
+ * An image carried by a user message.
+ *
+ * The path is stored, not the bytes. Each provider client loads the file when
+ * it renders the request, so a session on disk stays small and readable and
+ * compaction keeps moving short strings rather than megabytes of base64. The
+ * cost of that choice is that the file can change or disappear between turns,
+ * which every client handles by falling back to text rather than failing the
+ * request — a stale frame is worth less than a turn that cannot be sent.
+ */
+export interface ImageAttachment {
+  /** Absolute, already resolved through `resolveWorkspacePath`. */
+  path: string;
+  /** An IANA type the providers accept: image/png, image/jpeg, image/gif, image/webp. */
+  mediaType: string;
+}
+
 export type Message =
   | {
       role: "user";
       content: string;
+      /**
+       * Images shown alongside the text.
+       *
+       * On a user message rather than on the tool result that produced them
+       * because that is the one shape all three providers accept. Anthropic
+       * takes an image inside a `tool_result`, but Gemini's `functionResponse`
+       * wants a JSON object and OpenAI's `function_call_output` is a string, so
+       * a tool that returned an image directly would work on one provider and
+       * silently degrade on two.
+       */
+      images?: ImageAttachment[];
     }
   | {
       role: "assistant";
@@ -186,6 +214,15 @@ export interface ToolParameter {
   description: string;
   required: boolean;
   type?: "string" | "number" | "boolean" | "array";
+  /**
+   * Allowed values for the parameter itself, enforced by the provider.
+   *
+   * The same guarantee `ToolItemProperty.enum` already gave the objects inside
+   * an array, for the scalar case: an invalid value is rejected on their side
+   * and never costs a round trip. A parameter with a small closed set of values
+   * should say so here rather than only in prose, which the model may ignore.
+   */
+  enum?: string[];
   /**
    * The properties of each object in an array parameter.
    *

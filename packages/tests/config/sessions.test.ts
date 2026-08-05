@@ -420,6 +420,58 @@ describe("an index that has fallen behind the files", () => {
   });
 });
 
+/**
+ * A missing index means something different to each caller that writes one, and
+ * the three answers are not interchangeable. Asserted against the file on disk
+ * rather than through listSessions, because listSessions heals a wrong index by
+ * comparing its row count to the files and rebuilding — which would hide every
+ * one of these.
+ */
+describe("writing an index that is not there", () => {
+  test("saving a session rebuilds the other rows instead of replacing them", async () => {
+    const first = await seed();
+    rmSync(join(projectDir(), "index.json"), { force: true });
+
+    const second = await seed();
+
+    const index = JSON.parse(await Bun.file(join(projectDir(), "index.json")).text());
+    const ids = index.sessions.map((entry: any) => entry.id);
+    expect(ids).toContain(second.id);
+    expect(ids).toContain(first.id);
+  });
+
+  test("moving a session out of a project does not create an index there", async () => {
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "conversation.json"),
+      JSON.stringify([{ role: "user", content: "legacy work" }]),
+    );
+    resetSessionStoreForTests();
+    const imported = (await migrateLegacyConversation())!;
+
+    const legacyIndex = join(sessionsDir, LEGACY_SLUG, "index.json");
+    rmSync(legacyIndex, { force: true });
+
+    await adoptSession(imported);
+
+    // Nothing is left in that bucket to list, so an index recording zero rows
+    // is state the feature promises not to keep.
+    expect(existsSync(legacyIndex)).toBe(false);
+  });
+
+  test("stamping a prune keeps the sessions it did not remove", async () => {
+    const saved = await seed();
+    const indexPath = join(projectDir(), "index.json");
+    rmSync(indexPath, { force: true });
+
+    await pruneIfDue(30);
+
+    const index = JSON.parse(await Bun.file(indexPath).text());
+    expect(index.lastPrunedAt).toBeGreaterThan(0);
+    expect(index.sessions.map((entry: any) => entry.id)).toEqual([saved.id]);
+  });
+});
+
 describe("retention", () => {
   test("removes sessions past the cutoff and keeps the rest", async () => {
     const day = 24 * 60 * 60 * 1000;

@@ -84,7 +84,6 @@ Prompt → repository context → streaming agent → focused tools → review d
 The conversation, provider configuration, and local state are stored in:
 
 - macOS and Linux: `~/.config/woopcode/`
-- Windows: `%LOCALAPPDATA%\\woopcode\\`
 
 ### Session history
 

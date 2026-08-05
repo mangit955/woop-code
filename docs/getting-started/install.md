@@ -51,7 +51,7 @@ woopcode --version
 | | |
 | --- | --- |
 | Runtime | Bun 1.0+ |
-| Platforms | macOS, Linux, Windows |
+| Platforms | macOS, Linux — on Windows, use WSL |
 | Network | Outbound HTTPS to the provider |
 | Account | A Google Gemini API key — [free to create](https://aistudio.google.com/apikey) |
 

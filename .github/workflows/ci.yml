@@ -38,6 +38,16 @@ jobs:
         # The approval classifier and the config loader are built on path
         # semantics, and macOS differs from Linux on case sensitivity and on
         # where a temporary directory lives. Both are cheap to run.
+        #
+        # windows-latest is deliberately absent, and its absence is the honest
+        # signal rather than an oversight: `runCommand` spawns `sh -c`, which
+        # Windows does not have, so `run_terminal` and `run_tests` cannot run
+        # there at all. The classifier compounds it — it knows `rm -rf`, `sudo`
+        # and `chmod`, not `del /f /s /q` or `reg delete`, so every Windows
+        # command falls through to the fail-closed default and asks. Adding the
+        # runner would produce a permanently red job that documents nothing the
+        # docs do not now say outright. The platform is a port, not a matrix
+        # entry, and the docs claim macOS and Linux only.
         os: [ubuntu-latest, macos-latest]
 
     steps:

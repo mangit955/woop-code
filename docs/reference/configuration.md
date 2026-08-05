@@ -16,7 +16,6 @@ since: 0.6.0
 | Platform | Directory |
 | --- | --- |
 | macOS, Linux | `$XDG_CONFIG_HOME/woopcode/`, or `~/.config/woopcode/` |
-| Windows | `%LOCALAPPDATA%\woopcode\` |
 
 The directory is created on first run.
 
@@ -99,7 +98,6 @@ something you may want to remove yourself.
 | Variable | Effect |
 | --- | --- |
 | `XDG_CONFIG_HOME` | Moves the config directory on macOS and Linux |
-| `LOCALAPPDATA` | Moves the config directory on Windows |
 
 ### Credentials
 

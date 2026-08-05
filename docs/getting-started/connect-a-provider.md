@@ -62,7 +62,7 @@ mode in one line.
 ## Where the key goes
 
 Into `providers.json` in your config directory — `~/.config/woopcode/` on macOS
-and Linux, `%LOCALAPPDATA%\woopcode\` on Windows.
+and Linux.
 
 :::warning
 The key is stored in plain text. There is no encryption and no keychain

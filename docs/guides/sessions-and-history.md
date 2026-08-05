@@ -13,18 +13,19 @@ since: 0.6.0
 # Sessions & history
 
 A session is one saved conversation, belonging to the project it happened in.
-It is written after every turn, so quitting and coming back picks up where you
-left off — in that repository, and not in any other.
+It is written after every turn, so nothing is lost when you quit — but coming
+back to it is something you ask for.
 
 ## Resuming
 
-Starting Woopcode in a project reopens the newest session there. The rest:
+Starting Woopcode opens a fresh session. Going back to an old one:
 
 | Command | What it does |
 | --- | --- |
 | `woopcode --continue` | Reopen the newest session in this project |
 | `woopcode --resume <name-or-id>` | Reopen a particular one |
-| `woopcode --new` | Start fresh instead of continuing |
+| `woopcode --resume` | Pick from a list before starting |
+| `woopcode --new` | Start fresh — what a bare launch already does |
 | `/resume` | Pick from a list, without leaving the session you are in |
 | `/resume <name-or-id>` | Switch straight to one |
 | `/sessions` | List what is saved in this project |
@@ -121,9 +122,9 @@ Sessions are deleted 30 days after their last turn. Change it in
 
 ## Two windows on one conversation
 
-Open Woopcode twice in the same repository and both continue the newest session.
-Each turn writes the whole record, so the second window would overwrite the
-first's work.
+Two windows land on the same conversation when both resume it — `--continue` in
+each, or `/resume` onto one the other already has open. Each turn writes the
+whole record, so the second window would overwrite the first's work.
 
 It does not: a session that changed underneath a window is detected, and that
 window's turn is kept as a branch with its own id, leaving the other window's

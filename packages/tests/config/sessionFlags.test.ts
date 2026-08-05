@@ -4,13 +4,15 @@ import { sessionOptionsFrom } from "../../../commands/agent";
 /**
  * The mapping from command-line flags to what the controller resolves.
  *
- * Pure and worth testing on its own: the two entry points differ in one default
- * and getting it backwards is invisible until someone loses a conversation.
+ * Pure and worth testing on its own: getting a default backwards here is
+ * invisible until someone loses a conversation, or until a restored one starts
+ * hiding the home screen.
  */
 describe("sessionOptionsFrom", () => {
-  test("a bare interactive launch continues where you left off", () => {
-    // The documented promise, now scoped to the project you are in.
-    expect(sessionOptionsFrom({}, "interactive").continueLatest).toBe(true);
+  test("a bare interactive launch starts a fresh session", () => {
+    // Continuing on a bare launch is invisible state — nothing says a
+    // conversation was restored, and the home screen quietly stops appearing.
+    expect(sessionOptionsFrom({}, "interactive").continueLatest).toBe(false);
   });
 
   test("a bare headless run starts its own session", () => {
@@ -19,12 +21,17 @@ describe("sessionOptionsFrom", () => {
     expect(sessionOptionsFrom({}, "headless").continueLatest).toBe(false);
   });
 
-  test("--continue asks for it explicitly, headlessly too", () => {
+  test("--continue asks for it explicitly, in both modes", () => {
+    expect(sessionOptionsFrom({ continue: true }, "interactive").continueLatest).toBe(true);
     expect(sessionOptionsFrom({ continue: true }, "headless").continueLatest).toBe(true);
   });
 
-  test("--new overrides the interactive default", () => {
-    expect(sessionOptionsFrom({ new: true }, "interactive").continueLatest).toBe(false);
+  test("--new beats --continue rather than being ignored beside it", () => {
+    // --new is now the default rather than an override, but a script that
+    // passes both is asking for a fresh session and has to get one.
+    expect(
+      sessionOptionsFrom({ new: true, continue: true }, "headless").continueLatest,
+    ).toBe(false);
   });
 
   test("--resume <ref> resolves a reference instead of continuing", () => {

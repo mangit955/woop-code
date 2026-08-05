@@ -81,8 +81,8 @@ approval dialog. See [Keyboard](/docs/reference/keyboard).
 
 ## Afterwards
 
-The conversation is saved, globally rather than per repository — restarting
-Woopcode anywhere resumes from it. See
+The conversation is saved, to the project it happened in. Restarting Woopcode
+opens a fresh session; `--continue` or `/resume` goes back to this one. See
 [Sessions & history](/docs/guides/sessions-and-history).
 
 ## Next

@@ -15,6 +15,7 @@ export class UIStore {
     modelPickerOpen: false,
     approvalMode: DEFAULT_APPROVAL_MODE,
     approvalPickerOpen: false,
+    sessionPickerOpen: false,
     // A session always starts able to work. Plan mode is deliberately not
     // persisted: a mode that survived a restart would silently swallow the first
     // edit of the next session.
@@ -180,6 +181,11 @@ export class UIStore {
   }
 
   addSystemMessage(content: string) {
+    // A command that opens a dialog has nothing to say in the transcript, and
+    // returns "" to say so. Appending it would leave a blank row behind every
+    // such command.
+    if (!content.trim()) return;
+
     this.state = {
       ...this.state,
       timeline: [
@@ -445,6 +451,58 @@ export class UIStore {
     this.emit();
   }
 
+  openSessionPicker() {
+    this.state = { ...this.state, sessionPickerOpen: true };
+    this.emit();
+  }
+
+  closeSessionPicker() {
+    this.state = { ...this.state, sessionPickerOpen: false };
+    this.emit();
+  }
+
+  /**
+   * Redraws the transcript from a stored conversation.
+   *
+   * Restored history used to be loaded into the controller and never rendered,
+   * so relaunching showed an empty screen over a conversation the model could
+   * see — which reads as history having been lost. Only user and assistant
+   * messages exist on disk (tool traffic is deliberately not persisted), so
+   * this is the whole of what a resumed transcript can show.
+   */
+  hydrateTimeline(messages: readonly { role: string; content?: unknown }[]) {
+    const items: TimeLineItem[] = [];
+
+    for (const message of messages) {
+      if (typeof message.content !== "string" || !message.content.trim()) continue;
+      if (message.role === "user") {
+        items.push({ id: crypto.randomUUID(), type: "user", content: message.content });
+      } else if (message.role === "assistant") {
+        items.push({
+          id: crypto.randomUUID(),
+          type: "assistant",
+          content: message.content,
+          streaming: false,
+        });
+      }
+    }
+
+    this.follow = true;
+    this.state = {
+      ...this.state,
+      timeline: items,
+      activeTurn: null,
+      scrollOffset: 0,
+      maxScrollOffset: 0,
+      // The meter reports the prompt the current turn sends. A number carried
+      // over from the session being left would describe the wrong conversation.
+      usage: null,
+      sessionPickerOpen: false,
+    };
+    this.activeAssistantId = null;
+    this.emit();
+  }
+
   // Pending Edit Management
   setPendingEdit(edit: PendingEdit): Promise<boolean> {
     if (this.nonInteractive) {
@@ -635,6 +693,7 @@ export class UIStore {
     const {
       modelPickerOpen,
       approvalPickerOpen,
+      sessionPickerOpen,
       pendingCommand,
       pendingQuestion,
       pendingContinuation,
@@ -643,6 +702,7 @@ export class UIStore {
     return (
       modelPickerOpen ||
       approvalPickerOpen ||
+      sessionPickerOpen ||
       pendingCommand !== null ||
       pendingQuestion !== null ||
       pendingContinuation !== null ||
@@ -663,6 +723,10 @@ export class UIStore {
     }
     if (this.state.approvalPickerOpen) {
       this.closeApprovalPicker();
+      return true;
+    }
+    if (this.state.sessionPickerOpen) {
+      this.closeSessionPicker();
       return true;
     }
     if (this.state.pendingCommand) {

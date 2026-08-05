@@ -3,7 +3,7 @@ import { getConfig } from "../config/config";
 import type { AgentCallbacks, TurnSummary } from "../config/types";
 import { App, store } from "../tui/src";
 import { render } from "ink";
-import { AgentController } from "./agentController";
+import { AgentController, type InitializeOptions } from "./agentController";
 import { DEFAULT_MODEL_ID } from "../providers/client";
 import type { HomeScreenData } from "../tui/src/components/HomeScreen";
 import { ensureProviderConfigured } from "../onboarding";
@@ -28,15 +28,77 @@ export interface RunAgentOptions {
   model?: string;
   /** Headless only: path to write a JSONL record of the run to. */
   events?: string;
+  /** Reopen the newest session in this project. */
+  continue?: boolean;
+  /** A session name, id or id prefix to resume. `true` opens the picker. */
+  resume?: string | boolean;
+  /** Start a fresh session even where one would otherwise be continued. */
+  new?: boolean;
+  /** Branch whatever was resumed instead of writing into it. */
+  forkSession?: boolean;
+  /** Name a new session, so it can be resumed by name later. */
+  name?: string;
+  /** Headless only: run without ever writing a session file. */
+  sessionPersistence?: boolean;
 }
 
-export const agentCommand = new Command("agent")
-  .description("Runs the agent")
-  .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
-  .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
-  .option("-m, --model <model>", "model id to use for this run")
-  .option("--events <path>", "with --prompt, write a JSONL record of the run to this path")
-  .action(runAgent);
+/**
+ * Turns the session flags into what `AgentController.initialize` takes.
+ *
+ * The two entry points differ in one default and it matters: the TUI continues
+ * where you left off, because that is what Woopcode has always done and what
+ * the documentation promises, while `-p` starts clean. A headless run used to
+ * inherit whatever the interactive session had been doing, which is a surprise
+ * for a scripted caller and impossible to opt out of.
+ */
+export function sessionOptionsFrom(
+  options: RunAgentOptions,
+  mode: "interactive" | "headless",
+): InitializeOptions {
+  const resumeRef = typeof options.resume === "string" ? options.resume.trim() : "";
+  // `--resume` with no value. Interactively that opens the picker; headlessly
+  // there is nobody to pick, so the caller has to say which session.
+  const wantsPicker = options.resume === true;
+
+  if (wantsPicker && mode === "headless") {
+    throw new Error("--resume needs a session id when used with --prompt.");
+  }
+
+  return {
+    ...(resumeRef ? { sessionRef: resumeRef } : {}),
+    continueLatest:
+      !options.new &&
+      !resumeRef &&
+      (options.continue === true || mode === "interactive"),
+    fork: options.forkSession === true,
+    ...(options.name ? { name: options.name } : {}),
+    persist: options.sessionPersistence !== false,
+    openPicker: wantsPicker,
+  };
+}
+
+/**
+ * The session flags, declared on both the root program and `agent` because
+ * either can be the one commander parses.
+ */
+export function addSessionOptions(command: Command): Command {
+  return command
+    .option("-c, --continue", "resume the newest session in this project")
+    .option("--resume [session]", "resume a session by name or id")
+    .option("--new", "start a fresh session instead of continuing")
+    .option("--fork-session", "with --continue or --resume, branch instead of writing into it")
+    .option("-n, --name <name>", "name a new session so it can be resumed by name")
+    .option("--no-session-persistence", "with --prompt, do not save the session");
+}
+
+export const agentCommand = addSessionOptions(
+  new Command("agent")
+    .description("Runs the agent")
+    .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
+    .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
+    .option("-m, --model <model>", "model id to use for this run")
+    .option("--events <path>", "with --prompt, write a JSONL record of the run to this path"),
+).action(runAgent);
 
 /**
  * Entry point for both `woopcode` and `woopcode agent`. With `--prompt` the
@@ -51,12 +113,19 @@ export async function runAgent(options: RunAgentOptions = {}, command?: Command)
     options.autoApprove !== false && globals?.autoApprove !== false;
   const model = options.model || globals?.model;
   const events = options.events || globals?.events;
+  // Session flags can land on either the root program or the subcommand, the
+  // same way --prompt does.
+  const merged: RunAgentOptions = { ...globals, ...options };
 
   if (prompt) {
-    return runHeadless(prompt, autoApprove, { model, events });
+    return runHeadless(prompt, autoApprove, {
+      model,
+      events,
+      session: sessionOptionsFrom(merged, "headless"),
+    });
   }
 
-  return runInteractive(model);
+  return runInteractive(model, sessionOptionsFrom(merged, "interactive"));
 }
 
 /**
@@ -75,7 +144,7 @@ async function resolveModel(override: string | undefined): Promise<string> {
 async function runHeadless(
   prompt: string,
   autoApprove: boolean,
-  options: { model?: string; events?: string } = {},
+  options: { model?: string; events?: string; session?: InitializeOptions } = {},
 ) {
   registerCommands();
   const { provider, apiKey } = await ensureProviderConfigured();
@@ -181,7 +250,12 @@ async function runHeadless(
   };
 
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
-  await controller.initialize();
+  await controller.initialize(options.session);
+
+  // On stderr, not stdout: stdout is the agent's answer and a caller pipes it.
+  // Printed so a script can follow up with `--resume <id>` on the same session.
+  const session = controller.currentSession();
+  if (session) process.stderr.write(`session ${session.id}\n`);
 
   const onSigint = () => {
     controller.cancel();
@@ -215,7 +289,10 @@ async function runHeadless(
 export const EXIT_BUDGET_EXHAUSTED = 2;
 
 /** Runs the interactive TUI agent. */
-async function runInteractive(modelOverride?: string) {
+async function runInteractive(
+  modelOverride?: string,
+  session: InitializeOptions = { continueLatest: true },
+) {
   // Register slash commands
   registerCommands();
 
@@ -316,7 +393,27 @@ async function runInteractive(modelOverride?: string) {
     },
   };
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
-  await controller.initialize();
+  try {
+    await controller.initialize(session);
+  } catch (error) {
+    // A --resume that names nothing is a usage error, not a crash: report it
+    // and stop rather than dropping the user into a session they did not ask
+    // for and might overwrite.
+    process.stderr.write(`✖ ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+
+  // Draws the resumed conversation. Without this the transcript is blank over a
+  // history the model can see, which reads as the history having been lost.
+  const resumed = controller.currentSession();
+  if (resumed && resumed.messages.length > 0) {
+    store.hydrateTimeline(resumed.messages);
+  }
+
+  // A bare `--resume` asks to choose. The newest session is loaded above so
+  // there is something behind the dialog and something to fall back to on Esc.
+  if (session.openPicker) store.openSessionPicker();
+
   const homeScreen = await buildHomeScreen(provider);
 
   const customStdin = new PassThrough() as any;

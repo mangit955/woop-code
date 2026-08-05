@@ -48,18 +48,51 @@ export function getProvidersConfigPath(): string {
   return join(getConfigDir(), "providers.json");
 }
 
-export function getConversationPath(): string {
+/**
+ * The pre-sessions conversation file.
+ *
+ * Retained only so `migrateLegacyConversation` in config/sessions.ts can find
+ * what an older version wrote. Nothing reads or writes it as live history any
+ * more; sessions live under `sessions/<project>/`.
+ */
+export function getLegacyConversationPath(): string {
   return join(getConfigDir(), "conversation.json");
 }
 
+/** Root of the per-project session store. */
+export function getSessionsDir(): string {
+  return join(getConfigDir(), "sessions");
+}
+
 /**
- * Get the path to execution-log.json
+ * Where one project's sessions live.
  *
- * Kept beside the conversation rather than inside it: conversation.json is an
- * array of messages that older versions read directly, so widening it would
- * make a downgrade fail on its own history.
+ * Takes the slug rather than computing it, so the directory layout stays a pure
+ * function of its argument and the slug rules live in one place
+ * (`projectSlug`).
  */
-export function getExecutionLogPath(): string {
+export function getProjectSessionsDir(slug: string): string {
+  return join(getSessionsDir(), slug);
+}
+
+export function getSessionPath(slug: string, id: string): string {
+  return join(getProjectSessionsDir(slug), `${id}.json`);
+}
+
+export function getSessionIndexPath(slug: string): string {
+  return join(getProjectSessionsDir(slug), "index.json");
+}
+
+/**
+ * The pre-sessions execution log.
+ *
+ * It was kept beside the conversation because conversation.json was an array of
+ * messages that older versions read directly, so widening it would have made a
+ * downgrade fail on its own history. A session record has a version field and a
+ * place to put it, so the log now lives inside the session and this path exists
+ * only for the migration to drain.
+ */
+export function getLegacyExecutionLogPath(): string {
   return join(getConfigDir(), "execution-log.json");
 }
 
@@ -72,7 +105,6 @@ export function getModelsPath(): string {
  */
 export async function initializeConfig(): Promise<void> {
   const providersPath = getProvidersConfigPath();
-  const conversationPath = getConversationPath();
 
   // Create default providers.json if it doesn't exist
   if (!existsSync(providersPath)) {
@@ -99,10 +131,9 @@ export async function initializeConfig(): Promise<void> {
     await removeRetiredProviders(providersPath);
   }
 
-  // Create empty conversation.json if it doesn't exist
-  if (!existsSync(conversationPath)) {
-    await Bun.write(conversationPath, JSON.stringify([], null, 2));
-  }
+  // No conversation file is seeded any more. History lives in
+  // sessions/<project>/, and a session file is written only once a turn has
+  // actually run — an empty one would be a resume target with nothing in it.
 }
 
 /** Providers that were offered by an earlier version and have since been dropped. */

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterAll, mock } from "bun:test";
+import { describe, test, expect, beforeAll, beforeEach, afterAll, mock } from "bun:test";
 import { AgentController } from "../../../commands/agentController";
 import type { Message } from "../../../config/types";
 import {
@@ -13,6 +13,37 @@ import {
   createDoneEvent,
 } from "../shared/factories";
 import { wait } from "../shared/helpers";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as joinPath } from "node:path";
+
+/**
+ * Belt as well as braces for the session stub below.
+ *
+ * The stub keeps writes in memory, but a module mock is a whole-run
+ * registration: the moment it is restored — or simply not in effect for the
+ * order a given run picks — the controller persists for real, into whichever
+ * config directory is current. That is how this file's turns ("read it", "now
+ * plan it") ended up inside another e2e file's temporary store and failed it.
+ * A directory of its own means the worst case is a stray temp file.
+ *
+ * `getConfigDir` reads the variable on every call, so setting it here — after
+ * the static imports, before any test body — is enough.
+ */
+const previousConfigHome = process.env.XDG_CONFIG_HOME;
+const temporaryConfigHome = mkdtempSync(
+  joinPath(tmpdir(), `woopcode-controller-${crypto.randomUUID()}-`),
+);
+process.env.XDG_CONFIG_HOME = temporaryConfigHome;
+
+afterAll(() => {
+  if (previousConfigHome === undefined) {
+    delete process.env.XDG_CONFIG_HOME;
+  } else {
+    process.env.XDG_CONFIG_HOME = previousConfigHome;
+  }
+  rmSync(temporaryConfigHome, { recursive: true, force: true });
+});
 
 // Mock dependencies
 const mockToolRegistry = new MockToolRegistry();
@@ -41,26 +72,114 @@ const actualConfig = await import("../../../config/config");
 
 // The execution log is stubbed for the same reason the conversation is: the
 // controller persists both after every turn, and the spread above kept the real
-// saveExecutionLog — so these tests were writing the developer's own
-// ~/.config/woopcode/execution-log.json, provable from its mtime.
+// writer — so these tests were writing the developer's own
+// ~/.config/woopcode, provable from its mtime.
 let mockExecutionRecords: unknown[] = [];
-const getExecutionLog = mock(async () => [...mockExecutionRecords]);
-const saveExecutionLog = mock(async (records: unknown[]) => {
-  mockExecutionRecords = [...records];
-});
 
 mock.module("../../../config/config", () => ({
   ...actualConfig,
-  getConversation,
-  saveConversation,
-  getExecutionLog,
-  saveExecutionLog,
   buildRepositoryContext,
   recentMessages: (messages: Message[], maxTurns: number) => messages,
 }));
 
+// Sessions are stubbed as one in-memory record. `getConversation` and
+// `saveConversation` survive as the names the assertions below read, so what a
+// test means by "saved" is still the messages the controller handed over —
+// only the module underneath them moved.
+const actualSessions = await import("../../../config/sessions");
+
+/**
+ * The real implementations, captured before the stub is registered.
+ *
+ * `mock.module` rewrites the module registry, and a namespace object's
+ * properties follow it — so reading `actualSessions.createSession` *after*
+ * registration hands back the stub, and a stub that delegates through the
+ * namespace calls itself until the stack runs out.
+ */
+const realSessions = {
+  createSession: actualSessions.createSession,
+  loadSession: actualSessions.loadSession,
+  latestSession: actualSessions.latestSession,
+  saveSession: actualSessions.saveSession,
+  listSessions: actualSessions.listSessions,
+  pruneIfDue: actualSessions.pruneIfDue,
+};
+
+function stubRecord() {
+  return {
+    version: 1,
+    id: "test-session",
+    name: null,
+    title: "test",
+    cwd: "/test-project",
+    branch: null,
+    created: 0,
+    updated: 0,
+    forkedFrom: null,
+    messages: [...mockConversation],
+    executionLog: [...mockExecutionRecords],
+  } as any;
+}
+
+/**
+ * The stub is gated rather than simply registered.
+ *
+ * `mock.module` is a whole-run registration and Bun loads every test file's
+ * module graph before running any of them, so an ungated stub here is live
+ * during *other* files' tests — which is how this file's turns ("read it",
+ * "now plan it") surfaced inside the persistence e2e's assertions and failed
+ * them. Outside this file every function below delegates to the real one.
+ */
+let stubActive = false;
+
+beforeAll(() => {
+  stubActive = true;
+});
+
+afterAll(() => {
+  stubActive = false;
+});
+
+const createSession = mock(async (...args: any[]) =>
+  stubActive
+    ? { ...stubRecord(), messages: [], executionLog: [] }
+    : (realSessions.createSession as any)(...args),
+);
+const loadSession = mock(async (...args: any[]) =>
+  stubActive ? stubRecord() : (realSessions.loadSession as any)(...args),
+);
+const latestSession = mock(async (...args: any[]) => {
+  if (!stubActive) return (realSessions.latestSession as any)(...args);
+  // Null when there is nothing stored, so the controller creates rather than
+  // resumes — the same branch a first-ever launch takes.
+  return mockConversation.length > 0 ? ({ id: "test-session", slug: "test" } as any) : null;
+});
+const saveSession = mock(async (record: any) => {
+  if (!stubActive) return (realSessions.saveSession as any)(record);
+  await saveConversation(record.messages);
+  mockExecutionRecords = [...record.executionLog];
+  return { ...record, messages: [...mockConversation] };
+});
+const listSessions = mock(async (...args: any[]) =>
+  stubActive ? [] : (realSessions.listSessions as any)(...args),
+);
+const pruneIfDue = mock(async (...args: any[]) =>
+  stubActive ? 0 : (realSessions.pruneIfDue as any)(...args),
+);
+
+mock.module("../../../config/sessions", () => ({
+  ...actualSessions,
+  createSession,
+  loadSession,
+  latestSession,
+  saveSession,
+  listSessions,
+  pruneIfDue,
+}));
+
 afterAll(() => {
   mock.module("../../../config/config", () => actualConfig);
+  mock.module("../../../config/sessions", () => actualSessions);
   mock.module("../../../providers/client", () => actualClient);
   mock.module("../../../tools", () => actualTools);
 });
@@ -97,6 +216,15 @@ const mockStore = {
   clearPendingCommand: mock(() => {}),
   cancelPendingQuestion: mock(() => {}),
   clearPendingContinuation: mock(() => {}),
+  // Reached by the session slash commands rather than the controller. They are
+  // here for the reason in the comment above: this stub stands in for the store
+  // across the whole run, so a method missing from it fails in whichever file
+  // happens to call it.
+  clearTimeline: mock(() => {}),
+  addSystemMessage: mock(() => {}),
+  openSessionPicker: mock(() => {}),
+  closeSessionPicker: mock(() => {}),
+  hydrateTimeline: mock(() => {}),
 };
 
 mock.module("../../../tui/src", () => ({

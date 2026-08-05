@@ -2,11 +2,25 @@ import { createProviderClient, DEFAULT_MODEL_ID } from "../providers/client";
 import {
   MAX_REPO_CONTEXT_CHARS,
   buildRepositoryContext,
-  getConversation,
-  getExecutionLog,
-  saveConversation,
-  saveExecutionLog,
+  getConfig,
+  parseRetentionDays,
 } from "../config/config";
+import {
+  LEGACY_SLUG,
+  adoptSession,
+  createSession,
+  forkSession,
+  latestSession,
+  listSessions,
+  loadSession,
+  pruneIfDue,
+  reloadSession,
+  resolveSessionRef,
+  saveSession,
+  titleFromPrompt,
+  UNTITLED,
+  type SessionRecord,
+} from "../config/sessions";
 import { agentLoop } from "../runtime/loop";
 import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
 import {
@@ -38,6 +52,35 @@ export function isConversationalPrompt(prompt: string) {
     || /^(how are you|who are you|what can you do|what do you do|can you help me)[!?. ]*$/.test(text);
 }
 
+/**
+ * Which session a run attaches to.
+ *
+ * Every field is optional and the empty object is the common case: the TUI
+ * continues where it left off, and `-p` starts clean. Kept optional rather than
+ * required because `initialize()` is called bare from both entry points and
+ * from every controller test.
+ */
+export interface InitializeOptions {
+  /** A name, id or id prefix to resume. */
+  sessionRef?: string;
+  /**
+   * Reopen the newest session in this project rather than starting one.
+   * Defaults to true; the headless path sets it false.
+   */
+  continueLatest?: boolean;
+  /** Branch whatever was resolved instead of writing into it. */
+  fork?: boolean;
+  /** Name a new session at creation, as `--name` does. */
+  name?: string | null;
+  /** False runs the turn without ever writing a session file. */
+  persist?: boolean;
+  /**
+   * Open the session picker once the interface is up, for a bare `--resume`.
+   * Read by the launcher, not the controller.
+   */
+  openPicker?: boolean;
+}
+
 export class AgentController {
   private conversation: Message[] = [];
   private repoContext = "";
@@ -57,6 +100,19 @@ export class AgentController {
    * first edit of the next session.
    */
   private sessionMode: SessionMode = "build";
+  /**
+   * The session this turn belongs to. Null until `initialize`, and null for the
+   * lifetime of a run started with persistence off.
+   */
+  private session: SessionRecord | null = null;
+  private persistSession = true;
+  /**
+   * Whether a turn has been taken since this session was loaded.
+   *
+   * Only used to decide when migrated history is adopted into the current
+   * project: opening it to read it must not move it, but working in it should.
+   */
+  private sessionTouched = false;
   private readonly callbacks: AgentCallbacks;
 
   constructor(
@@ -150,6 +206,8 @@ export class AgentController {
 
     this.conversation.push(userMessage);
     this.pendingUserMessage = userMessage;
+    // The signal that this session is being worked in rather than just read.
+    this.sessionTouched = true;
 
     const conversation = [...this.conversation];
     const conversational = isConversationalPrompt(prompt);
@@ -250,10 +308,112 @@ export class AgentController {
     return response;
   }
 
-  async initialize() {
-    this.conversation = await getConversation();
-    this.executionRecords = await getExecutionLog();
+  /**
+   * Resolves which session this run belongs to and loads it.
+   *
+   * The options are optional and their defaults reproduce what Woopcode has
+   * always done interactively — reopen what you were last working on — now
+   * scoped to the repository you are in rather than shared by every repository
+   * on the machine.
+   */
+  async initialize(options: InitializeOptions = {}) {
+    this.persistSession = options.persist !== false;
+    this.session = await this.resolveSession(options);
+    this.conversation = this.session ? [...this.session.messages] : [];
+    this.executionRecords = this.session ? [...this.session.executionLog] : [];
     this.repoContext = await buildRepositoryContext();
+
+    if (this.persistSession) {
+      // Retention runs at most once a day; see pruneIfDue.
+      try {
+        const config = await getConfig();
+        await pruneIfDue(parseRetentionDays(config.retentionDays));
+      } catch {
+        // Housekeeping must never stop a session from starting.
+      }
+    }
+  }
+
+  private async resolveSession(
+    options: InitializeOptions,
+  ): Promise<SessionRecord | null> {
+    if (!this.persistSession) return null;
+
+    try {
+      if (options.sessionRef) {
+        const found = await this.findSession(options.sessionRef);
+        // A ref that names nothing is the caller's error to report, not ours to
+        // paper over by silently starting somewhere else.
+        if (!found) throw new Error(`No session found matching "${options.sessionRef}"`);
+        return options.fork ? this.mustFork(found, options.name) : found;
+      }
+
+      // Defaulted to true rather than false: continuing where you left off is
+      // what Woopcode has always done and what the documentation promises. The
+      // headless path opts out explicitly, because a scripted caller inheriting
+      // an interactive session is a surprise it cannot see coming.
+      if (options.continueLatest ?? true) {
+        const latest = await latestSession();
+        if (!latest) return createSession({ name: options.name });
+        const record = await loadSession(latest.id, latest.slug);
+        if (!record) return createSession({ name: options.name });
+        return options.fork ? this.mustFork(record, options.name) : record;
+      }
+
+      return createSession({ name: options.name });
+    } catch (error) {
+      if (options.sessionRef) throw error;
+      // Anything else — an unreadable store, a permissions problem — degrades to
+      // a session that runs now and may not persist, rather than a launch that
+      // fails.
+      return createSession({ name: options.name });
+    }
+  }
+
+  /**
+   * Branches a session, or fails loudly.
+   *
+   * Never falls back to the original: `--fork-session` is a request *not* to
+   * write into it, so quietly continuing there when the copy could not be made
+   * would do the one thing the flag exists to prevent.
+   */
+  private async mustFork(
+    source: SessionRecord,
+    name?: string | null,
+  ): Promise<SessionRecord> {
+    const copy = await forkSession(source.id, {
+      name: name ?? null,
+      // Migrated history has no project of its own, so say where it lives
+      // rather than letting the lookup fall back to a scan.
+      slug: source.cwd ? undefined : LEGACY_SLUG,
+    });
+    if (!copy) {
+      throw new Error(
+        `Could not branch session ${source.id.slice(0, 8)}; it was left untouched.`,
+      );
+    }
+    return copy;
+  }
+
+  /** Loads whichever session a user-supplied reference names. */
+  private async findSession(ref: string): Promise<SessionRecord | null> {
+    const scoped = await listSessions();
+    let resolution = resolveSessionRef(ref, scoped);
+
+    // Widened only when the current project has no answer, so a name used in
+    // two repositories still resolves to the local one.
+    if (resolution.status === "none") {
+      resolution = resolveSessionRef(ref, await listSessions({ scope: "all" }));
+    }
+
+    if (resolution.status === "ambiguous") {
+      throw new Error(
+        `"${ref}" matches ${resolution.matches.length} sessions. Use the id, or /sessions to list them.`,
+      );
+    }
+    if (resolution.status === "none") return null;
+
+    return loadSession(resolution.session.id, resolution.session.slug);
   }
 
   /**
@@ -318,14 +478,52 @@ export class AgentController {
   }
 
   /**
-   * Writes the conversation to disk. Failures are reported but never thrown:
-   * losing history is bad, but it must not take down a turn that otherwise
-   * succeeded.
+   * Writes the session to disk. Failures are reported but never thrown: losing
+   * history is bad, but it must not take down a turn that otherwise succeeded.
+   *
+   * This is also where a session first appears on disk. Nothing is written
+   * until a turn has run, so opening the TUI and quitting leaves no empty
+   * session behind for the picker to offer.
    */
   private async persist() {
+    if (!this.persistSession || !this.session) return;
+
     try {
-      await saveConversation(this.conversation);
-      await saveExecutionLog(this.executionRecords);
+      let pending: SessionRecord = {
+        ...this.session,
+        title: this.sessionTitle(),
+        messages: this.conversation,
+        executionLog: this.executionRecords,
+      };
+
+      // Two windows open on one session — two terminals in the same repository
+      // both continuing the newest one — each write the whole record, so the
+      // second silently discarded the first's turn. (The single conversation
+      // file behaved the same way; sessions inherited it rather than caused
+      // it.) Detected by the timestamp moving underneath us, and answered by
+      // branching: this turn is kept under a new id and the other window's work
+      // is left exactly as it was.
+      const onDisk = await reloadSession(this.session);
+      if (onDisk && onDisk.updated > this.session.updated) {
+        pending = {
+          ...pending,
+          id: crypto.randomUUID(),
+          name: null,
+          forkedFrom: this.session.id,
+        };
+        this.callbacks.onStatus?.(
+          `⚠️ This conversation was changed by another Woopcode window. Continuing in a branch (${pending.id.slice(0, 8)}); nothing was overwritten.`,
+        );
+      }
+
+      // Migrated history belongs to no project. Once a turn has been taken in
+      // it, it belongs to this one — otherwise an hour's work would stay in the
+      // `legacy` bucket, absent from the list of the very repository it
+      // happened in.
+      this.session =
+        pending.cwd === null && this.sessionTouched
+          ? await adoptSession(pending)
+          : await saveSession(pending);
     } catch (error) {
       this.callbacks.onError?.(
         new Error(
@@ -333,6 +531,102 @@ export class AgentController {
         ),
       );
     }
+  }
+
+  /**
+   * The title to store. A name set with /rename is authoritative; otherwise the
+   * first prompt names the session, and only until one exists.
+   */
+  private sessionTitle(): string {
+    if (!this.session) return UNTITLED;
+    if (this.session.title && this.session.title !== UNTITLED) {
+      return this.session.title;
+    }
+
+    const firstPrompt = this.conversation.find(
+      (message): message is Extract<Message, { role: "user" }> =>
+        message.role === "user",
+    );
+    return firstPrompt ? titleFromPrompt(firstPrompt.content) : UNTITLED;
+  }
+
+  /** The session in flight, for the status line and the pickers. */
+  currentSession(): SessionRecord | null {
+    return this.session;
+  }
+
+  /**
+   * Messages in the live conversation, which is ahead of the session record
+   * between turns: the record only catches up when `persist` trims and writes.
+   */
+  messageCount(): number {
+    return this.conversation.length;
+  }
+
+  /**
+   * Points the controller at a different session and returns its messages so
+   * the caller can redraw the transcript.
+   *
+   * Every one of these refuses while a turn is running: swapping the
+   * conversation underneath a request in flight would attribute its reply to
+   * the wrong session.
+   */
+  private async adopt(session: SessionRecord): Promise<SessionRecord> {
+    this.session = session;
+    this.conversation = [...session.messages];
+    this.executionRecords = [...session.executionLog];
+    this.pendingAssistantText = null;
+    this.pendingUserMessage = null;
+    // Reset with the session, or resuming migrated history after a turn in
+    // another session would move it on sight rather than on use.
+    this.sessionTouched = false;
+    return session;
+  }
+
+  /** Starts an empty session. The current one stays on disk. */
+  async newSession(): Promise<SessionRecord | null> {
+    if (this.isRunning) return null;
+    await this.persist();
+    return this.adopt(await createSession());
+  }
+
+  /** Switches to an existing session. Throws if the reference is unusable. */
+  async switchSession(ref: string): Promise<SessionRecord | null> {
+    if (this.isRunning) return null;
+
+    const found = await this.findSession(ref);
+    if (!found) return null;
+
+    await this.persist();
+    return this.adopt(found);
+  }
+
+  /**
+   * Copies this session and continues in the copy, leaving the original where
+   * it was. Persists first, so the branch starts from what is actually on disk.
+   */
+  async branchSession(name?: string): Promise<SessionRecord | null> {
+    if (this.isRunning || !this.session) return null;
+
+    await this.persist();
+    const copy = await forkSession(this.session.id, {
+      name: name ?? null,
+      // Same hint mustFork gives: migrated history has no project of its own,
+      // so name where it lives rather than paying for a scan to find it.
+      slug: this.session.cwd ? undefined : LEGACY_SLUG,
+    });
+    if (!copy) return null;
+
+    return this.adopt(copy);
+  }
+
+  /** Gives the session a resume handle. */
+  async renameSession(name: string): Promise<SessionRecord | null> {
+    if (this.isRunning || !this.session) return null;
+
+    this.session = { ...this.session, name: name.trim() || null };
+    await this.persist();
+    return this.session;
   }
 
   cancel() {

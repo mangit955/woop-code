@@ -110,6 +110,7 @@ export interface UIState {
   status: string;
   isThinking: boolean;
   modelPickerOpen: boolean;
+  sessionPickerOpen: boolean;
   selectedModel: string | null;
   pendingEdit: PendingEdit | null;
   pendingCommand: PendingCommand | null;

@@ -8,9 +8,10 @@
  *
  * The whole directory moves, rather than the keys being blanked in place.
  * `ensureProviderConfigured` treats a keyless provider and a missing config the
- * same way, but the rest of a first run does not: conversation.json and
- * execution-log.json are what separate "no key yet" from "never run before",
- * and blanking a key leaves both behind.
+ * same way, but the rest of a first run does not: the saved sessions under
+ * `sessions/` are what separate "no key yet" from "never run before", and
+ * blanking a key leaves them behind. Moving the directory is also what lets the
+ * one-time import of a pre-sessions `conversation.json` be exercised twice.
  *
  * This previously pointed at ./config/providers.json — a path inside the
  * repository, where no configuration has ever lived. It raised ENOENT on every

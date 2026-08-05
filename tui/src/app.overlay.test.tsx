@@ -124,6 +124,7 @@ describe("dialogs float over the app", () => {
   beforeEach(() => {
     store.clearTimeline();
     store.closeModelPicker();
+    store.closeSessionPicker();
     store.addUserMessage(TRANSCRIPT);
   });
 
@@ -135,6 +136,19 @@ describe("dialogs float over the app", () => {
     // Before, the dialog replaced the main content and the screen went black.
     expect(app.stdout.text()).toContain(TRANSCRIPT);
     expect(app.stdout.text()).toContain("Select model");
+    app.unmount();
+  });
+
+  test("keeps the transcript on screen behind the session picker", async () => {
+    // Also the only check that the picker renders at all: it reads the session
+    // store and the layout plan, and a mistake in either shows up as an empty
+    // or crashed frame rather than a type error.
+    const app = mount();
+    store.openSessionPicker();
+    await waitForFrame(app, "Resume session");
+
+    expect(app.stdout.text()).toContain(TRANSCRIPT);
+    expect(app.stdout.text()).toContain("Resume session");
     app.unmount();
   });
 

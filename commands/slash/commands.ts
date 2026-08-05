@@ -1,12 +1,9 @@
 import type { SlashCommand, SlashCommandContext } from "./types";
 import { registry } from "./registry";
 import { APPROVAL_MODES, describeApprovalMode, parseApprovalMode } from "../../runtime/approval";
-import {
-  getConfig,
-  saveConfig,
-  getConversation,
-  saveConversation,
-} from "../../config/config";
+import { getConfig, saveConfig } from "../../config/config";
+import { listSessions, UNTITLED, type SessionSummary } from "../../config/sessions";
+import { relativeTime } from "../../tui/src/relative-time";
 import { isProviderEnabled, unsupportedProviderMessage } from "../../providers/providerRegistry";
 import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../providers/client";
 import { toolRegistry } from "../../tools";
@@ -62,20 +59,151 @@ const helpCommand: SlashCommand = {
   },
 };
 
+/** A picker row rendered as one line of text, for /sessions and errors. */
+function describeSession(session: SessionSummary, active = false): string {
+  const label = session.name ?? session.title ?? UNTITLED;
+  const marker = active ? "●" : " ";
+  const parts = [
+    `${marker} ${session.id.slice(0, 8)}`,
+    label,
+    relativeTime(session.updated),
+    `${session.messageCount} msg`,
+  ];
+  if (session.branch) parts.push(session.branch);
+  return parts.join("  ·  ");
+}
+
 const newCommand: SlashCommand = {
   name: "new",
   aliases: ["clear", "reset"],
-  description: "Start a new conversation",
+  description: "Start a new conversation, keeping the current one",
   category: "session",
 
   async execute(context, args) {
-    await saveConversation([]);
-    
-    // Clear UI timeline as well
+    if (context.controller.isBusy()) {
+      return "Cannot start a new session while the agent is running. Press Esc to cancel first.";
+    }
+
+    const previous = context.controller.currentSession();
+    const session = await context.controller.newSession();
+    if (!session) return "Could not start a new session.";
+
     const { store } = await import("../../tui/src/store/ui-store");
     store.clearTimeline();
-    
-    return "Started new conversation";
+
+    // Naming the way back is the whole difference from what /new used to do.
+    return previous && previous.messages.length > 0
+      ? `Started a new session. The previous one is saved as ${previous.id.slice(0, 8)} — /resume ${previous.id.slice(0, 8)} to return.`
+      : "Started a new session";
+  },
+};
+
+const resumeCommand: SlashCommand = {
+  name: "resume",
+  aliases: ["r"],
+  description: "Switch to a previous conversation",
+  category: "session",
+  usage: "/resume [name-or-id]",
+
+  async execute(context, args) {
+    if (context.controller.isBusy()) {
+      return "Cannot switch sessions while the agent is running. Press Esc to cancel first.";
+    }
+
+    const { store } = await import("../../tui/src/store/ui-store");
+
+    if (args.length === 0) {
+      store.openSessionPicker();
+      return "";
+    }
+
+    const ref = args.join(" ");
+    let session;
+    try {
+      session = await context.controller.switchSession(ref);
+    } catch (error) {
+      // Ambiguity is reported rather than guessed at; the message names the way
+      // to disambiguate.
+      return error instanceof Error ? error.message : String(error);
+    }
+
+    if (!session) {
+      return `No session found matching "${ref}". Use /resume with no argument to pick from a list.`;
+    }
+
+    store.hydrateTimeline(session.messages);
+    return `Resumed ${session.name ?? session.title}`;
+  },
+};
+
+const listSessionsCommand: SlashCommand = {
+  name: "sessions",
+  aliases: ["ls"],
+  description: "List saved conversations for this project",
+  category: "session",
+
+  async execute(context, args) {
+    const sessions = await listSessions();
+    if (sessions.length === 0) return "No saved sessions in this project yet.";
+
+    const activeId = context.controller.currentSession()?.id;
+    const rows = sessions
+      .slice(0, 20)
+      .map((session) => describeSession(session, session.id === activeId));
+
+    return [
+      `Sessions in this project (${sessions.length}):`,
+      "",
+      ...rows,
+      "",
+      "Switch with /resume <name-or-id>",
+    ].join("\n");
+  },
+};
+
+const renameCommand: SlashCommand = {
+  name: "rename",
+  description: "Name the current conversation so it can be resumed by name",
+  category: "session",
+  usage: "/rename <name>",
+
+  async execute(context, args) {
+    if (args.length === 0) return "Usage: /rename <name>";
+    if (context.controller.isBusy()) {
+      return "Cannot rename while the agent is running. Press Esc to cancel first.";
+    }
+
+    const session = await context.controller.renameSession(args.join(" "));
+    if (!session) return "No session to rename yet — run a turn first.";
+
+    return `Renamed to ${session.name}`;
+  },
+};
+
+const branchCommand: SlashCommand = {
+  name: "branch",
+  aliases: ["fork"],
+  description: "Copy this conversation and continue in the copy",
+  category: "session",
+  usage: "/branch [name]",
+
+  async execute(context, args) {
+    if (context.controller.isBusy()) {
+      return "Cannot branch while the agent is running. Press Esc to cancel first.";
+    }
+
+    const original = context.controller.currentSession();
+    if (!original || original.messages.length === 0) {
+      return "Nothing to branch yet — run a turn first.";
+    }
+
+    const session = await context.controller.branchSession(args.join(" ") || undefined);
+    if (!session) return "Could not branch this session.";
+
+    return [
+      `Branched into ${session.name ?? session.title} (${session.id.slice(0, 8)}).`,
+      `The original is unchanged — /resume ${original.id.slice(0, 8)} to return to it.`,
+    ].join("\n");
   },
 };
 
@@ -396,7 +524,10 @@ const statusCommand: SlashCommand = {
 
   async execute(context, args) {
     const config = await getConfig();
-    const conversation = await getConversation();
+    // Optional the same way getModel is below: /status is the command someone
+    // runs when something is wrong, so it reports what it can rather than
+    // throwing on a controller that is not fully wired.
+    const session = context.controller?.currentSession?.() ?? null;
     const cwd = process.cwd();
     const parts = cwd.split("/").filter(Boolean);
     const repoName = parts[parts.length - 1] ?? "workspace";
@@ -418,7 +549,8 @@ const statusCommand: SlashCommand = {
       `Provider: ${providerLabel(provider)}`,
       `Model: ${getModelDisplayName(model)} (${model})`,
       ``,
-      `Conversation: ${conversation.length} messages`,
+      `Session: ${session ? `${session.name ?? session.title} (${session.id.slice(0, 8)})` : "none yet"}`,
+      `Conversation: ${context.controller?.messageCount?.() ?? 0} messages`,
       `Tools: ${toolRegistry.length} registered`,
       `Version: ${VERSION}`,
     ].join("\n");
@@ -443,6 +575,10 @@ const versionCommand: SlashCommand = {
 export function registerCommands() {
   registry.register(helpCommand);
   registry.register(newCommand);
+  registry.register(resumeCommand);
+  registry.register(listSessionsCommand);
+  registry.register(renameCommand);
+  registry.register(branchCommand);
   registry.register(exitCommand);
   registry.register(providerCommand);
   registry.register(loginCommand);

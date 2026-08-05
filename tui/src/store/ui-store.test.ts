@@ -637,3 +637,113 @@ describe("UIStore blocked tools", () => {
     expect(store.getState().timeline).toHaveLength(0);
   });
 });
+
+describe("UIStore session picker", () => {
+  test("counts as an open modal, so global keys stand aside", () => {
+    const store = new UIStore();
+    expect(store.hasOpenModal()).toBe(false);
+
+    store.openSessionPicker();
+
+    expect(store.hasOpenModal()).toBe(true);
+  });
+
+  test("esc closes it", () => {
+    const store = new UIStore();
+    store.openSessionPicker();
+
+    expect(store.dismissTopModal()).toBe(true);
+    expect(store.getState().sessionPickerOpen).toBe(false);
+  });
+
+  test("the model picker still takes precedence when both are open", () => {
+    // Matches the order app.tsx renders them in; a mismatch would dismiss the
+    // dialog underneath the one on screen.
+    const store = new UIStore();
+    store.openModelPicker();
+    store.openSessionPicker();
+
+    store.dismissTopModal();
+
+    expect(store.getState().modelPickerOpen).toBe(false);
+    expect(store.getState().sessionPickerOpen).toBe(true);
+  });
+});
+
+describe("UIStore system messages", () => {
+  test("an empty message is not appended", () => {
+    // A command that only opens a dialog has nothing to say and returns "".
+    // Appending it left a blank row in the transcript behind every /resume.
+    const store = new UIStore();
+    store.addSystemMessage("");
+    store.addSystemMessage("   \n ");
+
+    expect(store.getState().timeline).toHaveLength(0);
+  });
+
+  test("a real message is still appended", () => {
+    const store = new UIStore();
+    store.addSystemMessage("Resumed auth-work");
+
+    expect(store.getState().timeline).toHaveLength(1);
+  });
+});
+
+describe("UIStore hydrateTimeline", () => {
+  test("redraws a stored conversation as user and assistant rows", () => {
+    // Restored history used to be loaded into the controller and never
+    // rendered, so a resumed session showed an empty screen over a
+    // conversation the model could see.
+    const store = new UIStore();
+
+    store.hydrateTimeline([
+      { role: "user", content: "first" },
+      { role: "assistant", content: "second" },
+    ]);
+
+    expect(store.getState().timeline).toMatchObject([
+      { type: "user", content: "first" },
+      { type: "assistant", content: "second", streaming: false },
+    ]);
+  });
+
+  test("replaces whatever was on screen rather than appending to it", () => {
+    const store = new UIStore();
+    store.addUserMessage("from the session being left");
+
+    store.hydrateTimeline([{ role: "user", content: "from the session resumed" }]);
+
+    expect(store.getState().timeline).toHaveLength(1);
+  });
+
+  test("skips anything with no text to draw", () => {
+    const store = new UIStore();
+
+    store.hydrateTimeline([
+      { role: "user", content: "kept" },
+      { role: "assistant", content: "   " },
+      { role: "tool", content: "tool output" },
+      { role: "assistant_tool_call", toolName: "read_file" },
+    ] as any);
+
+    expect(store.getState().timeline).toHaveLength(1);
+  });
+
+  test("clears the usage meter, which described the previous conversation", () => {
+    const store = new UIStore();
+    store.setUsage(1234);
+
+    store.hydrateTimeline([{ role: "user", content: "hi" }]);
+
+    expect(store.getState().usage).toBeNull();
+  });
+
+  test("closes the picker that asked for it", () => {
+    const store = new UIStore();
+    store.openSessionPicker();
+
+    store.hydrateTimeline([{ role: "user", content: "hi" }]);
+
+    expect(store.getState().sessionPickerOpen).toBe(false);
+  });
+});

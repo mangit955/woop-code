@@ -1,12 +1,6 @@
 import { renameSync } from "fs";
 import type { Message } from "./types";
-import {
-  getProvidersConfigPath,
-  getConversationPath,
-  getExecutionLogPath,
-  initializeConfig,
-} from "./paths";
-import type { ExecutionRecord } from "../runtime/executionLog";
+import { getProvidersConfigPath, initializeConfig } from "./paths";
 import { type ApprovalMode, parseApprovalMode } from "../runtime/approval";
 
 export interface ProviderEntry {
@@ -19,7 +13,30 @@ export interface ProvidersConfig {
   selectedModel?: string;
   /** How much the agent may run without asking; see runtime/approval. */
   approvalMode?: ApprovalMode;
+  /** Days a session survives after its last turn; 0 keeps them forever. */
+  retentionDays?: number;
   providers: Record<string, ProviderEntry>;
+}
+
+/**
+ * How long a session lives after its last turn.
+ *
+ * Thirty days is what Claude Code defaults to and it is the right shape of
+ * number: long enough that coming back to last month's work still finds it,
+ * short enough that the store does not grow without bound.
+ */
+export const DEFAULT_RETENTION_DAYS = 30;
+
+/**
+ * Reads the retention setting, falling back to the default for anything that is
+ * not a usable number. Zero and negatives are honoured as "keep forever" rather
+ * than corrected — that is how retention is turned off.
+ */
+export function parseRetentionDays(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_RETENTION_DAYS;
+  }
+  return value < 0 ? 0 : value;
 }
 
 /**
@@ -28,7 +45,7 @@ export interface ProvidersConfig {
  * touches config — the user keeps the broken copy, and startup continues from
  * a clean default.
  */
-async function readJsonFile(path: string, label: string): Promise<unknown> {
+export async function readJsonFile(path: string, label: string): Promise<unknown> {
   const file = Bun.file(path);
 
   if (!(await file.exists())) {
@@ -84,6 +101,10 @@ export function normalizeConfig(raw: unknown): ProvidersConfig {
     // Always normalised, so an absent or misspelt setting cannot leave the
     // approval mode undefined at the point a command is about to run.
     approvalMode: parseApprovalMode(source.approvalMode),
+    // The spread above preserves unrecognised keys, which would leave a
+    // hand-written `retentionDays: "30"` intact and unusable. Normalise it for
+    // the same reason the approval mode is normalised.
+    retentionDays: parseRetentionDays(source.retentionDays),
     providers,
   };
 }
@@ -129,23 +150,18 @@ export async function saveConfig(config: ProvidersConfig) {
   await Bun.write(configPath, JSON.stringify(config, null, 2));
 }
 
-// for storing and apending the conversation history
-export async function getConversation(): Promise<Message[]> {
-  await initializeConfig();
-  const conversationPath = getConversationPath();
-
-  const parsed = await readJsonFile(conversationPath, "conversation history");
-
-  // A conversation that is not a list of messages is not worth recovering
-  // partially; starting a fresh transcript beats crashing on every launch.
-  if (!Array.isArray(parsed)) {
-    return [];
-  }
-
-  return parsed.filter(
-    (message): message is Message =>
-      !!message && typeof message === "object" && typeof (message as Message).role === "string",
-  );
+/**
+ * Writes JSON to a temporary sibling and renames it over the target.
+ *
+ * The rename is atomic on the same filesystem, so a crash mid-write leaves
+ * either the old file or the new one, never half of either. Everything that
+ * persists user state goes through here — a session, its index, the config —
+ * because all of them are written often enough to hit that window.
+ */
+export async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
+  const temporaryPath = `${path}.tmp`;
+  await Bun.write(temporaryPath, JSON.stringify(value, null, 2));
+  renameSync(temporaryPath, path);
 }
 
 /**
@@ -171,19 +187,6 @@ export function prepareConversationForDisk(messages: Message[]): Message[] {
   return conversational.slice(-MAX_PERSISTED_MESSAGES);
 }
 
-export async function saveConversation(messages: Message[]) {
-  await initializeConfig();
-  const conversationPath = getConversationPath();
-  const payload = JSON.stringify(prepareConversationForDisk(messages), null, 2);
-
-  // Saving now happens after every turn, so a crash mid-write would be much
-  // easier to hit. Write to a sibling file and rename, which is atomic on the
-  // same filesystem: readers see either the old file or the new one.
-  const temporaryPath = `${conversationPath}.tmp`;
-  await Bun.write(temporaryPath, payload);
-  renameSync(temporaryPath, conversationPath);
-}
-
 /**
  * How many execution records are kept on disk.
  *
@@ -192,48 +195,6 @@ export async function saveConversation(messages: Message[]) {
  * tokens.
  */
 export const MAX_PERSISTED_RECORDS = 200;
-
-/**
- * Loads what previous sessions did.
- *
- * Without this the execution log would survive a turn but not a restart, which
- * is the same forgetting one level up — reopening Woopcode in a repository
- * would discard everything it had learned there.
- */
-export async function getExecutionLog(): Promise<ExecutionRecord[]> {
-  await initializeConfig();
-
-  const parsed = await readJsonFile(getExecutionLogPath(), "execution log");
-  if (!Array.isArray(parsed)) return [];
-
-  return parsed.filter(
-    (record): record is ExecutionRecord =>
-      !!record &&
-      typeof record === "object" &&
-      typeof (record as ExecutionRecord).tool === "string" &&
-      typeof (record as ExecutionRecord).outcome === "string",
-  );
-}
-
-export async function saveExecutionLog(records: ExecutionRecord[]) {
-  await initializeConfig();
-  const path = getExecutionLogPath();
-  const payload = JSON.stringify(records.slice(-MAX_PERSISTED_RECORDS), null, 2);
-
-  // Same write-then-rename as the conversation: a crash mid-write must leave
-  // either the old file or the new one, never half of either.
-  const temporaryPath = `${path}.tmp`;
-  await Bun.write(temporaryPath, payload);
-  renameSync(temporaryPath, path);
-}
-
-export async function appendMessage(message: any) {
-  const conversation = await getConversation();
-
-  conversation.push(message);
-
-  await saveConversation(conversation);
-}
 
 // ==================== REPOSITORY CONTEXT ====================
 //

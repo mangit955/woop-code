@@ -1,7 +1,7 @@
 {
   "counts": {
     "tools": 14,
-    "commands": 11,
+    "commands": 15,
     "approvalModes": 4
   },
   "tools": [
@@ -310,8 +310,42 @@
         "reset"
       ],
       "category": "session",
-      "description": "Start a new conversation",
+      "description": "Start a new conversation, keeping the current one",
       "usage": "/new"
+    },
+    {
+      "name": "resume",
+      "aliases": [
+        "r"
+      ],
+      "category": "session",
+      "description": "Switch to a previous conversation",
+      "usage": "/resume [name-or-id]"
+    },
+    {
+      "name": "sessions",
+      "aliases": [
+        "ls"
+      ],
+      "category": "session",
+      "description": "List saved conversations for this project",
+      "usage": "/sessions"
+    },
+    {
+      "name": "rename",
+      "aliases": [],
+      "category": "session",
+      "description": "Name the current conversation so it can be resumed by name",
+      "usage": "/rename <name>"
+    },
+    {
+      "name": "branch",
+      "aliases": [
+        "fork"
+      ],
+      "category": "session",
+      "description": "Copy this conversation and continue in the copy",
+      "usage": "/branch [name]"
     },
     {
       "name": "exit",

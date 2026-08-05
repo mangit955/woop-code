@@ -218,9 +218,20 @@ describe("E2E Chat - Conversation Persistence", () => {
     // Create new controller and verify history is loaded
     const newController = new AgentController("test", "test-api-key", callbacks);
     await newController.initialize();
-    
-    // History should be restored (implementation detail - can't verify directly)
-    expect(true).toBe(true);
+
+    // This used to assert `true`, which passed whatever the controller did.
+    // A fresh controller continues the newest session in this project, so the
+    // turn above has to be visible in it — that is what "persists" means.
+    // Earlier tests in this file share the project's session, so this asserts
+    // on what *this* turn added rather than on a fixed position.
+    expect(newController.messageCount()).toBeGreaterThanOrEqual(2);
+    expect(
+      newController
+        .currentSession()
+        ?.messages.some(
+          (message) => message.role === "user" && message.content === "Test prompt",
+        ),
+    ).toBe(true);
   });
 
   test("dispose saves conversation state", async () => {

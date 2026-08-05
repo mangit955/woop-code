@@ -24,6 +24,14 @@ directory.
 | --- | --- |
 | `-p, --prompt <prompt>` | Run a single prompt without the interface and exit |
 | `--no-auto-approve` | With `--prompt`, reject tool edits and commands instead of approving them |
+| `-m, --model <model>` | Model id for this run only; the saved selection is left alone |
+| `-c, --continue` | Reopen the newest session in this project |
+| `--resume <session>` | Reopen a session by name, id or id prefix |
+| `--new` | Start a fresh session instead of continuing |
+| `--fork-session` | With `--continue` or `--resume`, branch instead of writing into it |
+| `-n, --name <name>` | Name a new session so it can be resumed by name |
+| `--no-session-persistence` | With `--prompt`, do not save the session |
+| `--events <path>` | With `--prompt`, write a JSONL record of the run |
 | `-V, --version` | Print the version |
 | `-h, --help` | Print usage |
 
@@ -35,6 +43,7 @@ directory.
 | `woopcode agent` | The same thing, named explicitly |
 | `woopcode models` | List the models Woopcode knows about |
 | `woopcode providers` | Inspect and configure providers |
+| `woopcode sessions` | List, inspect and prune saved conversations |
 
 ## `woopcode`
 
@@ -45,6 +54,23 @@ repository it is launched from, so the directory matters.
 cd path/to/your-project
 woopcode
 ```
+
+### Sessions
+
+A bare launch reopens the newest session in that project. The flags pick a
+different one:
+
+```bash
+woopcode --continue                 # explicit about the default
+woopcode --resume auth-refactor     # by name
+woopcode --resume 3f9c1a2b          # by id prefix
+woopcode --new                      # start fresh, keeping the old one
+woopcode --continue --fork-session  # branch rather than continue in place
+woopcode -n auth-refactor           # name the session as it starts
+```
+
+A reference that matches nothing exits with status 1 rather than dropping you
+into a session you did not ask for.
 
 ### Headless
 
@@ -69,6 +95,15 @@ Plain `--prompt` approves everything, including shell commands, regardless of
 the approval mode saved in your config. Use `--no-auto-approve` anywhere the
 checkout matters — CI in particular.
 :::
+
+A headless run starts its own session rather than continuing the one you have
+open interactively, and prints the id to stderr:
+
+```bash
+woopcode -p "summarise the auth flow" 2> >(grep '^session ')
+woopcode -p --resume 3f9c1a2b "now write the tests"
+woopcode -p --no-session-persistence "one-off question"
+```
 
 ## `woopcode models`
 
@@ -110,6 +145,30 @@ Google Gemini, OpenAI and Anthropic Claude are all implemented; every provider
 Switching provider also moves the model: a selection belonging to another
 provider is replaced with that provider's default, because the two are stored
 independently and a Gemini model id sent to Anthropic fails on the first turn.
+
+## `woopcode sessions`
+
+| Subcommand | Description |
+| --- | --- |
+| `list` | Saved sessions in this project, newest first |
+| `show` | Print one session's transcript |
+| `prune` | Delete sessions past the retention period |
+
+A bare `woopcode sessions` is the listing.
+
+```bash
+woopcode sessions
+woopcode sessions list --all          # every project on this machine
+woopcode sessions show auth-refactor
+woopcode sessions prune --days 7
+```
+
+`show` and `prune` take a name, id or id prefix. An ambiguous reference lists
+the candidates and exits 1 rather than picking one.
+
+`prune` without `--days` uses `retentionDays` from
+[`providers.json`](/docs/reference/configuration), which defaults to 30. It also
+runs on its own at most once a day when a session starts.
 
 ## Exit codes
 

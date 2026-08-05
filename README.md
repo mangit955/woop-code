@@ -4,6 +4,8 @@
 [![TypeScript](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg)](LICENSE)
 
+[Documentation](https://woop-code.vercel.app) · [Install](https://woop-code.vercel.app/docs/getting-started/install) · [How a turn works](https://woop-code.vercel.app/docs/introduction/how-a-turn-works)
+
 **A terminal-native coding agent that understands your repository, shows its work, and keeps you in control of code changes.**
 
 Woopcode runs where you work: in the terminal and inside the current repository. Ask it to investigate, explain, implement, review, or test a change; it streams progress, uses focused tools, and presents edits as a readable diff before it writes to an existing file.

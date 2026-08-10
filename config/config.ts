@@ -40,6 +40,8 @@ export interface ProvidersConfig {
   approvalMode?: ApprovalMode;
   /** Days a session survives after its last turn; 0 keeps them forever. */
   retentionDays?: number;
+  /** Run shell commands in an E2B sandbox rather than on this machine. */
+  sandbox?: boolean;
   providers: Record<string, ProviderEntry>;
 }
 
@@ -140,6 +142,11 @@ export function normalizeConfig(raw: unknown): ProvidersConfig {
     // hand-written `retentionDays: "30"` intact and unusable. Normalise it for
     // the same reason the approval mode is normalised.
     retentionDays: parseRetentionDays(source.retentionDays),
+    // Only a literal `true` turns it on. A hand-written `"true"` is a string and
+    // would be truthy everywhere it is read, which is the wrong direction for a
+    // setting that decides whether commands touch this machine — an unreadable
+    // value must not be able to change where code runs.
+    sandbox: source.sandbox === true,
     providers,
   };
 }

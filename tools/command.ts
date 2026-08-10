@@ -193,6 +193,7 @@ export async function runCommand(
   command: string,
   timeoutSeconds: number,
   signal?: AbortSignal,
+  cwd?: string,
 ): Promise<CommandResult> {
   if (signal?.aborted) throw new Error("Command cancelled");
 
@@ -201,6 +202,7 @@ export async function runCommand(
   const { cmd, processGroup } = shellArgv(command);
   const proc = Bun.spawn({
     cmd,
+    cwd,
     stdout: "pipe",
     stderr: "pipe",
   });

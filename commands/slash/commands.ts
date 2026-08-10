@@ -7,6 +7,13 @@ import { relativeTime } from "../../tui/src/relative-time";
 import { isProviderEnabled, unsupportedProviderMessage } from "../../providers/providerRegistry";
 import { DEFAULT_MODEL_ID, getModelDisplayName } from "../../providers/client";
 import { toolRegistry } from "../../tools";
+import {
+  disableSandbox,
+  enableSandbox,
+  hasApiKey,
+  isSandboxEnabled,
+  sandboxSession,
+} from "../../runtime/sandbox";
 import { VERSION } from "../../config/version";
 // The catalog owns the shape of models.json and the join with providerRegistry,
 // so the CLI command and this slash command cannot describe a model differently.
@@ -488,6 +495,77 @@ const approvalCommand: SlashCommand = {
   },
 };
 
+const sandboxCommand: SlashCommand = {
+  name: "sandbox",
+  description: "Run shell commands in an E2B sandbox instead of on this machine",
+  category: "configuration",
+  usage: "/sandbox [on|off|status]",
+
+  async execute(context, args) {
+    const action = (args[0] ?? "status").toLowerCase();
+
+    if (action === "status" || action === "") {
+      const session = sandboxSession();
+      const stored = (await getConfig()).sandbox === true;
+
+      if (!isSandboxEnabled()) {
+        return (
+          `Sandbox: off — shell commands run on this machine.\n` +
+          `${stored ? "Stored preference is on; it applies to the next session.\n" : ""}` +
+          (hasApiKey() ? "" : "E2B_API_KEY is not set, so /sandbox on has nowhere to run.\n") +
+          `\n  /sandbox on   confine commands to a virtual machine`
+        );
+      }
+
+      const id = session?.sandboxId;
+      const pushed = session?.pushedSet;
+      return (
+        `Sandbox: on${id ? ` (${id})` : " — created on the first command"}\n` +
+        (pushed ? `${pushed.files.length} files sent, ${pushed.skipped.length} held back\n` : "") +
+        `\n  repl and background processes are unavailable while it is on\n` +
+        `  /sandbox off  run commands on this machine again`
+      );
+    }
+
+    if (action === "on") {
+      if (!hasApiKey()) {
+        return (
+          "E2B_API_KEY is not set, so there would be nowhere to run a sandboxed " +
+          "command. Set it and try again."
+        );
+      }
+
+      const { refusedEnv } = enableSandbox({
+        onStatus: (message) => context.onOutput(`sandbox: ${message}`),
+      });
+      await saveSandboxPreference(true);
+
+      return (
+        "Sandbox on, and remembered for future sessions.\n" +
+        "The next command runs in a virtual machine, and one is created when it does.\n" +
+        "Your files are sent to it; nothing it writes comes back yet.\n" +
+        (refusedEnv.length > 0
+          ? `Not forwarded: ${refusedEnv.join(", ")} — agent and provider credentials never are.\n`
+          : "")
+      );
+    }
+
+    if (action === "off") {
+      await disableSandbox();
+      await saveSandboxPreference(false);
+      return "Sandbox off. Commands run on this machine again.";
+    }
+
+    return `Unknown option "${args[0]}". Usage: /sandbox [on|off|status]`;
+  },
+};
+
+async function saveSandboxPreference(enabled: boolean) {
+  const config = await getConfig();
+  config.sandbox = enabled;
+  await saveConfig(config);
+}
+
 const workspaceCommand: SlashCommand = {
   name: "workspace",
   aliases: ["ws"],
@@ -596,6 +674,7 @@ export function registerCommands() {
   registry.register(logoutCommand);
   registry.register(modelCommand);
   registry.register(approvalCommand);
+  registry.register(sandboxCommand);
   registry.register(workspaceCommand);
   registry.register(statusCommand);
   registry.register(versionCommand);

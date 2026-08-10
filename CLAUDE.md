@@ -120,11 +120,30 @@ Reading a trajectory, `run_end`'s `ok: true` means the loop finished, not that t
 
 `WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`, `WOOPCODE_DEMO_URL`. Bun loads `.env` automatically — no `dotenv`.
 
+Sandboxing: `E2B_API_KEY`, `WOOPCODE_SANDBOX_TEMPLATE`, `WOOPCODE_SANDBOX_TIMEOUT_MS`, `WOOPCODE_SANDBOX_MAX_FILE_BYTES`, `WOOPCODE_SANDBOX_NETWORK`, `WOOPCODE_SANDBOX_ENV`, `WOOPCODE_SANDBOX_SETUP`.
+
 `WOOPCODE_DEMO_URL` points demo mode at a proxy other than the production one, which is how the proxy is run locally. Demo mode stores a token, not a key: the credential in `providers.json` is only valid against that URL, so the two are written and cleared together (`config/demoAccount.ts`). A shared Gemini key cannot be shipped instead — the free-tier quota belongs to the project rather than the caller, and a key printed in a terminal gets scraped and revoked with no way to replace it.
 
 `WOOPCODE_THINKING_BUDGET` takes `off`, `-1` (the default, meaning automatic), or a token count. `off` omits `thinkingConfig` from the request entirely, and exists because `gemini-3.5-flash-lite` rejects a budget of `0` with a 400 — so "disable" cannot be expressed as a number. Budgets below roughly a thousand are ignored rather than honoured: measured, 128 and 512 return zero thinking tokens while 1024 and -1 return 54–202.
 
 That variable is Gemini-shaped, and the other two read it differently because they have to. Current Claude models reject `budget_tokens` outright, so a token count has no equivalent there: `off` sends `thinking: {type: "disabled"}`, every other value sends `{type: "adaptive", display: "omitted"}` — the model decides depth, which is what `-1` already meant. OpenAI takes an effort level rather than a count, so `off` sends `reasoning: {effort: "none"}` and every other value sends no `reasoning` at all, leaving the model's own default. In neither case is the number faked into a budget that was never applied.
+
+## Sandboxed execution
+
+`--sandbox` (or `/sandbox on`) routes shell commands into an E2B micro-VM instead of running them on the machine. `runtime/sandbox/` holds it: `registry.ts` is the executor in use, `control.ts` turns it on and off, `session.ts` is the lifecycle, `sandboxExecutor.ts` the E2B implementation.
+
+Local disk stays the source of truth for files — the diff review, the editor and git are untouched. Today files go **in** and nothing comes back; the pull-back and its conflict rule are the next phase.
+
+Four things that are easy to get wrong:
+
+- **A non-zero exit is a result, not an error.** E2B throws `CommandExitError` for any non-zero exit code. For a coding agent a red suite is the *answer*, so `sandboxExecutor.ts` unwraps it back into a `CommandResult`. Miss this and the model concludes the sandbox is broken every time its own code fails.
+- **What may be transmitted is a stricter question than what may be listed.** `walkWorkspace` does not read `.gitignore`, so it would have uploaded this repo's `.env`. `transmittable.ts` uses `git ls-files -co --exclude-standard`, minus an unconditional secret denylist — a force-added `.env` is *tracked*, so git lists it and only the denylist stops it — minus a 1MB size cap, because 93% of this repo is committed marketing video and pushing it cost 22s per session.
+- **Fail closed, always.** An unreachable sandbox refuses; it never falls back to local. `repl` refuses whenever `currentExecutor().kind !== "local"` — not `=== "sandbox"` — because a local interpreter beside a sandboxed `run_terminal` is an escape hatch via `subprocess.run`. Background processes are refused for the same reason until they are routed too.
+- **Cancellation is raced, not awaited.** Killing a command and then waiting for it to notice assumes the kill lands; when it does not, `wait()` never settles and the turn hangs with nothing to end it.
+
+Measured, so worth not re-discovering: `bun` is **not** in E2B's base template (node, npm, python3, git, gcc, make, curl, tar are), so a `bun.lock` in the pushed tree triggers a one-off install. A command round trip is ~300ms. `169.254.169.254` is reachable but is Firecracker's own metadata service, not a cloud credential endpoint; `10.0.0.1` and `192.168.1.1` are not reachable.
+
+`packages/tests/sandbox/e2b.integration.test.ts` is the live proof, and it needs `WOOPCODE_E2B_TESTS=1` as well as a key. Gating on the key alone is not enough: Bun loads `.env`, so everyone working here has one, and the suite would boot a VM before every commit. Guarded by a runtime check inside each body rather than `.skip`, which `verify.ts` flags. Everything else in `packages/tests/sandbox/` runs against a fake client in CI.
 
 User state (config, conversation, execution log) lives in `~/.config/woopcode/` (`%LOCALAPPDATA%\woopcode\` on Windows), never in the repo.
 

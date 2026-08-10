@@ -21,7 +21,7 @@
 
 import type { Tool } from "../config/types";
 import { requestCommandApproval } from "./approval";
-import { shellArgv, terminateProcessTree } from "./command";
+import { currentExecutor, type ProcessHandle } from "../runtime/sandbox";
 import { resolveWorkspacePath } from "./workspace";
 
 /**
@@ -41,15 +41,16 @@ const MAX_OUTPUT_RESULT = 16 * 1024;
 interface BackgroundProcess {
   id: string;
   command: string;
-  proc: ReturnType<typeof Bun.spawn>;
+  /**
+   * The running command, wherever it is running. Owns the exit code and the
+   * killing; everything below is this module's own bookkeeping.
+   */
+  handle: ProcessHandle;
   /** Output not yet handed to `process_output`. */
   unread: string;
   /** Characters dropped from the front of `unread` to stay under the cap. */
   dropped: number;
-  exitCode: number | null;
   startedAt: number;
-  /** Whether the command got a process group, which decides how it is killed. */
-  processGroup: boolean;
 }
 
 const processes = new Map<string, BackgroundProcess>();
@@ -71,31 +72,19 @@ function nextId(): string {
   return `bg${issued}`;
 }
 
-function collect(record: BackgroundProcess, stream: ReadableStream<Uint8Array> | null): void {
-  if (!stream) return;
-
-  void (async () => {
-    const decoder = new TextDecoder();
-    const reader = stream.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        record.unread += decoder.decode(value, { stream: true });
-        if (record.unread.length > MAX_BUFFERED_OUTPUT) {
-          const excess = record.unread.length - MAX_BUFFERED_OUTPUT;
-          record.unread = record.unread.slice(excess);
-          record.dropped += excess;
-        }
-      }
-    } catch {
-      // The process was killed mid-read, which is a normal end for this.
+function collect(record: BackgroundProcess): void {
+  record.handle.onOutput((chunk) => {
+    record.unread += chunk;
+    if (record.unread.length > MAX_BUFFERED_OUTPUT) {
+      const excess = record.unread.length - MAX_BUFFERED_OUTPUT;
+      record.unread = record.unread.slice(excess);
+      record.dropped += excess;
     }
-  })();
+  });
 }
 
 function describe(record: BackgroundProcess): string {
-  if (record.exitCode !== null) return `exited with code ${record.exitCode}`;
+  if (record.handle.exitCode !== null) return `exited with code ${record.handle.exitCode}`;
   const seconds = Math.round((Date.now() - record.startedAt) / 1000);
   return `running for ${seconds}s`;
 }
@@ -177,35 +166,23 @@ The process keeps running after this turn ends. Read what it has printed with pr
     }
 
     const id = nextId();
-    // Its own process group, so stopping it stops what it started. Without
-    // this the kill reaches the shell and nothing below it: measured, a
-    // `python3 ... ; true` left its interpreter running after process_stop
-    // returned, which is exactly the leak this tool claims to prevent.
-    const { cmd, processGroup } = shellArgv(command);
-    const proc = Bun.spawn({
-      cmd,
-      cwd,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    // The executor decides where this runs and hands back a handle. Locally
+    // that is a process in its own group, so stopping it stops what it started:
+    // measured, a `python3 ... ; true` left its interpreter running after
+    // process_stop returned, which is exactly the leak this tool prevents.
+    const handle = await currentExecutor().start(command, cwd);
 
     const record: BackgroundProcess = {
       id,
       command,
-      proc,
+      handle,
       unread: "",
       dropped: 0,
-      exitCode: null,
       startedAt: Date.now(),
-      processGroup,
     };
     processes.set(id, record);
 
-    collect(record, proc.stdout as ReadableStream<Uint8Array> | null);
-    collect(record, proc.stderr as ReadableStream<Uint8Array> | null);
-    void proc.exited.then((code) => {
-      record.exitCode = code;
-    });
+    collect(record);
 
     // Nothing is waited for, so there is nothing to report but the handle. The
     // model is told what to call next, because a bare id reads as a dead end.
@@ -254,13 +231,13 @@ export const processStopTool: Tool = {
 
   async execute(args) {
     const record = requireProcess(args);
-    const alreadyExited = record.exitCode !== null;
+    const alreadyExited = record.handle.exitCode !== null;
 
     if (!alreadyExited) {
-      // The whole tree, not just the shell — see the note at the spawn.
-      terminateProcessTree(record.proc, record.processGroup);
+      // The whole tree, not just the shell — see the note at the start.
+      record.handle.terminate();
       // Bounded: a process that ignores the signal must not hold the turn.
-      await Promise.race([record.proc.exited, Bun.sleep(2000)]);
+      await Promise.race([record.handle.exited, Bun.sleep(2000)]);
     }
 
     processes.delete(record.id);
@@ -283,9 +260,9 @@ export const processStopTool: Tool = {
 export function stopAllProcesses(): void {
   for (const record of [...processes.values()]) {
     processes.delete(record.id);
-    if (record.exitCode === null) {
-      terminateProcessTree(record.proc, record.processGroup);
-      record.proc.unref();
+    if (record.handle.exitCode === null) {
+      record.handle.terminate();
+      record.handle.unref();
     }
   }
 }

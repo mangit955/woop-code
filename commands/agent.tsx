@@ -12,6 +12,7 @@ import { isCommandTool, summarizeToolOutput } from "../tui/src/tool-display";
 import { parseApprovalMode } from "../runtime/approval";
 import { createEventLog, now } from "../runtime/eventLog";
 import { IterationBudgetExhaustedError } from "../runtime/loop";
+import { enableSandbox } from "../runtime/sandbox";
 import { VERSION } from "../config/version";
 import { PassThrough } from "stream";
 
@@ -40,6 +41,50 @@ export interface RunAgentOptions {
   name?: string;
   /** Headless only: run without ever writing a session file. */
   sessionPersistence?: boolean;
+  /** Run shell commands in an E2B sandbox rather than on this machine. */
+  sandbox?: boolean;
+  /** Sandbox egress: `full` (default) or `none`. */
+  sandboxNetwork?: string;
+}
+
+/**
+ * Turns sandboxing on when this run asked for it, or when it is the stored
+ * preference.
+ *
+ * The flag can only turn it on, never off: someone who has set `sandbox: true`
+ * in their config wants commands contained, and a flag that silently un-contains
+ * them would be a footgun pointed at the one thing this feature exists to
+ * prevent. `/sandbox off` is the deliberate way out.
+ */
+async function applySandboxSetting(
+  options: { sandbox?: boolean; sandboxNetwork?: string },
+  report: (message: string) => void,
+) {
+  let stored = false;
+  try {
+    stored = (await getConfig()).sandbox === true;
+  } catch {
+    // Said rather than swallowed. An explicit `--sandbox` is unaffected — it is
+    // checked below on its own — but someone whose *stored* preference is on
+    // would otherwise drop to running commands on their machine with nothing
+    // anywhere saying so, which is the one way this feature can quietly stop
+    // being a feature.
+    report("could not read the stored preference; not enabling on its own");
+  }
+
+  if (!options.sandbox && !stored) return;
+
+  const { refusedEnv } = enableSandbox({
+    ...(options.sandboxNetwork !== undefined ? { network: options.sandboxNetwork } : {}),
+    onStatus: report,
+  });
+
+  if (refusedEnv.length > 0) {
+    report(
+      `not forwarded to the sandbox: ${refusedEnv.join(", ")} — ` +
+        `agent and provider credentials are never sent`,
+    );
+  }
 }
 
 /**
@@ -96,7 +141,9 @@ export const agentCommand = addSessionOptions(
     .option("-p, --prompt <prompt>", "run a single prompt headlessly and exit", "")
     .option("--no-auto-approve", "with --prompt, reject tool edits and commands instead of approving them")
     .option("-m, --model <model>", "model id to use for this run")
-    .option("--events <path>", "with --prompt, write a JSONL record of the run to this path"),
+    .option("--events <path>", "with --prompt, write a JSONL record of the run to this path")
+    .option("--sandbox", "run shell commands in an E2B sandbox instead of on this machine")
+    .option("--sandbox-network <mode>", "sandbox egress: full (default) or none"),
 ).action(runAgent);
 
 /**
@@ -115,6 +162,14 @@ export async function runAgent(options: RunAgentOptions = {}, command?: Command)
   // Session flags can land on either the root program or the subcommand, the
   // same way --prompt does.
   const merged: RunAgentOptions = { ...globals, ...options };
+
+  // Before either path starts a turn, so the first command is already routed.
+  // Status goes to stderr in both: in the headless path stdout is the agent's
+  // answer and a caller pipes it, and in the TUI Ink has not taken the screen
+  // over yet.
+  await applySandboxSetting(merged, (message) => {
+    process.stderr.write(`sandbox: ${message}\n`);
+  });
 
   if (prompt) {
     return runHeadless(prompt, autoApprove, {

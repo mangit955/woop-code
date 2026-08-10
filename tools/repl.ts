@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
 import { requestCodeApproval } from "./approval";
+import { isSandboxed } from "../runtime/sandbox";
 import {
   DEFAULT_EVAL_TIMEOUT_SECONDS,
   MAX_REPL_OUTPUT,
@@ -74,6 +75,21 @@ This runs real code. It can write files and shell out, and is subject to the sam
     const timeout = args.timeout;
     if (timeout !== undefined && (typeof timeout !== "number" || !(timeout > 0))) {
       throw Error(`timeout must be a positive number of seconds, got ${JSON.stringify(timeout)}`);
+    }
+
+    // Refused while commands are being sandboxed, because this one is not yet.
+    // An interpreter here is a live process on the user's machine, and
+    // `subprocess.run` inside it reaches everything `run_terminal` was just
+    // stopped from reaching — a sandbox with this tool still local is not a
+    // sandbox. Checked before approval so the user is not asked to confirm
+    // something that is not going to run either way.
+    if (isSandboxed()) {
+      return (
+        "The repl is not available while the sandbox is on: it would run this code " +
+        "on your machine, outside the sandbox the other commands are confined to. " +
+        "Use run_terminal (which is sandboxed) for one-off evaluation, or turn the " +
+        "sandbox off with /sandbox off."
+      );
     }
 
     const { approved } = await requestCodeApproval(code, language);

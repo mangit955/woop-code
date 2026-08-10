@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
-import { formatCommandResult, runCommand } from "./command";
+import { formatCommandResult } from "./command";
+import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
 
 function startsBackgroundProcess(command: string) {
@@ -41,8 +42,13 @@ function startsBackgroundProcess(command: string) {
  * Five minutes, not longer: a command still running then is usually the thing
  * this tool refuses anyway — a server, a watch process — and an agent waiting
  * on one has stopped making progress.
+ *
+ * Exported because a sandbox has its own lifetime, and the two numbers have to
+ * be compared rather than left to coincide: E2B's default sandbox timeout is
+ * also five minutes, so a command using its whole budget would race the reaper
+ * for its life. `runtime/sandbox/settings.ts` keeps the sandbox above this.
  */
-const DEFAULT_TIMEOUT_SECONDS = 300;
+export const DEFAULT_TIMEOUT_SECONDS = 300;
 
 export const terminalTool: Tool = {
   name: "run_terminal",
@@ -86,7 +92,9 @@ export const terminalTool: Tool = {
     }
 
     try {
-      return formatCommandResult(await runCommand(command, timeoutSeconds, signal));
+      return formatCommandResult(
+        await currentExecutor().run(command, timeoutSeconds, signal),
+      );
     } catch (error) {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Command cancelled before completion.";

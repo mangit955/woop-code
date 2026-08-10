@@ -1,5 +1,6 @@
 import type { Tool } from "../config/types";
-import { formatCommandResult, runCommand } from "./command";
+import { formatCommandResult } from "./command";
+import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
 
 export const runTestsTool: Tool = {
@@ -31,7 +32,9 @@ export const runTestsTool: Tool = {
     }
 
     try {
-      return formatCommandResult(await runCommand(command, timeoutSeconds, signal));
+      return formatCommandResult(
+        await currentExecutor().run(command, timeoutSeconds, signal),
+      );
     } catch (error) {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Tests cancelled before completion.";

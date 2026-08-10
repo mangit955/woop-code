@@ -24,6 +24,7 @@ import {
 import { agentLoop } from "../runtime/loop";
 import { demoExhaustionMessage } from "../config/demoAccount";
 import { stopAllProcesses } from "../tools/process";
+import { disableSandbox } from "../runtime/sandbox";
 import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
 import {
   nextSessionMode,
@@ -503,6 +504,12 @@ export class AgentController {
     // Before the persist below rather than after, because persisting can fail
     // and must not be what decides whether the processes are cleaned up.
     stopAllProcesses();
+
+    // The sandbox goes with them, and for the same reason: it outlives a turn
+    // by design, so this is the only place it ends. A sandbox left running
+    // bills until its own timeout expires and holds a copy of the workspace
+    // nobody is reading.
+    await disableSandbox();
 
     if (this.wasCancelled) {
       this.pendingAssistantText = null;

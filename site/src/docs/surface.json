@@ -1,7 +1,7 @@
 {
   "counts": {
     "tools": 19,
-    "commands": 15,
+    "commands": 16,
     "approvalModes": 4
   },
   "tools": [
@@ -492,6 +492,13 @@
       "category": "configuration",
       "description": "Choose how much runs without asking",
       "usage": "/approval"
+    },
+    {
+      "name": "sandbox",
+      "aliases": [],
+      "category": "configuration",
+      "description": "Run shell commands in an E2B sandbox instead of on this machine",
+      "usage": "/sandbox [on|off|status]"
     },
     {
       "name": "workspace",

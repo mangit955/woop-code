@@ -118,7 +118,9 @@ Reading a trajectory, `run_end`'s `ok: true` means the loop finished, not that t
 
 ## Environment variables
 
-`WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`. Bun loads `.env` automatically — no `dotenv`.
+`WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`, `WOOPCODE_DEMO_URL`. Bun loads `.env` automatically — no `dotenv`.
+
+`WOOPCODE_DEMO_URL` points demo mode at a proxy other than the production one, which is how the proxy is run locally. Demo mode stores a token, not a key: the credential in `providers.json` is only valid against that URL, so the two are written and cleared together (`config/demoAccount.ts`). A shared Gemini key cannot be shipped instead — the free-tier quota belongs to the project rather than the caller, and a key printed in a terminal gets scraped and revoked with no way to replace it.
 
 `WOOPCODE_THINKING_BUDGET` takes `off`, `-1` (the default, meaning automatic), or a token count. `off` omits `thinkingConfig` from the request entirely, and exists because `gemini-3.5-flash-lite` rejects a budget of `0` with a 400 — so "disable" cannot be expressed as a number. Budgets below roughly a thousand are ignored rather than honoured: measured, 128 and 512 return zero thinking tokens while 1024 and -1 return 54–202.
 

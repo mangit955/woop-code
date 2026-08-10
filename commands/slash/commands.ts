@@ -1,7 +1,7 @@
 import type { SlashCommand, SlashCommandContext } from "./types";
 import { registry } from "./registry";
 import { APPROVAL_MODES, describeApprovalMode, parseApprovalMode } from "../../runtime/approval";
-import { getConfig, saveConfig } from "../../config/config";
+import { apiProviderEntry, getConfig, saveConfig } from "../../config/config";
 import { listSessions, UNTITLED, type SessionSummary } from "../../config/sessions";
 import { relativeTime } from "../../tui/src/relative-time";
 import { isProviderEnabled, unsupportedProviderMessage } from "../../providers/providerRegistry";
@@ -273,7 +273,12 @@ const providerCommand: SlashCommand = {
 
     // The running controller holds its own provider/key, so the config write
     // alone would leave this session on the previous provider.
-    context.controller.setProvider(newProvider, providerConfig.apiKey, model);
+    context.controller.setProvider(
+      newProvider,
+      providerConfig.apiKey,
+      model,
+      providerConfig.baseUrl,
+    );
 
     config.defaultProvider = newProvider;
     if (model) config.selectedModel = model;
@@ -357,7 +362,9 @@ const loginCommand: SlashCommand = {
       return `Cannot change provider while the agent is running. Press Esc to cancel first.`;
     }
 
-    config.providers[provider].apiKey = apiKey;
+    // Replaces the entry outright: this is the way out of demo mode, and the
+    // demo's proxy URL must not outlive the token it belonged to.
+    config.providers[provider] = apiProviderEntry(apiKey);
     config.defaultProvider = provider;
 
     const model = modelForProvider(provider, config.selectedModel);
@@ -366,7 +373,8 @@ const loginCommand: SlashCommand = {
 
     // A re-login with a fresh key must reach the running session too, not just
     // the config file.
-    context.controller.setProvider(provider, apiKey, model);
+    // No base URL: a user's own key always goes to the vendor directly.
+    context.controller.setProvider(provider, apiKey, model, undefined);
 
     if (model) {
       const { store } = await import("../../tui/src/store/ui-store");
@@ -424,15 +432,21 @@ const logoutCommand: SlashCommand = {
 
       // Drop the revoked key from the live session as well. With no provider
       // left, the next turn reports that instead of using stale credentials.
-      const nextKey = config.defaultProvider
-        ? config.providers[config.defaultProvider]?.apiKey ?? ""
-        : "";
+      const nextEntry = config.defaultProvider
+        ? config.providers[config.defaultProvider]
+        : undefined;
+      const nextKey = nextEntry?.apiKey ?? "";
       const nextModel = modelForProvider(
         config.defaultProvider,
         config.selectedModel,
       );
       if (nextModel) config.selectedModel = nextModel;
-      context.controller.setProvider(config.defaultProvider, nextKey, nextModel);
+      context.controller.setProvider(
+        config.defaultProvider,
+        nextKey,
+        nextModel,
+        nextEntry?.baseUrl,
+      );
 
       if (nextModel) {
         const { store } = await import("../../tui/src/store/ui-store");

@@ -6,6 +6,31 @@ import { type ApprovalMode, parseApprovalMode } from "../runtime/approval";
 export interface ProviderEntry {
   type?: string;
   apiKey?: string;
+  /**
+   * Where to send this provider's requests, when not the vendor's own host.
+   *
+   * Set for demo mode, whose credential is a token issued by Woopcode's proxy
+   * rather than a Google key. The two travel together and separating them is a
+   * failure: the token is meaningless to Google, so an entry that keeps the
+   * key but loses the URL authenticates against the wrong server.
+   */
+  baseUrl?: string;
+  /** Epoch ms after which a demo token is dead. Absent on a real key. */
+  demoExpiresAt?: number;
+}
+
+/**
+ * The entry for a key the user supplied themselves.
+ *
+ * Built fresh rather than spread over whatever was stored before, because the
+ * entry it replaces may be a demo one. Spreading kept `type: "demo"`, the
+ * proxy's `baseUrl` and the old expiry alive underneath the new key — so
+ * upgrading out of demo mode sent a real Google credential to Woopcode's
+ * proxy, and expired the moment the demo token would have. Every path that
+ * stores a user key goes through here so that cannot come back.
+ */
+export function apiProviderEntry(apiKey: string): ProviderEntry {
+  return { type: "api", apiKey };
 }
 
 export interface ProvidersConfig {
@@ -72,7 +97,13 @@ export async function readJsonFile(path: string, label: string): Promise<unknown
 
 /**
  * Fills in whatever the config is missing so callers never index into an
- * undefined `providers` map. Unrecognised extra keys are preserved.
+ * undefined `providers` map.
+ *
+ * Unrecognised extra keys are preserved at the top level, but *not* inside a
+ * provider entry: each entry is rebuilt field by field below, so a field this
+ * function does not know about is dropped on the next read. Anything added to
+ * `ProviderEntry` has to be added to that loop too, or it survives being
+ * written and disappears the moment the config is loaded again.
  */
 export function normalizeConfig(raw: unknown): ProvidersConfig {
   const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -84,10 +115,14 @@ export function normalizeConfig(raw: unknown): ProvidersConfig {
   const providers: Record<string, ProviderEntry> = {};
   for (const [name, entry] of Object.entries(rawProviders)) {
     if (!entry || typeof entry !== "object") continue;
-    const { type, apiKey } = entry as ProviderEntry;
+    const { type, apiKey, baseUrl, demoExpiresAt } = entry as ProviderEntry;
     providers[name] = {
       ...(typeof type === "string" ? { type } : { type: "api" }),
       ...(typeof apiKey === "string" ? { apiKey } : {}),
+      ...(typeof baseUrl === "string" ? { baseUrl } : {}),
+      ...(typeof demoExpiresAt === "number" && Number.isFinite(demoExpiresAt)
+        ? { demoExpiresAt }
+        : {}),
     };
   }
 

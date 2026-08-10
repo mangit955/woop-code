@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { loginProvider } from "../../config/authProvider";
-import { getConfig, saveConfig } from "../../config/config";
+import { apiProviderEntry, getConfig, saveConfig } from "../../config/config";
 import {
   isProviderEnabled,
   unsupportedProviderMessage,
@@ -30,13 +30,11 @@ export const loginCommand = new Command("login")
     const config = await getConfig();
 
     config.defaultProvider = options.provider;
-    // The entry can be absent in a config written by an older version or
-    // trimmed by hand, so create it rather than indexing into undefined.
-    config.providers[options.provider] = {
-      ...config.providers[options.provider],
-      type: "api",
-      apiKey: options.apiKey,
-    };
+    // Built fresh rather than spread over the previous entry: that entry may
+    // be a demo one, whose proxy URL would otherwise survive underneath a real
+    // key. It also covers an entry that is absent entirely, in a config
+    // written by an older version or trimmed by hand.
+    config.providers[options.provider] = apiProviderEntry(options.apiKey);
     await saveConfig(config);
 
     console.log("logging into " + options.provider);

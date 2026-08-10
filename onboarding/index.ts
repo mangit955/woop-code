@@ -7,27 +7,44 @@ import {
   canPromptInteractively,
   resolveEnvCredentials,
 } from "../config/envCredentials";
+import { isDemoExpired } from "../config/demoAccount";
 
 export interface ProviderCredentials {
   provider: string;
   apiKey: string;
+  /** Set for demo mode, whose token is only valid against Woopcode's proxy. */
+  baseUrl?: string;
 }
 
 /**
  * Resolves the active provider and its key, or null when the config cannot
- * currently run: no default provider, a missing or keyless provider entry, or
- * a provider Woopcode has no client for.
+ * currently run: no default provider, a missing or keyless provider entry, a
+ * provider Woopcode has no client for, or a demo token that has expired.
+ *
+ * An expired demo token counts as unconfigured on purpose. Returning it would
+ * put the failure on the first turn, as a 403 from a server the user has never
+ * heard of; returning null puts it in the wizard, where "try the demo again"
+ * and "use my own key" are both one keypress away.
  */
 export async function resolveCredentials(): Promise<ProviderCredentials | null> {
   const config = await getConfig();
   const provider = config.defaultProvider;
-  const apiKey = config.providers[provider]?.apiKey;
+  const entry = config.providers[provider];
+  const apiKey = entry?.apiKey;
 
   if (!provider || !apiKey || !isProviderEnabled(provider)) {
     return null;
   }
 
-  return { provider, apiKey };
+  if (isDemoExpired(entry)) {
+    return null;
+  }
+
+  return {
+    provider,
+    apiKey,
+    ...(entry?.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+  };
 }
 
 /**

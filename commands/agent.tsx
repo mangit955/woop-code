@@ -146,7 +146,7 @@ async function runHeadless(
   options: { model?: string; events?: string; session?: InitializeOptions } = {},
 ) {
   registerCommands();
-  const { provider, apiKey } = await ensureProviderConfigured();
+  const { provider, apiKey, baseUrl } = await ensureProviderConfigured();
 
   const selectedModel = await resolveModel(options.model);
   store.setSelectedModel(selectedModel);
@@ -248,7 +248,7 @@ async function runHeadless(
     },
   };
 
-  const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
+  const controller = new AgentController(provider, apiKey, selectedModel, callbacks, baseUrl);
   await controller.initialize(options.session);
 
   // On stderr, not stdout: stdout is the agent's answer and a caller pipes it.
@@ -296,7 +296,7 @@ async function runInteractive(
 
   // Launches onboarding when nothing is configured, so this may not return
   // immediately on a first run.
-  const { provider, apiKey } = await ensureProviderConfigured();
+  const { provider, apiKey, baseUrl } = await ensureProviderConfigured();
 
   const config = await getConfig();
   const selectedModel = await resolveModel(modelOverride);
@@ -390,7 +390,7 @@ async function runInteractive(
       store.setTransientStatus("Cancelled", CANCEL_STATUS_MS);
     },
   };
-  const controller = new AgentController(provider, apiKey, selectedModel, callbacks);
+  const controller = new AgentController(provider, apiKey, selectedModel, callbacks, baseUrl);
   try {
     await controller.initialize(session);
   } catch (error) {

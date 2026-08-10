@@ -128,6 +128,7 @@ export function geminiClient(
   apiKey: string,
   model = DEFAULT_MODEL_ID,
   injected?: Pick<GoogleGenAI, "models">,
+  baseUrl?: string,
 ): ProviderClient {
   // Built on the first request rather than here. As a default argument this ran
   // whenever a client was constructed, which made merely naming a provider do
@@ -135,8 +136,17 @@ export function geminiClient(
   // can reach for credentials, so a caller that only wanted to know a provider
   // is available paid for a network client and could block waiting for one.
   // Constructing a client should cost nothing until it is used.
+  //
+  // `baseUrl` sends the same requests somewhere other than Google. Demo mode
+  // uses it to reach Woopcode's proxy, which holds the real key: the SDK takes
+  // a full-URL override, so the wire format, the streaming and every code path
+  // below stay exactly what they are for a direct key.
   let ai = injected;
-  const sdk = () => (ai ??= new GoogleGenAI({ apiKey }));
+  const sdk = () =>
+    (ai ??= new GoogleGenAI({
+      apiKey,
+      ...(baseUrl ? { httpOptions: { baseUrl } } : {}),
+    }));
 
   return {
     async *stream(
@@ -483,6 +493,7 @@ export function createProviderClient(
   provider: string,
   apiKey: string,
   model?: string,
+  baseUrl?: string,
 ): ProviderClient {
   // A config written before a provider existed can pair it with another
   // provider's model — providers.json stores the two independently. Sending a
@@ -497,10 +508,19 @@ export function createProviderClient(
     model !== undefined && findModel(model) !== undefined && !modelBelongsToProvider(model, provider);
   const runnable = mismatched ? undefined : model;
 
+  // `baseUrl` is honoured only by Google, because demo mode is the only thing
+  // that sets it and the proxy speaks one vendor's wire format. Passing it to
+  // the others would point an Anthropic or OpenAI SDK at a server that cannot
+  // answer them, so it is ignored there rather than forwarded.
   switch (provider) {
     case "google":
     case "gemini":
-      return geminiClient(apiKey, runnable ?? defaultModelForProvider("google"));
+      return geminiClient(
+        apiKey,
+        runnable ?? defaultModelForProvider("google"),
+        undefined,
+        baseUrl,
+      );
 
     case "anthropic":
       return anthropicClient(apiKey, runnable ?? defaultModelForProvider("anthropic"));

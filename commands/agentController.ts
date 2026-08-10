@@ -22,6 +22,7 @@ import {
   type SessionRecord,
 } from "../config/sessions";
 import { agentLoop } from "../runtime/loop";
+import { demoExhaustionMessage } from "../config/demoAccount";
 import { stopAllProcesses } from "../tools/process";
 import { PLAN_MODE_PROMPT } from "../config/systemPrompt";
 import {
@@ -121,6 +122,8 @@ export class AgentController {
     private apiKey: string,
     modelOrCallbacks: string | AgentCallbacks,
     callbacks?: AgentCallbacks,
+    /** Non-vendor host for this provider's requests; see ProviderEntry.baseUrl. */
+    private baseUrl?: string,
   ) {
     this.model = typeof modelOrCallbacks === "string" ? modelOrCallbacks : DEFAULT_MODEL_ID;
     this.callbacks = typeof modelOrCallbacks === "string" ? callbacks! : modelOrCallbacks;
@@ -140,17 +143,36 @@ export class AgentController {
    *
    * Returns false when a turn is in flight, so the caller can report that
    * instead of swapping credentials underneath a running request.
+   *
+   * `baseUrl` is assigned unconditionally, unlike `model`. It belongs to the
+   * credential rather than to the session: a demo session that switches to a
+   * real key must stop talking to the proxy, and leaving the old value in
+   * place would send that key to a server it was never issued for.
    */
-  setProvider(provider: string, apiKey: string, model?: string) {
+  setProvider(provider: string, apiKey: string, model?: string, baseUrl?: string) {
     if (this.isRunning) return false;
     this.provider = provider;
     this.apiKey = apiKey;
+    this.baseUrl = baseUrl;
     if (model) this.model = model;
     return true;
   }
 
   getProvider() {
     return this.provider;
+  }
+
+  /**
+   * Replaces a failure the user cannot act on with one they can.
+   *
+   * Lives here rather than in the loop, which is deliberately ignorant of
+   * providers and of how this session was credentialed. Anything it does not
+   * recognise is passed through untouched — a mapping that swallowed unknown
+   * errors would turn a real bug into a wrong explanation.
+   */
+  private describeTurnError(error: Error): Error {
+    const demo = demoExhaustionMessage(error, { baseUrl: this.baseUrl });
+    return demo ? new Error(demo) : error;
   }
 
   getSessionMode() {
@@ -239,7 +261,12 @@ export class AgentController {
     let failed = false;
 
     try {
-      const client = createProviderClient(this.provider, this.apiKey, this.model);
+      const client = createProviderClient(
+        this.provider,
+        this.apiKey,
+        this.model,
+        this.baseUrl,
+      );
       agentLoopStarted = true;
       response = await agentLoop(
         client,
@@ -254,6 +281,9 @@ export class AgentController {
           onCancel: () => {
             this.wasCancelled = true;
             this.callbacks.onCancel?.();
+          },
+          onError: (error) => {
+            this.callbacks.onError?.(this.describeTurnError(error));
           },
         },
         this.abortController.signal,

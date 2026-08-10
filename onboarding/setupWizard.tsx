@@ -4,16 +4,28 @@ import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import { getEnabledProviders, type ProviderInfo } from "../providers/providerRegistry";
 import { loginProvider } from "../config/authProvider";
-import { getConfig, saveConfig } from "../config/config";
+import { apiProviderEntry, getConfig, saveConfig } from "../config/config";
+import {
+  DEMO_PROVIDER,
+  demoProviderEntry,
+  requestDemoSession,
+} from "../config/demoAccount";
 import { colors } from "../tui/src/styles/theme";
 
 type WizardStep =
   | "welcome"
+  | "choose-path"
+  | "demo-disclosure"
+  | "requesting-demo"
   | "select-provider"
   | "api-key-info"
   | "enter-key"
   | "validating"
   | "complete";
+
+/** The two ways out of the welcome screen, in the order they are listed. */
+const PATHS = ["demo", "own-key"] as const;
+type SetupPath = (typeof PATHS)[number];
 
 interface SetupWizardProps {
   onComplete: () => void;
@@ -27,12 +39,38 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
     null,
   );
   const [apiKey, setApiKey] = useState("");
+  const [pathIndex, setPathIndex] = useState(0);
+  /**
+   * Which path reached the final screen. Not derived from `pathIndex`: a demo
+   * request that fails falls back to provider selection while leaving the
+   * highlight where it was, so the index says "demo" for a run that ended with
+   * the user pasting their own key.
+   */
+  const [completedVia, setCompletedVia] = useState<SetupPath>("own-key");
 
   const enabledProviders = getEnabledProviders();
 
   useInput((input, key) => {
     if (step === "welcome") {
       if (key.return) {
+        setStep("choose-path");
+      }
+    } else if (step === "choose-path") {
+      if (key.upArrow) {
+        setPathIndex((prev) => Math.max(0, prev - 1));
+      } else if (key.downArrow) {
+        setPathIndex((prev) => Math.min(PATHS.length - 1, prev + 1));
+      } else if (key.return) {
+        setStep(PATHS[pathIndex]! === "demo" ? "demo-disclosure" : "select-provider");
+      }
+    } else if (step === "demo-disclosure") {
+      // Two distinct keys, not "any key". The disclosure below is the only
+      // notice a demo user gets that their code reaches Google's free tier,
+      // and a screen dismissed by whatever they happened to press next is not
+      // a notice anyone read.
+      if (input === "y" || input === "Y") {
+        void startDemo();
+      } else if (key.escape || input === "n" || input === "N") {
         setStep("select-provider");
       }
     } else if (step === "select-provider") {
@@ -52,6 +90,33 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
       }
     }
   });
+
+  const startDemo = async () => {
+    setStep("requesting-demo");
+
+    try {
+      const session = await requestDemoSession();
+
+      const config = await getConfig();
+      config.defaultProvider = DEMO_PROVIDER;
+      config.providers[DEMO_PROVIDER] = demoProviderEntry(session);
+      await saveConfig(config);
+
+      setCompletedVia("demo");
+      setStep("complete");
+      setTimeout(onComplete, 1000);
+    } catch (error) {
+      // The demo is the optional path. When it is unavailable the wizard drops
+      // into provider selection rather than dead-ending, so a user who came to
+      // set up their own key is not blocked by a service they never wanted.
+      onError(
+        error instanceof Error
+          ? error.message
+          : "Could not start the demo. You can still set up your own API key.",
+      );
+      setStep("select-provider");
+    }
+  };
 
   const handleKeySubmit = async (value: string) => {
     if (!selectedProvider || !value.trim()) {
@@ -73,14 +138,12 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
 
       const config = await getConfig();
       config.defaultProvider = selectedProvider.id;
-      // A provider chosen in the wizard may have no entry yet.
-      config.providers[selectedProvider.id] = {
-        ...config.providers[selectedProvider.id],
-        type: "api",
-        apiKey: value.trim(),
-      };
+      // Built fresh, which covers both a provider with no entry yet and one
+      // holding a demo entry whose proxy URL must not survive a real key.
+      config.providers[selectedProvider.id] = apiProviderEntry(value.trim());
       await saveConfig(config);
 
+      setCompletedVia("own-key");
       setStep("complete");
       setTimeout(onComplete, 1000);
     } catch (error) {
@@ -101,10 +164,82 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
           Welcome to Woopcode!
         </Text>
         <Text dimColor> </Text>
-        <Text>You'll need an AI provider to use Woopcode.</Text>
-        <Text>We'll only ask for this once.</Text>
+        <Text>Let's get you set up. We'll only ask for this once.</Text>
         <Text dimColor> </Text>
         <Text dimColor>Press Enter to continue...</Text>
+      </Box>
+    );
+  }
+
+  if (step === "choose-path") {
+    const options = [
+      {
+        label: "Try the demo — no API key needed",
+        hint: "Runs on Gemini through Woopcode's demo service. Limited daily usage.",
+      },
+      {
+        label: "Use my own API key",
+        hint: "Google, OpenAI or Anthropic. Your key stays on this machine.",
+      },
+    ];
+
+    return (
+      <Box flexDirection="column" paddingY={1}>
+        <Text bold>How would you like to start?</Text>
+        <Text dimColor> </Text>
+        {options.map((option, index) => (
+          <Box key={option.label} flexDirection="column">
+            <Text color={index === pathIndex ? colors.primary : undefined}>
+              {index === pathIndex ? "❯ " : "  "}
+              {option.label}
+            </Text>
+            {index === pathIndex && <Text dimColor> {option.hint}</Text>}
+          </Box>
+        ))}
+        <Text dimColor> </Text>
+        <Text dimColor>Use ↑↓ arrows to select, Enter to confirm</Text>
+      </Box>
+    );
+  }
+
+  if (step === "demo-disclosure") {
+    return (
+      <Box flexDirection="column" paddingY={1}>
+        <Text bold color={colors.primary}>
+          Before you try the demo
+        </Text>
+        <Text dimColor> </Text>
+        <Text>
+          The demo runs on Google's free tier. Under Google's terms, anything
+          you send there — including the contents of files in this repository —
+          may be used to improve Google's models, and may be read by human
+          reviewers.
+        </Text>
+        <Text dimColor> </Text>
+        <Text bold>Don't use the demo on private or confidential code.</Text>
+        <Text dimColor> </Text>
+        <Text dimColor>
+          Using your own API key avoids this. You can switch any time with
+          /login.
+        </Text>
+        <Text dimColor> </Text>
+        <Text>
+          Press <Text bold>y</Text> to accept and start the demo, or{" "}
+          <Text bold>n</Text> to set up your own key.
+        </Text>
+      </Box>
+    );
+  }
+
+  if (step === "requesting-demo") {
+    return (
+      <Box flexDirection="column" paddingY={1}>
+        <Box>
+          <Text color={colors.primary}>
+            <Spinner type="dots" />
+          </Text>
+          <Text> Starting your demo session...</Text>
+        </Box>
       </Box>
     );
   }
@@ -185,8 +320,19 @@ export function SetupWizard({ onComplete, onError }: SetupWizardProps) {
   if (step === "complete") {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text color="green">✓ API key verified</Text>
-        <Text color="green">✓ Configuration saved</Text>
+        {completedVia === "demo" ? (
+          <>
+            <Text color="green">✓ Demo session started</Text>
+            <Text dimColor>
+              Limited daily usage. Run /login to switch to your own API key.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text color="green">✓ API key verified</Text>
+            <Text color="green">✓ Configuration saved</Text>
+          </>
+        )}
         <Text dimColor> </Text>
         <Text>Starting Woopcode...</Text>
       </Box>

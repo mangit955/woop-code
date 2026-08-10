@@ -47,6 +47,32 @@ beforeEach(async () => {
   );
 });
 
+describe("the default endpoint", () => {
+  // The default is compiled into every installed copy and cannot be corrected
+  // for anyone who does not upgrade. It shipped once pointing at
+  // demo.woopcode.dev, a domain that was never registered, so every install
+  // reported the demo unreachable and fell through to the key prompt.
+  test("is not the unregistered host it used to be", () => {
+    expect(demoEndpoint({})).not.toContain("demo.woopcode.dev");
+  });
+
+  test("is an absolute https URL with no trailing slash", () => {
+    const endpoint = demoEndpoint({});
+    expect(endpoint).toStartWith("https://");
+    expect(endpoint).not.toEndWith("/");
+  });
+
+  test("an override wins and is normalised", () => {
+    expect(demoEndpoint({ WOOPCODE_DEMO_URL: "http://localhost:8787///" })).toBe(
+      "http://localhost:8787",
+    );
+  });
+
+  test("a blank override falls back rather than producing an empty URL", () => {
+    expect(demoEndpoint({ WOOPCODE_DEMO_URL: "   " })).toBe(demoEndpoint({}));
+  });
+});
+
 describe("a demo entry survives being stored", () => {
   // The regression this file exists for. normalizeConfig rebuilds every
   // provider entry field by field, so a field it does not name is dropped on

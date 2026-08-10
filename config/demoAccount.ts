@@ -27,6 +27,21 @@ export const DEMO_PROVIDER = "google";
 export const DEMO_ENTRY_TYPE = "demo";
 
 /**
+ * Where the demo proxy lives when nothing overrides it.
+ *
+ * This string ends up compiled into every installed copy, and an installed
+ * copy is not something that can be corrected later — a user on an older
+ * version keeps asking the old host forever. It was `demo.woopcode.dev`
+ * before this, a domain that was never registered, so the only thing every
+ * install did was fail to resolve it.
+ *
+ * The escape hatch, if the proxy ever moves off Railway, is a CNAME on a
+ * domain that *is* owned, pointed wherever the service goes. Changing this
+ * constant again only helps people who upgrade.
+ */
+const DEFAULT_DEMO_ENDPOINT = "https://woopcode-demo-proxy-production.up.railway.app";
+
+/**
  * The proxy Woopcode's demo talks to.
  *
  * Overridable so the proxy can be run on localhost during development. It is
@@ -36,7 +51,7 @@ export const DEMO_ENTRY_TYPE = "demo";
 export function demoEndpoint(
   env: Record<string, string | undefined> = process.env,
 ): string {
-  return (env.WOOPCODE_DEMO_URL?.trim() || "https://demo.woopcode.dev").replace(
+  return (env.WOOPCODE_DEMO_URL?.trim() || DEFAULT_DEMO_ENDPOINT).replace(
     /\/+$/,
     "",
   );

@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -52,6 +52,12 @@ beforeAll(async () => {
   await write(".npmrc", "//registry.npmjs.org/:_authToken=npm_secret\n");
 
   await write("assets/big.bin", "x".repeat(2_000_000));
+
+  // A symlink beside its target, and an AppleDouble sidecar: both are listed by
+  // git and neither may be sent.
+  await write("real.ts", "export const real = 1;\n");
+  await symlink("real.ts", path.join(fixture, "link.ts"));
+  await write("._real.ts", "\x00\x05\x16\x07resource fork\n");
 
   // Ordinary add first, so the .gitignore entries stay untracked and genuinely
   // ignored.
@@ -128,6 +134,23 @@ describe("transmittable set", () => {
 
     expect(description).toContain("credential-shaped");
     expect(description).toContain("size cap");
+  });
+
+  test("a symlink is not transmitted", async () => {
+    // `find -type f` in a sandbox does not match a symlink, so one pushed from
+    // here would be missing from every listing that came back — and "missing
+    // from the sandbox" is how the sync recognises a deletion. Sending one
+    // therefore ends with the user's file being deleted. This repository has
+    // exactly such a symlink, and it was deleted that way once.
+    const set = await transmittableSet(fixture);
+
+    expect(set.files).toContain("real.ts");
+    expect(set.files).not.toContain("link.ts");
+  });
+
+  test("AppleDouble sidecars are not transmitted", async () => {
+    const set = await transmittableSet(fixture);
+    expect(set.files).not.toContain("._real.ts");
   });
 
   test("a directory that is not a git repository still applies the rules", async () => {

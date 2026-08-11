@@ -9,13 +9,24 @@
 
 import path from "node:path";
 import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
 import {
   BUN_INSTALL_COMMAND,
   BUN_PATH_PREFIX,
   REMOTE_WORKSPACE,
+  TAR_ENV,
   type SandboxSettings,
 } from "./settings";
 import { describeSkipped, transmittableSet, type TransmittableSet } from "./transmittable";
+import { buildManifest, diffManifests, type Manifest } from "./manifest";
+import {
+  admissiblePaths,
+  applyChanges,
+  fetchToStaging,
+  pushChanges,
+  remoteManifest,
+  type SyncReport,
+} from "./sync";
 
 /**
  * The part of E2B's `Sandbox` this uses.
@@ -32,7 +43,9 @@ export interface SandboxClient {
   };
   files: {
     write(remotePath: string, data: string | ArrayBuffer): Promise<unknown>;
-    read(remotePath: string): Promise<string>;
+    // `format: "bytes"` is what makes a batched pull possible: the changed files
+    // come back as one gzipped archive rather than a round trip each.
+    read(remotePath: string, opts?: { format?: "text" | "bytes" }): Promise<string | Uint8Array>;
   };
   setTimeout(timeoutMs: number): Promise<void>;
   kill(): Promise<boolean>;
@@ -78,6 +91,11 @@ export class SandboxSession {
   /** In flight, so two commands at once do not create two sandboxes. */
   #starting: Promise<SandboxClient> | null = null;
   #pushed: TransmittableSet | null = null;
+
+  /** What the sandbox is believed to hold, as of the last sync. */
+  #remote: Manifest = new Map();
+  /** The tree handed to the command now running: the conflict rule's reference. */
+  #snapshot: Manifest = new Map();
 
   constructor(options: SandboxSessionOptions) {
     this.#options = options;
@@ -137,6 +155,12 @@ export class SandboxSession {
       onStatus?.(`uploading ${set.files.length} files…`);
       await this.#push(client, set);
 
+      // Seeded from what was just sent, so the first command's sync has nothing
+      // to do. Without this the whole tree would be diffed against an empty
+      // manifest and pushed a second time.
+      const manifest = await buildManifest(workspace, set.files);
+      this.#remote = manifest;
+
       const skipped = describeSkipped(set);
       if (skipped) onStatus?.(skipped);
 
@@ -175,6 +199,7 @@ export class SandboxSession {
       const tar = Bun.spawnSync({
         cmd: ["tar", "-czf", tarPath, "-T", listPath],
         cwd: this.#options.workspace,
+        env: TAR_ENV,
         stdout: "pipe",
         stderr: "pipe",
       });
@@ -225,6 +250,84 @@ export class SandboxSession {
       cwd: REMOTE_WORKSPACE,
       timeoutMs: 300_000,
     });
+  }
+
+  /**
+   * Brings the sandbox up to date with local disk, and records what it was given.
+   *
+   * The snapshot recorded here is what makes the pull afterwards answerable: the
+   * sandbox holds exactly this, so anything different afterwards is the
+   * command's doing and nothing else's.
+   */
+  async syncBefore(report: SyncReport): Promise<void> {
+    const client = await this.client();
+
+    const local = await pushChanges(
+      client,
+      this.#options.workspace,
+      this.#remote,
+      this.#options.settings.maxFileBytes,
+      report,
+    );
+
+    // Two copies rather than one shared map: the snapshot must stay the tree
+    // the command was handed even as the remote view moves on.
+    this.#snapshot = new Map(local);
+    this.#remote = new Map(local);
+  }
+
+  /**
+   * Brings back what the command wrote.
+   *
+   * Diffed against the snapshot rather than against anything time-based, so the
+   * question is what this command did to the tree it was given.
+   */
+  async syncAfter(report: SyncReport): Promise<void> {
+    const client = await this.client();
+
+    const after = await remoteManifest(client);
+
+    // Unusable rather than empty — see `remoteManifest`. Acting on it would
+    // read as "the command deleted everything" and take the working tree with
+    // it. The sandbox's believed state is left alone too, so the next push
+    // re-establishes it rather than assuming this one held.
+    if (after === null) {
+      report.refused.push({ path: "*", reason: "manifest-unavailable" });
+      return;
+    }
+
+    const { changed, deleted } = diffManifests(this.#snapshot, after);
+    this.#remote = after;
+
+    if (changed.length === 0 && deleted.length === 0) return;
+
+    const admitted = await admissiblePaths(this.#options.workspace, changed, report);
+    const admittedDeletes = await admissiblePaths(this.#options.workspace, deleted, report);
+
+    // Anything the pull refused is forgotten rather than remembered as
+    // something the sandbox has and local does not — which is what the next
+    // push reads as "delete it there". A command that wrote itself a `.env` or
+    // a log file gets to keep it for the rest of the session; refusing to
+    // deliver a file is not a reason to destroy it.
+    for (const entry of report.refused) this.#remote.delete(entry.path);
+
+    let staging: string | null = null;
+    if (admitted.length > 0) {
+      staging = await fetchToStaging(client, admitted);
+    }
+
+    try {
+      await applyChanges(
+        this.#options.workspace,
+        staging ?? "",
+        this.#snapshot,
+        admitted,
+        admittedDeletes,
+        report,
+      );
+    } finally {
+      if (staging) await rm(staging, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   /**

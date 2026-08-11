@@ -146,3 +146,21 @@ export const BUN_INSTALL_COMMAND =
 
 /** Where bun lands, so commands can find it without a login shell. */
 export const BUN_PATH_PREFIX = "$HOME/.bun/bin";
+
+/**
+ * The environment every `tar` here runs under.
+ *
+ * `COPYFILE_DISABLE` stops macOS's bsdtar writing an AppleDouble `._name`
+ * member beside every file that carries an extended attribute. GNU tar in the
+ * sandbox does not recognise those members and extracts them as ordinary files,
+ * which then look exactly like files a command created — so the sync pulls them
+ * back, and a single command litters the working tree. Measured on this
+ * repository: 217 of them after one run.
+ *
+ * Ignored on Linux, where bsdtar is not what runs and the variable means
+ * nothing.
+ */
+export const TAR_ENV: Record<string, string> = {
+  ...(process.env as Record<string, string>),
+  COPYFILE_DISABLE: "1",
+};

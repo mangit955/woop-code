@@ -30,6 +30,7 @@ import {
   withToolchainPath,
   type SandboxSession,
 } from "./session";
+import { describeForModel, emptyReport, type SyncReport } from "./sync";
 
 /**
  * E2B's result shape, structurally.
@@ -81,6 +82,36 @@ function isHandle(value: unknown): value is E2BHandleLike {
   );
 }
 
+/**
+ * Brings back what the command wrote, and tells the model about anything it
+ * needs to know.
+ *
+ * The note is appended to stdout rather than stderr: a model reading a tool
+ * result reads stdout first, and a conflict it does not see is a conflict it
+ * cannot reconcile. Empty in the ordinary case — a line on every command would
+ * be noise, and the one that mattered would go with it.
+ */
+async function withSync(
+  session: SandboxSession,
+  result: CommandResult,
+  report: SyncReport,
+): Promise<CommandResult> {
+  try {
+    await session.syncAfter(report);
+  } catch (error) {
+    return {
+      ...result,
+      stdout:
+        `${result.stdout}\n\n[sandbox sync]\nThe command ran, but its changes could not ` +
+        `be brought back: ${error instanceof Error ? error.message : String(error)}. ` +
+        `Local files are unchanged.`,
+    };
+  }
+
+  const note = describeForModel(report);
+  return note ? { ...result, stdout: `${result.stdout}${note}` } : result;
+}
+
 export function createSandboxExecutor(session: SandboxSession): Executor {
   return {
     kind: "sandbox",
@@ -90,6 +121,11 @@ export function createSandboxExecutor(session: SandboxSession): Executor {
 
       const client = await session.client();
       await session.keepAlive();
+
+      // Local disk is authoritative for what goes in, so it goes in first. A
+      // command reading a file the user edited a moment ago must see the edit.
+      const report = emptyReport();
+      await session.syncBefore(report);
 
       // Background, so the command has a pid that cancellation and the timeout
       // can actually kill. `timeoutMs: 0` disables E2B's own timer: the one
@@ -149,7 +185,7 @@ export function createSandboxExecutor(session: SandboxSession): Executor {
         // and it carries the same fields as a result — so a failing test suite
         // arrives here as an error and has to leave as an answer.
         const result = resultFrom(outcome.ok ? outcome.value : outcome.error);
-        if (result) return result;
+        if (result) return await withSync(session, result, report);
 
         if (outcome.ok) {
           throw new SandboxUnavailableError(
@@ -165,6 +201,14 @@ export function createSandboxExecutor(session: SandboxSession): Executor {
           }`,
           { cause: error },
         );
+      } catch (error) {
+        // A killed command has usually written something already — a `sed -i`
+        // stopped half way, a build that produced most of its output. Leaving
+        // that in the sandbox is the divergence this module exists to prevent,
+        // so the pull is attempted even on the failing paths. Best-effort: a
+        // sync that itself fails must not replace the error the caller needs.
+        await session.syncAfter(report).catch(() => {});
+        throw error;
       } finally {
         if (timer) clearTimeout(timer);
         if (onAbort) signal?.removeEventListener("abort", onAbort);

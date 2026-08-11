@@ -76,7 +76,13 @@ function fakeClient(options: FakeOptions = {}) {
   return { client, commands, killed };
 }
 
-/** A session already holding a client, so nothing is created or pushed. */
+/**
+ * A session already holding a client, with syncing stubbed out.
+ *
+ * This file is about the error contract around a command, not about sync — and
+ * a real `syncBefore` here would tar the repository on every test. Sync has its
+ * own tests against a temp workspace.
+ */
 function sessionWith(client: SandboxClient): SandboxSession {
   const { settings } = resolveSandboxSettings({});
   const session = new SandboxSession({
@@ -84,9 +90,16 @@ function sessionWith(client: SandboxClient): SandboxSession {
     workspace: process.cwd(),
     createSandbox: async () => client,
   });
-  // `client()` would otherwise tar and upload the repository. The push path has
-  // its own tests; this file is about what happens once a sandbox exists.
-  (session as unknown as { client: () => Promise<SandboxClient> }).client = async () => client;
+
+  const stub = session as unknown as {
+    client: () => Promise<SandboxClient>;
+    syncBefore: () => Promise<void>;
+    syncAfter: () => Promise<void>;
+  };
+  stub.client = async () => client;
+  stub.syncBefore = async () => {};
+  stub.syncAfter = async () => {};
+
   return session;
 }
 

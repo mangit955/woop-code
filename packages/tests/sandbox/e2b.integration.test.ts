@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll, afterEach } from "bun:test";
 import path from "node:path";
 import { homedir } from "node:os";
 import { disableSandbox, enableSandbox } from "../../../runtime/sandbox/control";
@@ -159,6 +159,82 @@ describe("a real sandbox", () => {
 
       expect(result.stdout.trim()).toBe("");
     }, 180_000);
+  });
+
+  describe("sync", () => {
+    // A scratch file inside the repository, because the sync only carries what
+    // the transmittable set lists. Removed on both sides of every test.
+    const scratch = `.sandbox-sync-probe-${crypto.randomUUID()}.txt`;
+    const scratchPath = path.join(process.cwd(), scratch);
+
+    afterEach(async () => {
+      await Bun.file(scratchPath)
+        .unlink()
+        .catch(() => {});
+      await Bun.file(`${scratchPath}.sandbox`)
+        .unlink()
+        .catch(() => {});
+    });
+
+    test("a local edit is visible to the next command", async () => {
+      if (!HAS_KEY) return;
+
+      await Bun.write(scratchPath, "written locally\n");
+
+      const result = await currentExecutor().run(`cat ${scratch}`, 60);
+
+      expect(result.stdout).toContain("written locally");
+    }, 120_000);
+
+    test("what a command writes comes back", async () => {
+      if (!HAS_KEY) return;
+
+      await currentExecutor().run(`echo "written in the sandbox" > ${scratch}`, 60);
+
+      expect(await Bun.file(scratchPath).text()).toContain("written in the sandbox");
+    }, 120_000);
+
+    test("an in-place edit comes back", async () => {
+      if (!HAS_KEY) return;
+
+      await Bun.write(scratchPath, "before\n");
+      await currentExecutor().run(`sed -i 's/before/after/' ${scratch}`, 60);
+
+      expect(await Bun.file(scratchPath).text()).toContain("after");
+    }, 120_000);
+
+    test("a deletion comes back", async () => {
+      if (!HAS_KEY) return;
+
+      await Bun.write(scratchPath, "doomed\n");
+      // Pushed by this command's own sync, then removed by it.
+      await currentExecutor().run(`test -f ${scratch} && rm ${scratch}`, 60);
+
+      expect(await Bun.file(scratchPath).exists()).toBe(false);
+    }, 120_000);
+
+    test("a command that writes nothing leaves the tree alone", async () => {
+      if (!HAS_KEY) return;
+
+      const before = await Bun.file(path.join(process.cwd(), "package.json")).text();
+      await currentExecutor().run("ls > /dev/null", 60);
+
+      expect(await Bun.file(path.join(process.cwd(), "package.json")).text()).toBe(before);
+    }, 120_000);
+
+    test("a credential the sandbox writes is refused rather than delivered", async () => {
+      if (!HAS_KEY) return;
+
+      const planted = ".env.sandbox-planted";
+      const result = await currentExecutor().run(
+        `echo "STOLEN=1" > ${planted} && echo done`,
+        60,
+      );
+
+      expect(result.stdout).toContain("done");
+      expect(await Bun.file(path.join(process.cwd(), planted)).exists()).toBe(false);
+      expect(result.stdout).toContain("look like credentials");
+    }, 120_000);
   });
 
   test("bun was provisioned, so this repository can run its own suite", async () => {

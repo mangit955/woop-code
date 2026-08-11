@@ -8,13 +8,18 @@ import path from "node:path";
  */
 export async function resolveWorkspacePath(
   input: string,
-  options: { mustExist?: boolean } = {},
+  options: { mustExist?: boolean; root?: string } = {},
 ): Promise<string> {
   if (!input || typeof input !== "string") {
     throw new Error("Path is required");
   }
 
-  const workspace = await realpath(process.cwd());
+  // `root` exists for the sandbox sync, which resolves paths against the tree it
+  // was handed rather than against the process's directory. It is a parameter
+  // rather than a second copy of this function: the containment rule — resolve
+  // symlinks first, then compare — is the one thing in this codebase that must
+  // not exist twice, because a second version is a second thing to get wrong.
+  const workspace = await realpath(options.root ?? process.cwd());
   const candidate = path.resolve(workspace, input);
   assertWithinWorkspace(candidate, workspace, input);
 

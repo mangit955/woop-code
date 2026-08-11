@@ -25,7 +25,7 @@
  */
 
 import path from "node:path";
-import { stat } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import { walkWorkspace } from "../../tools/scan";
 
 /**
@@ -163,10 +163,29 @@ export async function transmittableSet(
       continue;
     }
 
+    // AppleDouble sidecars. macOS `tar` writes one per file carrying extended
+    // attributes, GNU tar in a sandbox extracts them as ordinary files, and
+    // they then look like files a command created. Never source, either way.
+    if (path.basename(relativePath).startsWith("._")) {
+      continue;
+    }
+
     let bytes: number;
     try {
-      const info = await stat(path.join(root, relativePath));
-      // A directory can appear here through a submodule entry; nothing to send.
+      // `lstat`, not `stat`: the difference is symlinks, and it decides whether
+      // a symlink is described as itself or as whatever it points at.
+      //
+      // Regular files only, and symlinks are the reason. `find -type f` in a
+      // sandbox does not match a symlink, so one pushed from here would be
+      // absent from every listing that came back — and "absent from the
+      // sandbox" is how this code recognises a deletion. A symlinked file in
+      // the tree would therefore be deleted from the user's working copy after
+      // the first command. Measured, on this repository: `.cursor/rules/` is a
+      // symlink to CLAUDE.md, and it was deleted exactly that way.
+      //
+      // The cost is that a symlinked file is not visible inside the sandbox.
+      // That is a limitation; deleting someone's file is a defect.
+      const info = await lstat(path.join(root, relativePath));
       if (!info.isFile()) continue;
       bytes = info.size;
     } catch {

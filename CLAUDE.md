@@ -132,7 +132,9 @@ That variable is Gemini-shaped, and the other two read it differently because th
 
 `--sandbox` (or `/sandbox on`) routes shell commands into an E2B micro-VM instead of running them on the machine. `runtime/sandbox/` holds it: `registry.ts` is the executor in use, `control.ts` turns it on and off, `session.ts` is the lifecycle, `sandboxExecutor.ts` the E2B implementation.
 
-Local disk stays the source of truth for files — the diff review, the editor and git are untouched. Today files go **in** and nothing comes back; the pull-back and its conflict rule are the next phase.
+Local disk stays the source of truth for files — the diff review, the editor and git are untouched. Files are pushed before each command and what the command wrote is pulled back after (`sync.ts`, `manifest.ts`).
+
+**The sandbox is a cache.** Local disk is authoritative for input; the sandbox is authoritative only for what a command just wrote. Nothing is merged and no local edit is overwritten. Each command is a transaction against an input snapshot, so afterwards the question is *what did this command do to the exact tree I handed it* rather than "what changed lately" — which cannot tell the command's work from the user's. When both sides changed a file, the user wins and the sandbox's copy lands at `<path>.sandbox`.
 
 Four things that are easy to get wrong:
 
@@ -140,6 +142,12 @@ Four things that are easy to get wrong:
 - **What may be transmitted is a stricter question than what may be listed.** `walkWorkspace` does not read `.gitignore`, so it would have uploaded this repo's `.env`. `transmittable.ts` uses `git ls-files -co --exclude-standard`, minus an unconditional secret denylist — a force-added `.env` is *tracked*, so git lists it and only the denylist stops it — minus a 1MB size cap, because 93% of this repo is committed marketing video and pushing it cost 22s per session.
 - **Fail closed, always.** An unreachable sandbox refuses; it never falls back to local. `repl` refuses whenever `currentExecutor().kind !== "local"` — not `=== "sandbox"` — because a local interpreter beside a sandboxed `run_terminal` is an escape hatch via `subprocess.run`. Background processes are refused for the same reason until they are routed too.
 - **Cancellation is raced, not awaited.** Killing a command and then waiting for it to notice assumes the kill lands; when it does not, `wait()` never settles and the turn hangs with nothing to end it.
+
+Three ways the sync deleted or littered a working tree before it was right, all found by running it:
+
+- **An unusable remote listing must be `null`, never an empty manifest.** Empty is indistinguishable from "the command deleted everything", and the caller acts on that by removing files. The listing prints a sentinel; no sentinel means unusable, and the pull is skipped.
+- **Symlinks are never transmitted.** `find -type f` in the sandbox does not match one, so a pushed symlink is absent from every listing that comes back — which is how a deletion is recognised. This repo's `.cursor/rules/` symlink was deleted exactly that way. `transmittableSet` uses `lstat` and sends regular files only; a symlinked file is invisible in the sandbox, which is a limitation rather than a defect.
+- **`COPYFILE_DISABLE=1` on every `tar`.** macOS bsdtar writes an AppleDouble `._name` member per file with xattrs; GNU tar in the sandbox extracts them as ordinary files, which then look like files a command created. One run put 217 of them in the repo.
 
 Measured, so worth not re-discovering: `bun` is **not** in E2B's base template (node, npm, python3, git, gcc, make, curl, tar are), so a `bun.lock` in the pushed tree triggers a one-off install. A command round trip is ~300ms. `169.254.169.254` is reachable but is Firecracker's own metadata service, not a cloud credential endpoint; `10.0.0.1` and `192.168.1.1` are not reachable.
 

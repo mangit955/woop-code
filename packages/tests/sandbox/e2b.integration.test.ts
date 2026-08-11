@@ -237,6 +237,121 @@ describe("a real sandbox", () => {
     }, 120_000);
   });
 
+  describe("background processes", () => {
+    const scratch = `.sandbox-bg-probe-${crypto.randomUUID()}.txt`;
+    const scratchPath = path.join(process.cwd(), scratch);
+
+    afterEach(async () => {
+      await Bun.file(scratchPath)
+        .unlink()
+        .catch(() => {});
+    });
+
+    test("a process outlives the call that started it, and its output is collected", async () => {
+      if (!HAS_KEY) return;
+
+      const handle = await currentExecutor().start(
+        "for i in 1 2 3 4 5; do echo tick-$i; sleep 1; done",
+      );
+
+      let seen = "";
+      handle.onOutput((chunk) => {
+        seen += chunk;
+      });
+
+      // Nothing was waited for, so the later ticks cannot have been printed yet.
+      expect(handle.exitCode).toBeNull();
+      await Bun.sleep(3500);
+
+      expect(seen).toContain("tick-1");
+      expect(seen).toContain("tick-3");
+      handle.terminate();
+    }, 120_000);
+
+    test("terminate actually stops it in the sandbox", async () => {
+      if (!HAS_KEY) return;
+
+      const marker = `woopbg${crypto.randomUUID().replace(/-/g, "")}`;
+      const handle = await currentExecutor().start(
+        `python3 -c "import time; time.sleep(120)" ${marker}`,
+      );
+
+      // Two things this counting command has to avoid, both of which produced a
+      // confident wrong answer while it was being written.
+      //
+      // It is delimited rather than read off the whole of stdout, because
+      // stdout is not the command's output alone — the sync appends a note to
+      // it, and an earlier test here leaves a refused file in the sandbox that
+      // is re-reported on every command afterwards. `Number(stdout.trim())` was
+      // NaN for that reason, not because the count was wrong.
+      //
+      // And the pattern is bracketed, because `pgrep -f` reads whole command
+      // lines: an unbracketed marker matches the shell running this very
+      // pipeline, so the count never reached zero however dead the process was.
+      const pattern = `[${marker[0]}]${marker.slice(1)}`;
+      const count = async () => {
+        const result = await currentExecutor().run(
+          `echo "COUNT:$(pgrep -f '${pattern}' | wc -l)"`,
+          60,
+        );
+        const match = result.stdout.match(/COUNT:(\d+)/);
+        expect(match).not.toBeNull();
+        return Number(match![1]);
+      };
+
+      await Bun.sleep(1500);
+      expect(await count()).toBeGreaterThan(0);
+
+      handle.terminate();
+      await Bun.sleep(2000);
+
+      expect(await count()).toBe(0);
+    }, 180_000);
+
+    test("what it wrote comes back at the pull", async () => {
+      if (!HAS_KEY) return;
+
+      const handle = await currentExecutor().start(
+        `sh -c 'sleep 1; echo "written by a background process" > ${scratch}'`,
+      );
+
+      await Bun.sleep(3000);
+      expect(await handle.syncBack!()).not.toContain("could not be brought back");
+
+      expect(await Bun.file(scratchPath).text()).toContain("written by a background process");
+    }, 120_000);
+
+    test("a server started inside is reachable at the published URL", async () => {
+      if (!HAS_KEY) return;
+
+      // The claim `getHost` exists to make, and the only one in this file that
+      // leaves the machine in the other direction: an inbound request through
+      // E2B's proxy into a port inside the sandbox.
+      const port = 8321;
+      const handle = await currentExecutor().start(
+        `python3 -m http.server ${port}`,
+      );
+
+      try {
+        const url = await currentExecutor().urlForPort(port);
+        expect(url).toContain(`${port}-`);
+
+        // The server needs a moment; a single fetch would be a flake.
+        let response: Response | null = null;
+        for (let attempt = 0; attempt < 15 && !response?.ok; attempt++) {
+          await Bun.sleep(1000);
+          response = await fetch(url).catch(() => null);
+        }
+
+        expect(response?.ok).toBe(true);
+        // The directory listing of the pushed workspace.
+        expect(await response!.text()).toContain("package.json");
+      } finally {
+        handle.terminate();
+      }
+    }, 180_000);
+  });
+
   test("bun was provisioned, so this repository can run its own suite", async () => {
     if (!HAS_KEY) return;
 

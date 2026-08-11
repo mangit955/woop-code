@@ -19,7 +19,10 @@
  *
  * **A sandbox that cannot be reached fails closed.** Never a local fallback:
  * a user who asked for isolation and silently ran on their own machine is worse
- * off than one who never asked for it.
+ * off than one who never asked for it. That holds for a background process too:
+ * one started on this machine while `run_terminal` is sandboxed would hold a
+ * real port and write to the real tree, which is the hole sandboxing closes. It
+ * runs in the sandbox or it does not run.
  */
 
 import type { CommandResult } from "../../tools/command";
@@ -28,6 +31,7 @@ import { REMOTE_WORKSPACE } from "./settings";
 import {
   SandboxUnavailableError,
   withToolchainPath,
+  type SandboxClient,
   type SandboxSession,
 } from "./session";
 import { describeForModel, emptyReport, type SyncReport } from "./sync";
@@ -110,6 +114,135 @@ async function withSync(
 
   const note = describeForModel(report);
   return note ? { ...result, stdout: `${result.stdout}${note}` } : result;
+}
+
+/**
+ * A background process running in the sandbox.
+ *
+ * **Output arrives before anything is listening.** E2B takes `onStdout` and
+ * `onStderr` when the command starts, but `tools/process.ts` registers its sink
+ * after `start()` has returned — locally that is harmless, because Bun's pipes
+ * hold what was printed in the meantime. Here the callbacks fire into whatever
+ * is there, so the chunks are buffered until a sink exists and flushed the
+ * moment one does. Without it a server's startup banner, which is the one line
+ * that says which port it chose, is gone before anyone can read it.
+ */
+class SandboxProcessHandle implements ProcessHandle {
+  #session: SandboxSession;
+  #client: SandboxClient;
+  #pid: number;
+  #report: SyncReport;
+  #exitCode: number | null = null;
+  #exited: Promise<number | null>;
+  #buffer: OutputBuffer;
+
+  constructor(
+    session: SandboxSession,
+    client: SandboxClient,
+    started: E2BHandleLike,
+    report: SyncReport,
+    buffer: OutputBuffer,
+  ) {
+    this.#session = session;
+    this.#client = client;
+    this.#pid = started.pid;
+    this.#report = report;
+    this.#buffer = buffer;
+
+    // A killed or failing command ends by throwing — the same landmine `run`
+    // handles — so both settlements are read for an exit code rather than only
+    // the resolution. Null for anything carrying none, which matches what the
+    // local handle reports for a process killed by a signal.
+    this.#exited = started.wait().then(
+      (value) => resultFrom(value)?.exitCode ?? null,
+      (error) => resultFrom(error)?.exitCode ?? null,
+    );
+    void this.#exited.then((code) => {
+      this.#exitCode = code;
+    });
+  }
+
+  get exitCode(): number | null {
+    return this.#exitCode;
+  }
+
+  get exited(): Promise<number | null> {
+    return this.#exited;
+  }
+
+  onOutput(sink: (chunk: string) => void): void {
+    this.#buffer.attach(sink);
+  }
+
+  terminate(): void {
+    // Synchronous and never throwing, per the interface: `stopAllProcesses`
+    // runs at session exit and cannot await. `process_stop` waits on `exited`
+    // itself, bounded, for the callers that need to know it landed.
+    try {
+      void this.#client.commands.kill(this.#pid).catch(() => {});
+    } catch {
+      // A client already torn down. There is nothing left to kill.
+    }
+  }
+
+  unref(): void {
+    // Nothing local holds the event loop open — the process is in a VM.
+  }
+
+  keepAlive(): void {
+    void this.#session.keepAlive();
+  }
+
+  async syncBack(): Promise<string> {
+    // A process can outlive its sandbox: `/sandbox off` disposes the session
+    // and resets the executor, but the handles already handed to
+    // `tools/process.ts` stay in its map. Going through `syncAfter` then would
+    // reach `session.client()`, which *creates* one — booting a virtual machine
+    // the user just turned off, and then diffing it against a snapshot taken
+    // before all of it, which is a pull nobody asked for against a reference
+    // that no longer describes anything.
+    if (!this.#session.isRunning) {
+      return (
+        `\n\n[sandbox sync]\nThe sandbox was shut down before this process was ` +
+        `stopped, so anything it wrote is gone with it. Local files are unchanged.`
+      );
+    }
+
+    try {
+      await this.#session.syncAfter(this.#report);
+    } catch (error) {
+      return (
+        `\n\n[sandbox sync]\nThe process ran, but its changes could not be brought ` +
+        `back: ${error instanceof Error ? error.message : String(error)}. ` +
+        `Local files are unchanged.`
+      );
+    }
+
+    return describeForModel(this.#report);
+  }
+}
+
+/**
+ * Chunks printed before anyone asked for them.
+ *
+ * Its own object because the sink has to be wired into `commands.run` before
+ * the handle that owns it exists.
+ */
+class OutputBuffer {
+  #pending: string[] = [];
+  #sink: ((chunk: string) => void) | null = null;
+
+  emit = (chunk: string): void => {
+    if (this.#sink) this.#sink(chunk);
+    else this.#pending.push(chunk);
+  };
+
+  attach(sink: (chunk: string) => void): void {
+    this.#sink = sink;
+    const pending = this.#pending;
+    this.#pending = [];
+    for (const chunk of pending) sink(chunk);
+  }
 }
 
 export function createSandboxExecutor(session: SandboxSession): Executor {
@@ -215,15 +348,53 @@ export function createSandboxExecutor(session: SandboxSession): Executor {
       }
     },
 
-    async start(): Promise<ProcessHandle> {
-      // Refused rather than quietly run on this machine. A background process
-      // started locally while `run_terminal` is sandboxed would write to the
-      // real tree and hold real ports — the exact hole sandboxing closes.
-      throw new Error(
-        "Background processes are not available while the sandbox is on. " +
-          "Use run_terminal for a command that finishes on its own, or turn the " +
-          "sandbox off with /sandbox off to start a server locally.",
-      );
+    async start(command, cwd): Promise<ProcessHandle> {
+      const client = await session.client();
+      await session.keepAlive();
+
+      // Same order as `run`: local disk is authoritative for what goes in, so a
+      // server starting now serves the file the user edited a moment ago. The
+      // matching pull is at `process_stop` — the report is carried on the handle
+      // until then, which is what makes that pull answerable about this process.
+      const report = emptyReport();
+      await session.syncBefore(report);
+
+      // Wired before the command starts, because output that arrives in the
+      // meantime has to land somewhere. See `SandboxProcessHandle`.
+      const buffer = new OutputBuffer();
+
+      const started = await client.commands.run(withToolchainPath(command), {
+        cwd: cwd ?? REMOTE_WORKSPACE,
+        background: true,
+        // No timer at all, unlike `run`: this is a process that is *supposed*
+        // to outlive the call. It ends at process_stop, when it dies on its
+        // own, or when the sandbox does.
+        timeoutMs: 0,
+        onStdout: buffer.emit,
+        onStderr: buffer.emit,
+      });
+
+      if (!isHandle(started)) {
+        throw new SandboxUnavailableError(
+          "The sandbox did not return a process handle for the command.",
+        );
+      }
+
+      return new SandboxProcessHandle(session, client, started, report, buffer);
+    },
+
+    async urlForPort(port: number): Promise<string> {
+      const client = await session.client();
+
+      if (typeof client.getHost !== "function") {
+        throw new SandboxUnavailableError(
+          "This sandbox cannot publish a port, so there is no URL for it.",
+        );
+      }
+
+      // E2B terminates TLS at its proxy, so the published URL is https even
+      // though the server inside is listening on plain http.
+      return `https://${client.getHost(port)}`;
     },
   };
 }

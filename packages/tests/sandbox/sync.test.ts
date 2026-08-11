@@ -210,6 +210,9 @@ describe("an unusable remote listing is never read as mass deletion", () => {
       async kill() {
         return true;
       },
+      getHost(port: number) {
+        return `${port}-sbx.e2b.app`;
+      },
     };
   }
 

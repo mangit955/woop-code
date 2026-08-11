@@ -17,6 +17,14 @@
  * started while answering one question has to still be up for the next; ending
  * it with the turn would make the tool useless for the thing it exists for.
  * They end at `process_stop`, at session exit, or when the process itself dies.
+ *
+ * With the sandbox on they run there instead, and two things follow. What such
+ * a process writes comes back at `process_stop` rather than as it goes — though
+ * in practice most of it arrives sooner, because the next `run_terminal` pulls
+ * whatever the sandbox holds. And a process outliving the sandbox's lease would
+ * be reaped mid-session, so reading and stopping renew it. Both are asked of the
+ * handle, which knows where its process is; this file still never branches on
+ * whether there is a sandbox at all.
  */
 
 import type { Tool } from "../config/types";
@@ -144,12 +152,35 @@ The process keeps running after this turn ends. Read what it has printed with pr
       description: "Directory to run it in. Defaults to the project root.",
       required: false,
     },
+    {
+      name: "port",
+      description:
+        "The port this command listens on, if it is a server. Give it to get back the URL to reach it at — which is not localhost when the sandbox is on.",
+      required: false,
+      type: "number",
+    },
   ],
 
   async execute(args) {
     const command = args.command;
     if (typeof command !== "string" || command.trim() === "") {
       throw Error("command is required and must be a non-empty string");
+    }
+
+    // Validated before anything is started, so a bad port is a message rather
+    // than a running server the model was told nothing useful about.
+    let port: number | undefined;
+    if (args.port !== undefined) {
+      const value = typeof args.port === "string" ? Number(args.port) : args.port;
+      if (
+        typeof value !== "number" ||
+        !Number.isInteger(value) ||
+        value < 1 ||
+        value > 65535
+      ) {
+        throw Error(`port must be a whole number between 1 and 65535, not ${String(args.port)}`);
+      }
+      port = value;
     }
 
     let cwd: string | undefined;
@@ -184,13 +215,30 @@ The process keeps running after this turn ends. Read what it has printed with pr
 
     collect(record);
 
+    // Asked of the executor rather than assembled here: sandboxed, the port is
+    // published on a host only the sandbox can name, and a model told to try
+    // localhost would get a connection refused and conclude its server failed
+    // to start. Best-effort — a URL that could not be worked out must not undo
+    // a process that did start.
+    let reach = "";
+    if (port !== undefined) {
+      try {
+        const url = await currentExecutor().urlForPort(port);
+        reach = `\n\nOn port ${port} it should be reachable at ${url} once it is listening.`;
+      } catch (error) {
+        reach =
+          `\n\nIt was started, but the URL for port ${port} could not be worked out: ` +
+          `${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+
     // Nothing is waited for, so there is nothing to report but the handle. The
     // model is told what to call next, because a bare id reads as a dead end.
     return (
       `Started ${id}: ${command}\n\n` +
       `It is running in the background. Call process_output with id "${id}" to read ` +
       `what it has printed, and process_stop to end it. It is not waited for, so ` +
-      `give it a moment before expecting output.`
+      `give it a moment before expecting output.${reach}`
     );
   },
 };
@@ -206,6 +254,11 @@ export const processOutputTool: Tool = {
 
   async execute(args) {
     const record = requireProcess(args);
+    // Reading is the only sign of life a background process gives off, so it is
+    // what tells a sandbox the session is still going. Absent locally, where
+    // there is no lease to renew.
+    record.handle.keepAlive?.();
+
     const output = drain(record);
     const status = `${record.id} (${record.command}) — ${describe(record)}`;
 
@@ -231,6 +284,7 @@ export const processStopTool: Tool = {
 
   async execute(args) {
     const record = requireProcess(args);
+    record.handle.keepAlive?.();
     const alreadyExited = record.handle.exitCode !== null;
 
     if (!alreadyExited) {
@@ -242,12 +296,18 @@ export const processStopTool: Tool = {
 
     processes.delete(record.id);
 
+    // After it is dead, so what comes back is what it finally wrote rather than
+    // a half-written file it was still appending to. Absent locally, where it
+    // has been writing to the real tree all along. Never throws.
+    const synced = (await record.handle.syncBack?.()) ?? "";
+
     const trailing = drain(record);
     const outcome = alreadyExited
       ? `${record.id} had already ${describe(record)}.`
       : `Stopped ${record.id} (${record.command}).`;
 
-    return trailing === "" ? outcome : `${outcome}\n\n${trailing}`;
+    const body = trailing === "" ? outcome : `${outcome}\n\n${trailing}`;
+    return `${body}${synced}`;
   },
 };
 

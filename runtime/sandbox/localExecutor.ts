@@ -100,4 +100,11 @@ export const localExecutor: Executor = {
 
     return new LocalProcessHandle(proc, processGroup);
   },
+
+  // Nothing to map: the port is on this machine. `localhost` rather than
+  // `127.0.0.1` because a server bound to the IPv6 loopback is reachable by the
+  // name and not by the v4 address.
+  async urlForPort(port: number): Promise<string> {
+    return `http://localhost:${port}`;
+  },
 };

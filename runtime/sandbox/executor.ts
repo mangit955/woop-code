@@ -50,6 +50,20 @@ export interface Executor {
    * process, because in a sandbox there is no local process to assume about.
    */
   start(command: string, cwd?: string): Promise<ProcessHandle>;
+
+  /**
+   * Where a server listening on `port` inside this executor can be reached.
+   *
+   * Exists so `process_start` can answer "what is the URL" without asking where
+   * it is running: locally the port is simply on this machine, and in a sandbox
+   * it is a hostname on E2B's proxy that nothing else could construct. A tool
+   * calls this instead of branching on `kind`, which is the rule everywhere else
+   * in this interface.
+   *
+   * Says nothing about whether anything is listening yet. A server started a
+   * moment ago usually is not, and that is the caller's problem to describe.
+   */
+  urlForPort(port: number): Promise<string>;
 }
 
 export interface ProcessHandle {
@@ -89,4 +103,34 @@ export interface ProcessHandle {
 
   /** Stops the process from holding the event loop open. */
   unref(): void;
+
+  /**
+   * Pushes back the deadline on whatever is hosting this process.
+   *
+   * Optional, and absent locally: a process on this machine has no lease to
+   * renew. A sandbox does, and it is refreshed per command — so a development
+   * server left running while the agent reads files would be reaped underneath
+   * it with nothing to say so. Called by `process_output` and `process_stop`,
+   * which are the only signs of life a background process produces.
+   *
+   * Fire and forget. A failed renewal is not worth failing a read over; the
+   * next call against a dead sandbox reports it far more clearly.
+   */
+  keepAlive?(): void;
+
+  /**
+   * Brings back what the process wrote, and describes anything the model needs
+   * to know about it.
+   *
+   * Optional, and absent locally, where a background process writes to the real
+   * tree as it goes and there is nothing to bring back. In a sandbox the pull
+   * happens once, at `process_stop`: doing it per `process_output` would put a
+   * remote listing and a diff behind a call the model makes in a tight polling
+   * loop.
+   *
+   * Returns a note to append to the result, empty when there is nothing to say.
+   * Never throws — a sync that failed is reported in the note, because losing
+   * the process's output on top of losing its files helps nobody.
+   */
+  syncBack?(): Promise<string>;
 }

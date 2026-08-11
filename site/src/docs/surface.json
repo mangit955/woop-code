@@ -340,6 +340,12 @@
           "type": "string",
           "required": false,
           "description": "Directory to run it in. Defaults to the project root."
+        },
+        {
+          "name": "port",
+          "type": "number",
+          "required": false,
+          "description": "The port this command listens on, if it is a server. Give it to get back the URL to reach it at — which is not localhost when the sandbox is on."
         }
       ]
     },

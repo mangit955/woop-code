@@ -47,9 +47,22 @@ class FakeHandle implements ProcessHandle {
   });
   terminated = false;
   unrefd = false;
+  keptAlive = 0;
+  syncedBack = 0;
+  /** What the pull has to say, for the test that it reaches the model. */
+  syncNote = "";
 
   onOutput(sink: (chunk: string) => void): void {
     this.#sink = sink;
+  }
+
+  keepAlive(): void {
+    this.keptAlive++;
+  }
+
+  async syncBack(): Promise<string> {
+    this.syncedBack++;
+    return this.syncNote;
   }
 
   /** Drives the tool from the test's side, as a real process would. */
@@ -88,6 +101,9 @@ function fakeExecutor() {
       const handle = new FakeHandle();
       handles.push(handle);
       return handle;
+    },
+    async urlForPort(port) {
+      return `https://${port}-fake.example`;
     },
   };
 
@@ -185,6 +201,78 @@ describe("executor seam", () => {
 
     await processStopTool.execute({ id });
     expect(handles[0]!.terminated).toBe(true);
+  });
+
+  describe("a background process running somewhere else", () => {
+    async function startOne(args: Record<string, unknown> = {}) {
+      const fake = fakeExecutor();
+      setExecutor(fake.executor);
+      const result = await processStartTool.execute({ command: "sleep 30", ...args });
+      const id = result.match(/Started (bg\d+):/)?.[1]!;
+      return { ...fake, id, result };
+    }
+
+    test("reading and stopping renew the lease, so it is not reaped mid-session", async () => {
+      // A sandbox's lifetime is refreshed per command. A development server the
+      // agent starts and then watches issues no commands at all, so without
+      // this it is reaped underneath the session with nothing to say so.
+      const { id, handles } = await startOne();
+      expect(handles[0]!.keptAlive).toBe(0);
+
+      await processOutputTool.execute({ id });
+      expect(handles[0]!.keptAlive).toBe(1);
+
+      await processStopTool.execute({ id });
+      expect(handles[0]!.keptAlive).toBe(2);
+    });
+
+    test("what it wrote is pulled back once, at the stop", async () => {
+      // Not per read: `process_output` is called in a polling loop, and a
+      // remote listing and a diff behind each one would make watching a build
+      // cost more than running it.
+      const { id, handles } = await startOne();
+
+      await processOutputTool.execute({ id });
+      await processOutputTool.execute({ id });
+      expect(handles[0]!.syncedBack).toBe(0);
+
+      await processStopTool.execute({ id });
+      expect(handles[0]!.syncedBack).toBe(1);
+    });
+
+    test("what the pull has to say reaches the model", async () => {
+      const { id, handles } = await startOne();
+      handles[0]!.syncNote = "\n\n[sandbox sync]\nsrc/a.ts was changed locally.";
+
+      const stopped = await processStopTool.execute({ id });
+
+      // A conflict the model cannot see is a conflict it cannot reconcile.
+      expect(stopped).toContain("src/a.ts was changed locally");
+    });
+
+    test("a port is answered with the executor's URL, not with localhost", async () => {
+      // The whole point of asking the executor: sandboxed, the server is not on
+      // this machine, and a model told to try localhost gets a connection
+      // refused and concludes its server failed to start.
+      const { result } = await startOne({ command: "bun run site", port: 3000 });
+
+      expect(result).toContain("https://3000-fake.example");
+      expect(result).not.toContain("localhost");
+    });
+
+    test("an unusable port is refused before anything is started", async () => {
+      const { executor, started } = fakeExecutor();
+      setExecutor(executor);
+
+      await expect(
+        processStartTool.execute({ command: "bun run site", port: 70000 }),
+      ).rejects.toThrow(/between 1 and 65535/);
+      expect(started).toEqual([]);
+    });
+
+    test("locally the URL is simply this machine", async () => {
+      expect(await localExecutor.urlForPort(3000)).toBe("http://localhost:3000");
+    });
   });
 
   test("a rejected command never reaches the executor at all", async () => {

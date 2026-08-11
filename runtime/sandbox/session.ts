@@ -49,6 +49,13 @@ export interface SandboxClient {
   };
   setTimeout(timeoutMs: number): Promise<void>;
   kill(): Promise<boolean>;
+  /**
+   * The hostname a port inside the sandbox is published on, without a scheme.
+   *
+   * Synchronous in the SDK — it is string formatting over the sandbox id, not a
+   * request — and it answers regardless of whether anything is listening.
+   */
+  getHost(port: number): string;
 }
 
 export interface SandboxRunOpts {

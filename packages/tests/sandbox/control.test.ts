@@ -42,6 +42,9 @@ function fakeClient(): SandboxClient {
     async kill() {
       return true;
     },
+    getHost(port: number) {
+      return `${port}-sbx-control.e2b.app`;
+    },
   };
 }
 

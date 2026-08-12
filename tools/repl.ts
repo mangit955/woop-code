@@ -1,19 +1,13 @@
 import type { Tool } from "../config/types";
 import { requestCodeApproval } from "./approval";
-import { isSandboxed } from "../runtime/sandbox";
+import { currentExecutor } from "../runtime/sandbox";
+import { REPL_LANGUAGES as LANGUAGES, isReplLanguage as isLanguage } from "./replDrivers";
 import {
   DEFAULT_EVAL_TIMEOUT_SECONDS,
   MAX_REPL_OUTPUT,
   ReplUnavailableError,
   evaluate,
-  type ReplLanguage,
 } from "./replSession";
-
-const LANGUAGES: ReplLanguage[] = ["python", "node"];
-
-function isLanguage(value: unknown): value is ReplLanguage {
-  return typeof value === "string" && LANGUAGES.includes(value as ReplLanguage);
-}
 
 export const replTool: Tool = {
   name: "repl",
@@ -26,7 +20,7 @@ State lasts for the current turn and is discarded when the turn ends.
 python: the value of a trailing expression is printed, as in a notebook.
 node: a top-level \`var\` persists between calls; \`const\` and \`let\` are scoped to the single call, so assign to \`globalThis\` for anything that must outlive it.
 
-This runs real code. It can write files and shell out, and is subject to the same approval and plan-mode rules as run_terminal.`,
+This runs real code. It can write files and shell out, and is subject to the same approval and plan-mode rules as run_terminal. With the sandbox on it runs inside the sandbox, like every other command, and files it writes are brought back after each call.`,
 
   parameters: [
     {
@@ -77,18 +71,17 @@ This runs real code. It can write files and shell out, and is subject to the sam
       throw Error(`timeout must be a positive number of seconds, got ${JSON.stringify(timeout)}`);
     }
 
-    // Refused while commands are being sandboxed, because this one is not yet.
-    // An interpreter here is a live process on the user's machine, and
-    // `subprocess.run` inside it reaches everything `run_terminal` was just
-    // stopped from reaching — a sandbox with this tool still local is not a
-    // sandbox. Checked before approval so the user is not asked to confirm
+    // Asked of the executor rather than of a flag, and refused when it cannot
+    // answer. An interpreter running outside the boundary the other commands
+    // are confined to is not a boundary at all — `subprocess.run` inside one
+    // reaches everything `run_terminal` was just stopped from reaching. Local
+    // and sandbox can both host one; anything added later is refused until it
+    // says it can. Checked before approval so the user is not asked to confirm
     // something that is not going to run either way.
-    if (isSandboxed()) {
+    if (!currentExecutor().startRepl) {
       return (
-        "The repl is not available while the sandbox is on: it would run this code " +
-        "on your machine, outside the sandbox the other commands are confined to. " +
-        "Use run_terminal (which is sandboxed) for one-off evaluation, or turn the " +
-        "sandbox off with /sandbox off."
+        "The repl is not available in the current execution environment, which " +
+        "cannot host an interpreter. Use run_terminal for one-off evaluation."
       );
     }
 
@@ -98,9 +91,10 @@ This runs real code. It can write files and shell out, and is subject to the sam
     }
 
     let output: string;
+    let note: string;
     let started: boolean;
     try {
-      ({ output, started } = await evaluate(language, code, {
+      ({ output, note, started } = await evaluate(language, code, {
         restart: args.restart === true,
         timeoutSeconds: timeout,
         signal,
@@ -113,22 +107,28 @@ This runs real code. It can write files and shell out, and is subject to the sam
       return `Error: ${message}`;
     }
 
+    // Appended after everything below, never folded into the output: it has to
+    // survive the empty case, which has a message of its own, and the truncated
+    // case, which drops the end of exactly the long result most likely to have
+    // written the files the note is about.
     // An evaluation that assigns a variable prints nothing, which is a success
     // and has to read as one — an empty result looks like a tool that failed.
     if (output === "") {
-      return started
+      const body = started
         ? `Started a ${language} session. The code ran and produced no output.`
         : "The code ran and produced no output.";
+      return `${body}${note}`;
     }
 
     if (output.length > MAX_REPL_OUTPUT) {
       return (
         `${output.slice(0, MAX_REPL_OUTPUT)}\n\n` +
         `... Output truncated: showing the first ${MAX_REPL_OUTPUT} of ${output.length} characters. ` +
-        `The session still holds the full result — print a slice or a summary of it instead.`
+        `The session still holds the full result — print a slice or a summary of it instead.` +
+        note
       );
     }
 
-    return output;
+    return `${output}${note}`;
   },
 };

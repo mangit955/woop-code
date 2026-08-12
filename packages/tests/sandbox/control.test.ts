@@ -5,18 +5,27 @@ import {
   isSandboxEnabled,
   sandboxSession,
 } from "../../../runtime/sandbox/control";
-import { currentExecutor, isSandboxed } from "../../../runtime/sandbox/registry";
+import {
+  currentExecutor,
+  isSandboxed,
+  resetExecutor,
+  setExecutor,
+} from "../../../runtime/sandbox/registry";
 import type { SandboxClient } from "../../../runtime/sandbox/session";
 import { replTool } from "../../../tools/repl";
+import { closeReplSessions } from "../../../tools/replSession";
+import { fakeSandboxClient } from "../shared/fakeSandbox";
 import { store } from "../../../tui/src/store/ui-store";
 
 /**
- * Turning the sandbox on and off, and what refuses to run while it is on.
+ * Turning the sandbox on and off, and where the repl runs while it is on.
  *
- * The refusals are the load-bearing part. A sandbox that contains
- * `run_terminal` while `repl` still runs locally is not a sandbox: the model
- * has `subprocess.run` and walks straight out through the tool that was left
- * behind. That is why this is tested at the tool, not at the policy.
+ * The repl is the load-bearing part. A sandbox that contains `run_terminal`
+ * while `repl` still runs locally is not a sandbox: the model has
+ * `subprocess.run` and walks straight out through the tool that was left
+ * behind. That is why this is tested at the tool, not at the policy — and why
+ * it is still tested now that the answer is "it runs in the sandbox too"
+ * rather than "it is refused".
  */
 
 function fakeClient(): SandboxClient {
@@ -128,7 +137,7 @@ describe("sandbox control", () => {
   });
 });
 
-describe("repl fails closed while sandboxed", () => {
+describe("the repl goes where the commands go", () => {
   const originalSetPendingCommand = store.setPendingCommand;
 
   beforeEach(() => {
@@ -137,22 +146,31 @@ describe("repl fails closed while sandboxed", () => {
 
   afterEach(async () => {
     store.setPendingCommand = originalSetPendingCommand;
+    closeReplSessions();
     await disableSandbox();
+    resetExecutor();
   });
 
-  test("the repl refuses rather than running code on this machine", async () => {
-    enableSandbox({ createSandbox: async () => fakeClient(), env: {} });
+  test("code runs in the sandbox rather than on this machine", async () => {
+    // The property the old refusal bought, now bought by routing instead: an
+    // interpreter on the host has `subprocess.run` and reaches everything
+    // run_terminal was just stopped from reaching.
+    const probe = `/tmp/repl-escape-probe-${crypto.randomUUID()}`;
+    const fake = fakeSandboxClient();
+    enableSandbox({ createSandbox: async () => fake.client, env: {} });
 
-    const result = await replTool.execute({
+    await replTool.execute({
       language: "python",
-      code: "import os; os.system('touch /tmp/repl-escape-probe')",
+      code: `import os; os.system('touch ${probe}')`,
     });
 
-    expect(result).toContain("not available while the sandbox is on");
-    expect(await Bun.file("/tmp/repl-escape-probe").exists()).toBe(false);
+    expect(fake.evaluated).toHaveLength(1);
+    expect(fake.evaluated[0]).toContain(probe);
+    // ...and nothing happened here.
+    expect(await Bun.file(probe).exists()).toBe(false);
   });
 
-  test("it refuses before asking the user to approve anything", async () => {
+  test("an executor that cannot host an interpreter is refused before approval", async () => {
     // Being asked to confirm something that will not run either way trains a
     // user to click through prompts.
     let asked = false;
@@ -160,15 +178,30 @@ describe("repl fails closed while sandboxed", () => {
       asked = true;
       return true;
     };
-    enableSandbox({ createSandbox: async () => fakeClient(), env: {} });
 
-    await replTool.execute({ language: "node", code: "1 + 1" });
+    // Neither local nor sandbox: the fail-closed case, which is what keeps a
+    // third kind of executor from silently reopening the hole.
+    setExecutor({
+      kind: "sandbox",
+      async run() {
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+      async start() {
+        throw new Error("not used");
+      },
+      async urlForPort() {
+        return "http://unused";
+      },
+    });
 
+    const result = await replTool.execute({ language: "node", code: "1 + 1" });
+
+    expect(result).toContain("cannot host an interpreter");
     expect(asked).toBe(false);
   });
 
-  test("and runs normally again once the sandbox is off", async () => {
-    enableSandbox({ createSandbox: async () => fakeClient(), env: {} });
+  test("and runs on this machine again once the sandbox is off", async () => {
+    enableSandbox({ createSandbox: async () => fakeSandboxClient().client, env: {} });
     await disableSandbox();
 
     const result = await replTool.execute({ language: "python", code: "6 * 7" });

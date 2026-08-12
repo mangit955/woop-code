@@ -14,23 +14,24 @@
  * `editFile.ts`: "keep a subprocess alive and talk to it" is a question about
  * processes, not about tools, and it is the part worth testing on its own.
  *
- * ## Why a driver and not `python3 -i`
+ * ## What is here and what is not
  *
- * An interactive interpreter is built for a terminal, not a protocol. Output
- * arrives interleaved with prompts (`>>> `, `... `), continuation state depends
- * on blank lines, and there is no marker saying a statement finished — so a
- * reader has to guess, and guesses wrongly on any code that prints something
- * prompt-shaped. Instead each interpreter runs a small driver that speaks a
- * framed protocol: one JSON-encoded string of source per line in, the captured
- * output followed by a per-session sentinel out. Nothing has to be guessed.
+ * The framed protocol — one JSON-encoded string of source per line in, output
+ * followed by a per-session sentinel out — and the reasoning behind it live in
+ * `replDrivers.ts` beside the two programs that speak it. *Starting* an
+ * interpreter lives in the executor, because where it runs is the executor's
+ * whole job: on this machine, or inside the sandbox with the boundary intact.
  *
- * The sentinel is a UUID generated per session rather than a fixed string, so
- * source that happens to print the delimiter cannot end a read early.
+ * What is left here is the part that is the same either way: the sentinel, the
+ * frame reader, the timeout, the sessions map and what makes one unusable.
  */
 
 import { randomUUID } from "node:crypto";
+import { currentExecutor } from "../runtime/sandbox";
+import type { Executor, ReplTransport } from "../runtime/sandbox";
+import { ReplUnavailableError, type ReplLanguage } from "./replDrivers";
 
-export type ReplLanguage = "python" | "node";
+export { ReplUnavailableError, type ReplLanguage };
 
 /** Characters of output kept from a single evaluation. */
 export const MAX_REPL_OUTPUT = 16 * 1024;
@@ -38,154 +39,19 @@ export const MAX_REPL_OUTPUT = 16 * 1024;
 /** How long one evaluation may run before the session is considered lost. */
 export const DEFAULT_EVAL_TIMEOUT_SECONDS = 120;
 
-/**
- * Python's side of the protocol.
- *
- * `exec` into one persistent globals dict is what makes state survive. The
- * `ast` dance around the final statement is what makes the session usable as a
- * REPL rather than as a script runner: `frames[0].shape` on its own line should
- * print, and under a plain `exec` it evaluates and discards silently, which
- * reads to the model as a tool that returned nothing.
- *
- * stdout and stderr are captured into one buffer so a traceback arrives in the
- * same result as the output that preceded it, in the order they happened.
- * `BaseException` rather than `Exception` so a `SystemExit` from library code
- * is reported instead of killing the driver and taking the session with it.
- */
-const PYTHON_DRIVER = String.raw`
-import sys, json, io, ast, traceback
-
-_globals = {"__name__": "__main__"}
-_sentinel = sys.argv[1]
-
-def _run(source):
-    block = ast.parse(source, "<repl>", "exec")
-    if not block.body:
-        return
-    last = block.body[-1]
-    if isinstance(last, ast.Expr):
-        head = ast.Module(body=block.body[:-1], type_ignores=[])
-        exec(compile(head, "<repl>", "exec"), _globals)
-        value = eval(compile(ast.Expression(last.value), "<repl>", "eval"), _globals)
-        if value is not None:
-            print(repr(value))
-    else:
-        exec(compile(block, "<repl>", "exec"), _globals)
-
-for _line in sys.stdin:
-    _line = _line.strip()
-    if not _line:
-        continue
-    _buffer = io.StringIO()
-    _out, _err = sys.stdout, sys.stderr
-    sys.stdout = sys.stderr = _buffer
-    try:
-        _run(json.loads(_line))
-    except BaseException:
-        traceback.print_exc(file=_buffer)
-    finally:
-        sys.stdout, sys.stderr = _out, _err
-    _out.write(_buffer.getvalue())
-    _out.write("\n" + _sentinel + "\n")
-    _out.flush()
-`;
-
-/**
- * Node's side of the same protocol.
- *
- * `runInThisContext` rather than a fresh context per call, because a fresh one
- * is what loses the state this whole file exists to keep. It also decides the
- * rule the tool description has to state: a top-level `var` becomes a property
- * of the global object and survives, while `const` and `let` are scoped to the
- * single script and do not. That is Node's semantics, not a choice made here,
- * and pretending otherwise by rewriting declarations would break any source
- * that shadows a name deliberately.
- *
- * `console` is redirected rather than the process's stdout, so that the
- * sentinel frame is written by this driver alone and cannot be interleaved
- * with evaluated output.
- */
-const NODE_DRIVER = String.raw`
-const vm = require("vm");
-const util = require("util");
-// argv[1], not [2]: with -e there is no script path, so the first trailing
-// argument sits where a filename normally would. Both node and bun agree.
-const sentinel = process.argv[1];
-
-let buffer = "";
-const write = (...args) => {
-  buffer += args
-    .map((a) => (typeof a === "string" ? a : util.inspect(a, { depth: 4 })))
-    .join(" ") + "\n";
-};
-console.log = write;
-console.error = write;
-console.warn = write;
-console.info = write;
-
-let pending = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", async (chunk) => {
-  pending += chunk;
-  let newline;
-  while ((newline = pending.indexOf("\n")) >= 0) {
-    const line = pending.slice(0, newline);
-    pending = pending.slice(newline + 1);
-    if (!line.trim()) continue;
-    buffer = "";
-    try {
-      let value = vm.runInThisContext(JSON.parse(line), { filename: "<repl>" });
-      if (value && typeof value.then === "function") value = await value;
-      if (value !== undefined) write(util.inspect(value, { depth: 4 }));
-    } catch (error) {
-      buffer += (error && error.stack) || String(error);
-      buffer += "\n";
-    }
-    process.stdout.write(buffer + "\n" + sentinel + "\n");
-  }
-});
-`;
-
-interface Driver {
-  /** Looked up on PATH; the first that resolves wins. */
-  readonly candidates: readonly string[];
-  readonly source: string;
-  /** The flag that makes the interpreter read the driver from an argument. */
-  readonly flag: string;
-}
-
-const DRIVERS: Record<ReplLanguage, Driver> = {
-  // `-u` because the driver's framing is only useful if it is not sitting in a
-  // block-buffered pipe waiting for more.
-  python: { candidates: ["python3", "python"], source: PYTHON_DRIVER, flag: "-u" },
-  node: { candidates: ["node", "bun"], source: NODE_DRIVER, flag: "-e" },
-};
-
-export class ReplUnavailableError extends Error {}
-
-/**
- * All three streams piped, stated rather than inferred.
- *
- * `ReturnType<typeof Bun.spawn>` is the shape for the *default* options, where
- * stdin is ignored — so a session typed that way has a `stdin` of `number` and
- * no `write` on it, which is the opposite of what this file needs.
- */
-type PipedProcess = Bun.Subprocess<"pipe", "pipe", "pipe">;
-
-/**
- * The stream is consumed through its async iterator rather than a reader.
- *
- * Bun's `ReadableStreamDefaultReader.read` takes a buffer to fill, so the
- * zero-argument DOM form does not type-check against it. The iterator hands
- * back the chunk instead, which is all this needs, and it is still one held
- * cursor across many evaluations — the property that matters, since a reader
- * acquired per call would drop whatever had already been buffered.
- */
-type StreamCursor = AsyncIterator<Uint8Array>;
 
 interface Session {
-  proc: PipedProcess;
-  cursor: StreamCursor;
+  /** The pipe to the interpreter, wherever the executor put it. */
+  transport: ReplTransport;
+  /**
+   * The executor this was started through.
+   *
+   * Kept so a session cannot outlive it. `/sandbox on` or `off` mid-turn swaps
+   * the executor while this map still holds an interpreter attached to the old
+   * one — reusing it would evaluate code in a place the user has just moved
+   * away from, and in the `off` direction that place may not exist any more.
+   */
+  executor: Executor;
   sentinel: string;
   /** Output read past the last sentinel, belonging to no evaluation yet. */
   pending: string;
@@ -195,39 +61,24 @@ interface Session {
 
 const sessions = new Map<ReplLanguage, Session>();
 
-function spawnSession(language: ReplLanguage): Session {
-  const driver = DRIVERS[language];
-  const interpreter = driver.candidates
-    .map((candidate) => Bun.which(candidate))
-    .find((resolved): resolved is string => resolved !== null);
+async function startSession(language: ReplLanguage): Promise<Session> {
+  const executor = currentExecutor();
 
-  if (!interpreter) {
+  // Refused rather than run here. An executor that cannot host an interpreter
+  // must not be answered by starting one on this machine: that is the whole
+  // hole — `subprocess.run` from a local interpreter reaches everything a
+  // sandboxed `run_terminal` was just stopped from reaching.
+  if (!executor.startRepl) {
     throw new ReplUnavailableError(
-      `No ${language} interpreter is available on this machine ` +
-        `(looked for ${driver.candidates.join(", ")}). Use run_terminal instead.`,
+      "The current execution environment cannot host an interpreter, so the repl " +
+        "is not available. Use run_terminal instead.",
     );
   }
 
   const sentinel = `__woopcode_repl_${randomUUID()}__`;
-  const args =
-    language === "python"
-      ? [driver.flag, "-c", driver.source, sentinel]
-      : [driver.flag, driver.source, sentinel];
+  const transport = await executor.startRepl({ language, sentinel });
 
-  const proc: PipedProcess = Bun.spawn({
-    cmd: [interpreter, ...args],
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  return {
-    proc,
-    cursor: proc.stdout[Symbol.asyncIterator]() as StreamCursor,
-    sentinel,
-    pending: "",
-    broken: false,
-  };
+  return { transport, executor, sentinel, pending: "", broken: false };
 }
 
 /**
@@ -245,7 +96,6 @@ async function readFrame(
   timeoutSeconds: number,
   signal?: AbortSignal,
 ): Promise<string> {
-  const decoder = new TextDecoder();
   const deadline = Date.now() + timeoutSeconds * 1000;
 
   // One timer for the whole read, not one per chunk. Created inside the loop it
@@ -284,52 +134,37 @@ async function readFrame(
       );
     }
 
-    // Raced rather than awaited outright: `cursor.next()` on a process that is
-    // busy evaluating never settles, so without this the timeout above is
+    // Raced rather than awaited outright: a read on an interpreter that is busy
+    // evaluating never settles, so without this the timeout above is
     // unreachable and a runaway loop hangs the turn instead of ending it.
-    const chunk = await Promise.race([session.cursor.next(), timeout]);
+    const chunk = await Promise.race([session.transport.read(), timeout]);
 
     if (chunk === "timeout") continue;
-    if (chunk.done) {
+    if (chunk === null) {
       session.broken = true;
       throw new Error(
         "The interpreter exited. Its state is gone; the next call starts a fresh one.",
       );
     }
 
-    session.pending += decoder.decode(chunk.value as Uint8Array, { stream: true });
+    session.pending += chunk;
   }
 }
 
 /**
  * Ends one session.
  *
- * stdin is closed before the kill, and that ordering is the whole of it. Both
- * drivers loop until their input ends, so closing stdin is what lets them
- * return normally; `kill` alone left the pipe open, and Bun kept the process
- * handle alive waiting on a writer that never went away — a probe that had
- * already printed every result sat for two minutes before exiting. The kill
- * stays as the backstop for a driver wedged inside an evaluation, which will
- * never reach its read of stdin to notice the close.
+ * How an interpreter is shut down belongs to the transport that started it —
+ * the ordering that matters locally (stdin closed before the kill, or Bun holds
+ * the process handle open waiting on a writer that never leaves) is in
+ * `localExecutor.ts` beside the spawn it pairs with.
  */
 function discard(language: ReplLanguage): void {
   const session = sessions.get(language);
   if (!session) return;
   sessions.delete(language);
 
-  session.cursor.return?.(undefined)?.catch(() => {
-    // The process is being killed regardless; a cursor that will not release
-    // is not a reason to leave the interpreter running.
-  });
-
-  try {
-    session.proc.stdin.end();
-  } catch {
-    // Already closed, or the process is gone. The kill below covers both.
-  }
-
-  session.proc.kill();
-  session.proc.unref();
+  session.transport.close();
 }
 
 export interface EvalOptions {
@@ -340,6 +175,17 @@ export interface EvalOptions {
 
 export interface EvalResult {
   output: string;
+  /**
+   * What the executor has to say about the evaluation, or "".
+   *
+   * Kept apart from `output` rather than concatenated onto it, because the
+   * caller treats the two differently and would otherwise get both wrong: an
+   * evaluation that printed nothing has a message of its own to give, and a
+   * note folded in would make that branch unreachable — while output long
+   * enough to be truncated would drop the note entirely, which is exactly when
+   * a conflict is most worth reporting.
+   */
+  note: string;
   /** True when this call started the interpreter rather than reusing it. */
   started: boolean;
 }
@@ -358,22 +204,33 @@ export async function evaluate(
   // evaluation, and the fact that the previous one timed out has already been
   // reported to it as that call's error.
   if (existing?.broken) discard(language);
+  // And one belonging to an executor that is no longer current is not reusable
+  // at all — its interpreter is in the wrong place, or nowhere.
+  else if (existing && existing.executor !== currentExecutor()) discard(language);
 
   let session = sessions.get(language);
   const started = session === undefined;
   if (!session) {
-    session = spawnSession(language);
+    session = await startSession(language);
     sessions.set(language, session);
   }
 
-  // One line, so the driver's line-oriented read frames it. JSON.stringify is
-  // what makes that safe for source containing newlines, quotes or backslashes.
-  session.proc.stdin.write(`${JSON.stringify(code)}\n`);
-  session.proc.stdin.flush();
-
   try {
+    // Absent locally, where the interpreter is already looking at the real
+    // tree. Before the write, so the code sees the files as they are now.
+    await session.transport.beforeEval?.();
+
+    // One line, so the driver's line-oriented read frames it. JSON.stringify is
+    // what makes that safe for source containing newlines, quotes or backslashes.
+    await session.transport.write(`${JSON.stringify(code)}\n`);
+
     const output = await readFrame(session, timeoutSeconds, signal);
-    return { output, started };
+
+    // After the frame, so what comes back is what the evaluation finished
+    // writing. Never throws; an empty note is the ordinary case.
+    const note = (await session.transport.afterEval?.()) ?? "";
+
+    return { output, note, started };
   } catch (error) {
     discard(language);
     throw error;

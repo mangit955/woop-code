@@ -65,6 +65,13 @@ export interface SandboxRunOpts {
   envs?: Record<string, string>;
   onStdout?: (data: string) => void;
   onStderr?: (data: string) => void;
+  /**
+   * Keeps the command's stdin open, so the handle can be written to.
+   *
+   * What makes an interpreter possible: without it the driver reads EOF
+   * immediately and exits before anything can be sent.
+   */
+  stdin?: boolean;
 }
 
 /**

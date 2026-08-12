@@ -1,6 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach, afterAll } from "bun:test";
 import { replTool } from "../../../tools/repl";
 import { closeReplSessions, openReplLanguages } from "../../../tools/replSession";
+import { localExecutor, resetExecutor, setExecutor } from "../../../runtime/sandbox";
 import { store } from "../../../tui/src/store/ui-store";
 
 /**
@@ -205,6 +206,129 @@ describe("repl Tool - Integration Tests", () => {
 
       expect(result).toContain("rejected by user");
       expect(openReplLanguages()).toEqual([]);
+    });
+  });
+
+  describe("Where the interpreter lives", () => {
+    /** An executor whose interpreter answers with a fixed frame and note. */
+    function noteExecutor(output: string, note: string) {
+      return {
+        ...localExecutor,
+        async startRepl({ sentinel }: { sentinel: string }) {
+          const queue: string[] = [];
+          return {
+            async write() {
+              queue.push(`${output}\n${sentinel}\n`);
+            },
+            async read() {
+              return queue.shift() ?? null;
+            },
+            close() {},
+            async afterEval() {
+              return note;
+            },
+          };
+        },
+      };
+    }
+
+    afterEach(() => {
+      // Module state outlives a test file, so a fake left installed here would
+      // point the rest of the run at it.
+      resetExecutor();
+    });
+
+    test("a session is not reused after the executor changes underneath it", async () => {
+      // `/sandbox on` or `off` mid-turn swaps the executor while the sessions
+      // map still holds an interpreter attached to the old one. Reusing it
+      // would evaluate in a place the user has just moved away from — and in
+      // the `off` direction, a place that may no longer exist.
+      await replTool.execute({ language: "python", code: "kept = 'from the first executor'" });
+      expect(openReplLanguages()).toEqual(["python"]);
+
+      // A different executor object, still able to host an interpreter.
+      setExecutor({ ...localExecutor });
+
+      const result = await replTool.execute({ language: "python", code: "kept" });
+
+      // A fresh session: the name from the previous one is gone rather than
+      // silently answered.
+      expect(result).toContain("NameError");
+    });
+
+    test("what the executor's pull has to say reaches the model", async () => {
+      // A conflict the model cannot see is a conflict it cannot reconcile. The
+      // note is produced by the transport and has to survive `evaluate`, which
+      // is the only place that can drop it.
+      let synced = 0;
+      setExecutor({
+        ...localExecutor,
+        async startRepl({ sentinel }) {
+          const queue: string[] = [];
+          return {
+            async write() {
+              queue.push(`ran\n${sentinel}\n`);
+            },
+            async read() {
+              return queue.shift() ?? null;
+            },
+            close() {},
+            async beforeEval() {},
+            async afterEval() {
+              synced++;
+              return "\n\n[sandbox sync]\nsrc/a.ts was changed locally.";
+            },
+          };
+        },
+      });
+
+      const result = await replTool.execute({ language: "python", code: "1" });
+
+      expect(synced).toBe(1);
+      expect(result).toContain("ran");
+      expect(result).toContain("src/a.ts was changed locally");
+    });
+
+    test("the note survives an evaluation that printed nothing", async () => {
+      // Folded into the output this branch becomes unreachable: an assignment
+      // is the commonest thing a repl call does, and it would report a sync
+      // note where it should report that the code ran.
+      setExecutor(noteExecutor("", "\n\n[sandbox sync]\nnote survives"));
+
+      const result = await replTool.execute({ language: "python", code: "x = 1" });
+
+      expect(result).toContain("produced no output");
+      expect(result).toContain("note survives");
+    });
+
+    test("the note survives output long enough to be truncated", async () => {
+      // And here it matters most: the long result is the one that has been
+      // churning through files, so it is the one whose conflicts are worth
+      // reporting — and concatenated, it is the one where they are cut off.
+      setExecutor(noteExecutor("x".repeat(20_000), "\n\n[sandbox sync]\nnote survives"));
+
+      const result = await replTool.execute({ language: "python", code: "big()" });
+
+      expect(result).toContain("Output truncated");
+      expect(result).toContain("note survives");
+    });
+
+    test("a multi-byte character split across two reads survives", async () => {
+      // One decoder per session, not per read. Built per read with
+      // `{ stream: true }`, the half of a character carried out of one
+      // evaluation is dropped before the next one starts.
+      const first = await replTool.execute({
+        language: "python",
+        code: "print('é' * 400)",
+      });
+      const second = await replTool.execute({
+        language: "python",
+        code: "print('日本語' * 400)",
+      });
+
+      expect(first).not.toContain("�");
+      expect(second).not.toContain("�");
+      expect(second).toContain("日本語日本語");
     });
   });
 });

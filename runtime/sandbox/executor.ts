@@ -16,6 +16,7 @@
  */
 
 import type { CommandResult } from "../../tools/command";
+import type { ReplLanguage } from "../../tools/replDrivers";
 
 export interface Executor {
   /** Which implementation this is. Shown to the user; never branched on in a tool. */
@@ -64,6 +65,84 @@ export interface Executor {
    * moment ago usually is not, and that is the caller's problem to describe.
    */
   urlForPort(port: number): Promise<string>;
+
+  /**
+   * Starts an interpreter that stays alive across calls, and hands back the
+   * pipe to it.
+   *
+   * **Optional, and that is the safety property.** `tools/repl.ts` refuses when
+   * this is absent rather than falling back to running code here, so an
+   * executor kind added later is refused by default instead of quietly
+   * reopening the hole this closes — an interpreter on the host has
+   * `subprocess.run`, which reaches everything a sandboxed `run_terminal` was
+   * just stopped from reaching.
+   *
+   * The driver's *source* is shared (`tools/replDrivers.ts`); how it is
+   * launched is not, and that difference is why this is on the executor at all.
+   */
+  startRepl?(launch: ReplLaunch): Promise<ReplTransport>;
+}
+
+export interface ReplLaunch {
+  language: ReplLanguage;
+  /**
+   * The per-session delimiter the driver prints after each result.
+   *
+   * Passed as the interpreter's last argument, which is where both driver
+   * sources read it from — see the note in `replDrivers.ts` about why the
+   * position and not `argv[1]`.
+   */
+  sentinel: string;
+}
+
+/**
+ * A pipe to a live interpreter.
+ *
+ * Deliberately smaller than a `ProcessHandle`: nothing here waits for an exit
+ * code, because an interpreter that exits has failed. Reading is pull-shaped
+ * rather than the sink `ProcessHandle.onOutput` takes, because a caller framing
+ * output against a sentinel needs to read until it sees one, not be handed
+ * chunks whenever they arrive.
+ */
+export interface ReplTransport {
+  /** Sends one framed line. Rejects if the interpreter cannot be reached. */
+  write(line: string): Promise<void>;
+
+  /**
+   * The next piece of output, decoded, or null once the interpreter has ended.
+   *
+   * Decoding belongs to the implementation, not the caller: a multi-byte
+   * character split across two chunks has to be carried between them, and one
+   * decoder per session is the only place that can be done correctly.
+   */
+  read(): Promise<string | null>;
+
+  /**
+   * Ends the interpreter.
+   *
+   * Synchronous and never throwing, for the same reason as
+   * `ProcessHandle.terminate`: `closeReplSessions` runs in the agent loop's
+   * `finally` on every exit a turn has, and cannot await or catch.
+   */
+  close(): void;
+
+  /**
+   * Runs before an evaluation, for an executor where the interpreter is not
+   * looking at the local disk.
+   *
+   * Absent locally. In a sandbox this is the push half of the transaction, and
+   * the sandbox's lease being renewed.
+   */
+  beforeEval?(): Promise<void>;
+
+  /**
+   * Runs after an evaluation, returning a note for the model or "".
+   *
+   * Absent locally, where the interpreter has been writing to the real tree all
+   * along. Never throws — a failed pull is reported in the note, because losing
+   * the evaluation's output on top of its files helps nobody.
+   */
+  afterEval?(): Promise<string>;
 }
 
 export interface ProcessHandle {

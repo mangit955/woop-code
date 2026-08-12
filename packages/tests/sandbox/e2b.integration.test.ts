@@ -5,6 +5,9 @@ import { disableSandbox, enableSandbox } from "../../../runtime/sandbox/control"
 import { currentExecutor } from "../../../runtime/sandbox/registry";
 import { localExecutor } from "../../../runtime/sandbox/localExecutor";
 import { sandboxSession } from "../../../runtime/sandbox/control";
+import { replTool } from "../../../tools/repl";
+import { closeReplSessions } from "../../../tools/replSession";
+import { store } from "../../../tui/src/store/ui-store";
 
 /**
  * Against a real E2B sandbox.
@@ -42,9 +45,16 @@ async function removeHostProbe() {
     .catch(() => {});
 }
 
+const originalSetPendingCommand = store.setPendingCommand;
+
 beforeAll(async () => {
   if (!HAS_KEY) return;
   await removeHostProbe();
+
+  // The repl asks for approval and there is no human here. Restored in
+  // `afterAll` only — per-test restoration would leave the rest of the file
+  // waiting on a prompt nobody answers.
+  store.setPendingCommand = async () => true;
 
   enableSandbox({
     workspace: process.cwd(),
@@ -57,6 +67,8 @@ beforeAll(async () => {
 }, 300_000);
 
 afterAll(async () => {
+  closeReplSessions();
+  store.setPendingCommand = originalSetPendingCommand;
   await disableSandbox();
   await removeHostProbe();
 });
@@ -349,6 +361,86 @@ describe("a real sandbox", () => {
       } finally {
         handle.terminate();
       }
+    }, 180_000);
+  });
+
+  describe("the repl", () => {
+    const scratch = `.sandbox-repl-probe-${crypto.randomUUID()}.txt`;
+    const scratchPath = path.join(process.cwd(), scratch);
+
+    afterEach(async () => {
+      closeReplSessions();
+      await Bun.file(scratchPath)
+        .unlink()
+        .catch(() => {});
+    });
+
+    test("python state survives between calls", async () => {
+      if (!HAS_KEY) return;
+
+      // The whole reason the tool exists, proved where it now runs.
+      await replTool.execute({
+        language: "python",
+        code: "kept = sum(range(1000))",
+      });
+      const result = await replTool.execute({ language: "python", code: "kept" });
+
+      expect(result).toContain("499500");
+    }, 180_000);
+
+    test("a top-level var survives between node calls", async () => {
+      if (!HAS_KEY) return;
+
+      await replTool.execute({ language: "node", code: "var kept = 6 * 7;" });
+      const result = await replTool.execute({ language: "node", code: "kept" });
+
+      expect(result).toContain("42");
+    }, 180_000);
+
+    test("it runs in the sandbox, not on this machine", async () => {
+      if (!HAS_KEY) return;
+
+      const result = await replTool.execute({
+        language: "python",
+        code: "import subprocess; print(subprocess.run(['ls', '/'], capture_output=True, text=True).stdout)",
+      });
+
+      // The sandbox has no /Users; this machine does. Same expression, two
+      // filesystems, which is the containment claim.
+      expect(result).toContain("home");
+      expect(result).not.toContain("Users");
+    }, 180_000);
+
+    test("it sees a local edit made between two evaluations", async () => {
+      if (!HAS_KEY) return;
+
+      await Bun.write(scratchPath, "first\n");
+      const before = await replTool.execute({
+        language: "python",
+        code: `open(${JSON.stringify(scratch)}).read()`,
+      });
+      expect(before).toContain("first");
+
+      await Bun.write(scratchPath, "second\n");
+      const after = await replTool.execute({
+        language: "python",
+        code: `open(${JSON.stringify(scratch)}).read()`,
+      });
+
+      // The push half of the per-evaluation transaction.
+      expect(after).toContain("second");
+    }, 180_000);
+
+    test("a file it writes arrives on local disk", async () => {
+      if (!HAS_KEY) return;
+
+      await replTool.execute({
+        language: "python",
+        code: `open(${JSON.stringify(scratch)}, "w").write("written by the repl")`,
+      });
+
+      // The pull half.
+      expect(await Bun.file(scratchPath).text()).toContain("written by the repl");
     }, 180_000);
   });
 

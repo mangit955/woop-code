@@ -6,7 +6,12 @@
  * them. A tool only ever needs `currentExecutor` or `isSandboxed`.
  */
 
-export type { Executor, ProcessHandle } from "./executor";
+export type {
+  Executor,
+  ProcessHandle,
+  ReplLaunch,
+  ReplTransport,
+} from "./executor";
 export { localExecutor } from "./localExecutor";
 export {
   currentExecutor,

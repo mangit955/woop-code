@@ -26,7 +26,9 @@
  */
 
 import type { CommandResult } from "../../tools/command";
-import type { Executor, ProcessHandle } from "./executor";
+import type { Executor, ProcessHandle, ReplLaunch, ReplTransport } from "./executor";
+import { isHandle, resultFrom, type E2BHandleLike } from "./e2bResult";
+import { createSandboxReplTransport } from "./sandboxRepl";
 import { REMOTE_WORKSPACE } from "./settings";
 import {
   SandboxUnavailableError,
@@ -35,56 +37,6 @@ import {
   type SandboxSession,
 } from "./session";
 import { describeForModel, emptyReport, type SyncReport } from "./sync";
-
-/**
- * E2B's result shape, structurally.
- *
- * Both `CommandResult` and `CommandExitError` carry these, which is what makes
- * the conversion below a field copy rather than a special case.
- */
-interface E2BResultLike {
-  exitCode?: unknown;
-  stdout?: unknown;
-  stderr?: unknown;
-}
-
-function asText(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-/**
- * Reads an E2B result, or an E2B error that is really a result.
- *
- * Returns null for anything that does not carry an exit code, so a genuine
- * transport failure is not mistaken for a command that ran and failed.
- */
-function resultFrom(value: unknown): CommandResult | null {
-  if (!value || typeof value !== "object") return null;
-
-  const candidate = value as E2BResultLike;
-  if (typeof candidate.exitCode !== "number") return null;
-
-  return {
-    exitCode: candidate.exitCode,
-    stdout: asText(candidate.stdout),
-    stderr: asText(candidate.stderr),
-  };
-}
-
-/** E2B's handle, structurally — a pid and something to wait on. */
-interface E2BHandleLike {
-  pid: number;
-  wait(): Promise<unknown>;
-}
-
-function isHandle(value: unknown): value is E2BHandleLike {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as E2BHandleLike).pid === "number" &&
-    typeof (value as E2BHandleLike).wait === "function"
-  );
-}
 
 /**
  * Brings back what the command wrote, and tells the model about anything it
@@ -395,6 +347,13 @@ export function createSandboxExecutor(session: SandboxSession): Executor {
       // E2B terminates TLS at its proxy, so the published URL is https even
       // though the server inside is listening on plain http.
       return `https://${client.getHost(port)}`;
+    },
+
+    // Present, so `tools/repl.ts` stops refusing: an interpreter here is inside
+    // the boundary, and `subprocess.run` from it reaches no further than a
+    // sandboxed `run_terminal` does. See `sandboxRepl.ts`.
+    startRepl(launch: ReplLaunch): Promise<ReplTransport> {
+      return createSandboxReplTransport(session, launch);
     },
   };
 }

@@ -83,6 +83,14 @@ export interface PendingCommand {
   toolName: "run_terminal" | "run_tests" | "repl" | "process_start";
   /** Why it needs approval, from the classifier. */
   risk?: CommandRisk;
+  /**
+   * Whether it will run in the sandbox rather than on this machine.
+   *
+   * Shown, never used to decide: the decision was already made by the time this
+   * dialog exists. Without it `chmod -R 777 /` reads as though it is about to
+   * happen to the reader's own filesystem.
+   */
+  sandboxed?: boolean;
 }
 
 export interface PendingQuestion {

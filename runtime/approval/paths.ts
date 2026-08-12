@@ -27,6 +27,15 @@ export interface WorkspaceContext {
   readonly root: string;
   /** Used to expand `~`. Absent means `~` cannot be resolved. */
   readonly home?: string;
+  /**
+   * Whether the command will run somewhere it cannot reach this machine.
+   *
+   * Part of the workspace context because it answers the same question the root
+   * does — *what does a path in this command actually reach* — and the two are
+   * read together. False unless a caller says otherwise, so nothing that does
+   * not know about sandboxing is quietly graded as contained.
+   */
+  readonly contained?: boolean;
 }
 
 /**
@@ -65,6 +74,10 @@ export function workspaceContext(context?: Partial<WorkspaceContext>): Workspace
   return {
     root: path.resolve(context?.root ?? defaults.root),
     home: context?.home ?? defaults.home,
+    // `=== true`, not a truthy check: containment is a security property and an
+    // undefined that reads as "probably fine" is how one gets granted by
+    // accident.
+    contained: context?.contained === true,
   };
 }
 

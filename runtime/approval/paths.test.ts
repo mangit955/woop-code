@@ -82,3 +82,22 @@ describe("the default context", () => {
     expect(workspaceContext({ root: "." }).root).toBe(process.cwd());
   });
 });
+
+describe("containment is off unless it is asked for", () => {
+  // The security-relevant default. Every caller that predates sandboxing, and
+  // every future one that does not think about it, has to be graded as running
+  // on the real machine — a permission that can be granted by forgetting to
+  // mention it is a permission that will be.
+  test("an absent flag is not containment", () => {
+    expect(workspaceContext().contained).toBe(false);
+    expect(workspaceContext({ root: "/workspace" }).contained).toBe(false);
+  });
+
+  test("only an explicit true counts", () => {
+    expect(workspaceContext({ contained: true }).contained).toBe(true);
+    expect(workspaceContext({ contained: false }).contained).toBe(false);
+    // Truthiness is not consent: a stray value must not widen anything.
+    expect(workspaceContext({ contained: "yes" as unknown as boolean }).contained).toBe(false);
+    expect(workspaceContext({ contained: 1 as unknown as boolean }).contained).toBe(false);
+  });
+});

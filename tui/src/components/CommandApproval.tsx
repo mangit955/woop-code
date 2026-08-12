@@ -69,6 +69,10 @@ export function CommandApproval({ command }: { command: PendingCommand }) {
             <Text color={accent} wrap="truncate-end">
               {severe ? "⚠ " : ""}
               {describeRisk(command.risk)}
+              {/* Where, not just what. `chmod -R 777 /` reads very differently
+                  depending on whose filesystem it is about to land on, and the
+                  risk line alone does not say. */}
+              {command.sandboxed ? " · in the sandbox" : ""}
             </Text>
           </Box>
         )}

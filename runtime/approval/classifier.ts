@@ -89,6 +89,52 @@ const SYSTEM_COMMANDS = new Set([
 ]);
 
 /**
+ * The SYSTEM commands whose entire effect lands on the machine they run on.
+ *
+ * Read only when the command is contained — running in a sandbox that is
+ * discarded — and then it drops to WORKSPACE_WRITE. Not READ_ONLY: it still
+ * writes, it just cannot write anywhere that outlives the command.
+ *
+ * **An allowlist, and it has to stay one.** A name missing from here keeps
+ * asking, so anything added to `SYSTEM_COMMANDS` later is contained-unsafe by
+ * default rather than quietly permitted by a rule written before it existed.
+ *
+ * Three groups are kept out on purpose, because a sandbox does not contain them:
+ *
+ *  - **The network.** `curl`, `wget`, `ssh`, `scp`, `sftp`, `rsync`, `nc`,
+ *    `telnet`, and git's remote subcommands. Egress is on by default and the
+ *    workspace source is pushed into the sandbox, so these are how it leaves.
+ *  - **Remote control planes.** `docker`, `podman`, `kubectl`, `helm`,
+ *    `terraform` talk to daemons, clusters and clouds that are emphatically not
+ *    in the VM, and can destroy real infrastructure from inside it.
+ *  - **`sudo`, `su`, `doas`**, which are handled separately below rather than
+ *    listed here — see `classifyEscalation`.
+ */
+const CONTAINED_SYSTEM_COMMANDS = new Set([
+  "chmod", "chown", "chgrp", "chflags",
+  "systemctl", "launchctl", "service", "mount", "umount", "diskutil",
+  "apt", "apt-get", "yum", "dnf", "pacman", "brew", "port", "snap",
+  "defaults", "networksetup", "ifconfig", "route", "iptables",
+  "reboot", "shutdown", "halt", "crontab", "at",
+]);
+
+/** Privilege escalation: contained, what it wraps is what matters. */
+const ESCALATION_COMMANDS = new Set(["sudo", "su", "doas"]);
+
+/**
+ * `sudo` flags that consume the token after them.
+ *
+ * Only needed to find where the wrapped command starts. A flag not listed here
+ * is read as a boolean, and if that is wrong the token after it is taken for
+ * the command name — which is unrecognised, which is DESTRUCTIVE. Being wrong
+ * costs a prompt.
+ */
+const SUDO_VALUE_FLAGS = new Set([
+  "-u", "--user", "-g", "--group", "-p", "--prompt", "-C", "--close-from",
+  "-h", "--host", "-r", "--role", "-t", "--type", "-U", "--other-user",
+]);
+
+/**
  * Prefixes that wrap another command. `sudo` is special: it is itself a system
  * escalation, so it is not stripped — it is classified.
  */
@@ -124,6 +170,13 @@ const ARGUMENT_SENSITIVE: Record<string, SubcommandClassifier> = {
 /**
  * @param context The workspace to judge paths against. Defaults to the process
  * working directory, which is the root the file tools already use.
+ *
+ * `context.contained` says the command will run somewhere it cannot reach this
+ * machine — a sandbox. It lowers the risk of machine-level work and of writes
+ * outside the tree, because in a virtual machine that is discarded neither
+ * survives. It lowers **nothing** else, and in particular not DESTRUCTIVE: the
+ * sync brings deletions back onto local disk, and an unrecognised command is
+ * DESTRUCTIVE precisely because nobody knows what it does.
  */
 export function classifyCommand(
   command: string,
@@ -184,7 +237,74 @@ function resolveCommand(tokens: string[]): [string | undefined, string[]] {
 }
 
 function classifyProgram(name: string, args: string[], workspace: WorkspaceContext): CommandRisk {
-  return enforceBoundary(name, args, baseRisk(name, args), workspace);
+  if (workspace.contained && ESCALATION_COMMANDS.has(name)) {
+    return classifyEscalation(args, workspace);
+  }
+
+  const risk = enforceBoundary(name, args, baseRisk(name, args), workspace);
+
+  // Contained, a machine-level command cannot reach anything that outlives it.
+  // Applied after the boundary check so it can only ever lower SYSTEM, never
+  // rescue something the boundary raised for a different reason.
+  if (workspace.contained && risk === CommandRisk.SYSTEM && CONTAINED_SYSTEM_COMMANDS.has(name)) {
+    return CommandRisk.WORKSPACE_WRITE;
+  }
+
+  return risk;
+}
+
+/**
+ * `sudo X`, when the whole thing is running in a sandbox.
+ *
+ * Root in a virtual machine that is thrown away is not an escalation worth
+ * stopping for, so the escalation itself drops to a write — but **what it wraps
+ * still decides**, and that is the entire point of this function rather than a
+ * line in `CONTAINED_SYSTEM_COMMANDS`.
+ *
+ * `sudo` is not a transparent prefix (see `TRANSPARENT_PREFIXES`), so
+ * `sudo rm -rf /` classifies as plain SYSTEM everywhere else in this file.
+ * Listing `sudo` as contained would therefore have graded it WORKSPACE_WRITE
+ * and run it unattended — and a sandboxed `rm -rf` is *not* harmless, because
+ * `applyChanges` in the sync deletes every local file whose sandbox copy went
+ * away. The user's uncommitted work is exactly what that costs.
+ *
+ * So: at least a write, and at worst whatever it is really running.
+ */
+function classifyEscalation(args: string[], workspace: WorkspaceContext): CommandRisk {
+  const tail = afterOptions(args, SUDO_VALUE_FLAGS);
+
+  // `sudo` alone, or `sudo -s`: a root shell with nothing to inspect. Unknown
+  // means destructive here as everywhere.
+  if (tail.length === 0) return CommandRisk.DESTRUCTIVE;
+
+  const [name, rest] = resolveCommand(tail);
+  if (!name) return CommandRisk.DESTRUCTIVE;
+
+  return Math.max(CommandRisk.WORKSPACE_WRITE, classifyProgram(name, rest, workspace));
+}
+
+/**
+ * The tail of `args` from its first non-flag token.
+ *
+ * Unlike `positionals`, the flags belonging to the *wrapped* command are kept —
+ * `sudo sed -i s/a/b/ f` has to reach `classifySed` with its `-i` intact, or the
+ * one flag that decides whether it writes is thrown away before anyone looks.
+ */
+function afterOptions(args: string[], valueFlags: ReadonlySet<string>): string[] {
+  for (let index = 0; index < args.length; index++) {
+    const token = args[index]!;
+
+    if (token === "--") return args.slice(index + 1);
+
+    if (token.startsWith("-") && token.length > 1) {
+      if (valueFlags.has(token)) index += 1;
+      continue;
+    }
+
+    return args.slice(index);
+  }
+
+  return [];
 }
 
 /** What the command does, before asking where it does it. */
@@ -205,13 +325,17 @@ function baseRisk(name: string, args: string[]): CommandRisk {
 /**
  * The one place the workspace boundary is enforced.
  *
+ * Exported for the test that pins its undeclared-destination branch, which no
+ * real command reaches — every write command declares destinations today, and a
+ * test enforces that. The branch exists for the day one does not.
+ *
  * Only WORKSPACE_WRITE is examined, and that is the whole point: it is the only
  * risk level a mode runs unattended without also opting into the machine. The
  * levels above it already require approval everywhere except FULL_AUTO, which
  * is a deliberate "run anything" — escalating them would flatten the distinction
  * the UI shows the user without changing a single decision.
  */
-function enforceBoundary(
+export function enforceBoundary(
   name: string,
   args: string[],
   base: CommandRisk,
@@ -222,12 +346,19 @@ function enforceBoundary(
   const destinations = destinationsOf(name, args);
 
   // Write-capable but undeclared. Someone added a command to a table and not to
-  // `DESTINATIONS`; that costs a prompt, never the boundary.
+  // `DESTINATIONS`; that costs a prompt, never the boundary. Containment does
+  // not excuse it either — this branch means we do not know where the write
+  // lands, and "we do not know" is not a thing a sandbox can make safe.
   if (!destinations) return CommandRisk.SYSTEM;
 
-  return destinations.some((destination) => escapesWorkspace(destination, workspace))
-    ? CommandRisk.SYSTEM
-    : CommandRisk.WORKSPACE_WRITE;
+  if (!destinations.some((destination) => escapesWorkspace(destination, workspace))) {
+    return CommandRisk.WORKSPACE_WRITE;
+  }
+
+  // Escaping the workspace is only an escalation when there is a machine to
+  // escape onto. Contained, `mkdir /opt/thing` builds a directory in a virtual
+  // machine that is about to be discarded.
+  return workspace.contained ? CommandRisk.WORKSPACE_WRITE : CommandRisk.SYSTEM;
 }
 
 // ─── Per-command rules ───────────────────────────────────────────────────────
@@ -547,10 +678,17 @@ function classifyRedirect(tokens: string[], workspace: WorkspaceContext): Comman
     if (target === "" || target.startsWith("&")) continue; // `2>&1` duplicates a handle
     if (HARMLESS_REDIRECT_TARGETS.has(target)) continue;
 
-    risk = Math.max(
-      risk,
-      escapesWorkspace(target, workspace) ? CommandRisk.SYSTEM : CommandRisk.WORKSPACE_WRITE,
-    );
+    // Contained, a redirect out of the tree lands in a virtual machine that is
+    // about to be discarded — the same reasoning as `enforceBoundary`, and it
+    // has to be applied here too or the two disagree about the same effect:
+    // `tee /etc/hosts` would be a write while `echo hi > /etc/hosts` stayed a
+    // system change.
+    const escaped =
+      escapesWorkspace(target, workspace) && !workspace.contained
+        ? CommandRisk.SYSTEM
+        : CommandRisk.WORKSPACE_WRITE;
+
+    risk = Math.max(risk, escaped);
   }
 
   return risk;

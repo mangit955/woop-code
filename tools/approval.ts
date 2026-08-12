@@ -1,5 +1,6 @@
 import { getApprovalMode } from "../config/config";
 import { CommandRisk, classifyCommand, createApprovalPolicy } from "../runtime/approval";
+import { isSandboxed } from "../runtime/sandbox";
 import { classifyCode, codeShellsOut } from "../runtime/toolEffects";
 import { store } from "../tui/src/store/ui-store";
 
@@ -22,7 +23,19 @@ export async function requestCommandApproval(
   command: string,
   toolName: ApprovedToolName,
 ): Promise<CommandApprovalResult> {
-  return decide(command, toolName, classifyCommand(command));
+  // Where it will run is part of how risky it is: `chmod -R 777 /` in a virtual
+  // machine that is about to be discarded cannot touch anything of the user's,
+  // and prompting for it anyway is how a user learns to click through the
+  // dialog that mattered. The classifier decides what that is worth — this only
+  // tells it where.
+  //
+  // `isSandboxed()` is `!== "local"`, so an executor kind added later is
+  // uncontained until it says otherwise. Read once and passed down rather than
+  // asked again below: one decision should not be able to grade a command
+  // against one answer and describe it to the user with the other.
+  const contained = isSandboxed();
+
+  return decide(command, toolName, classifyCommand(command, { contained }), contained);
 }
 
 /** The tools that clear something to run through this module. */
@@ -56,16 +69,22 @@ export async function requestCodeApproval(
       ? CommandRisk.WORKSPACE_WRITE
       : CommandRisk.READ_ONLY;
 
+  // The risk itself is unchanged by containment: these three grades are about
+  // what the source *does*, and source that shells out builds its command at
+  // runtime, so there is nothing to reason about no matter where it runs. Only
+  // the "where" shown to the user comes from the executor.
+  //
   // Shown to the user as what it is: source for an interpreter, not a command
   // line. Without the prefix a multi-line Python block renders in the approval
   // dialog as though it were about to be handed to a shell.
-  return decide(`${language}:\n${code}`, "repl", risk);
+  return decide(`${language}:\n${code}`, "repl", risk, isSandboxed());
 }
 
 async function decide(
   command: string,
   toolName: ApprovedToolName,
   risk: CommandRisk,
+  sandboxed: boolean,
 ): Promise<CommandApprovalResult> {
   const policy = createApprovalPolicy(await getApprovalMode());
 
@@ -73,11 +92,15 @@ async function decide(
     return { approved: true, risk, auto: true };
   }
 
+  // Told to the human, not used to decide anything: a command that reaches this
+  // dialog is one we are asking about, and `chmod -R 777 /` reads very
+  // differently depending on whose filesystem it is about to land on.
   const approved = await store.setPendingCommand({
     id: crypto.randomUUID(),
     command,
     toolName,
     risk,
+    sandboxed,
   });
 
   return { approved, risk, auto: false };

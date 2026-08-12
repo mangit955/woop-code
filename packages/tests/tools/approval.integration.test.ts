@@ -14,6 +14,9 @@ const { terminalTool } = await import("../../../tools/terminal");
 const { store } = await import("../../../tui/src/store/ui-store");
 const { getConfig, saveConfig } = await import("../../../config/config");
 const { ApprovalMode } = await import("../../../runtime/approval");
+const { localExecutor, resetExecutor, setExecutor } = await import(
+  "../../../runtime/sandbox"
+);
 
 async function useApprovalMode(mode: string) {
   const config = await getConfig();
@@ -145,6 +148,88 @@ describe("tool approvals", () => {
       await terminalTool.execute({ command: "mkdir -p .approval-scratch" });
       expect(asked).toBe(true);
       expect(existsSync(join(process.cwd(), ".approval-scratch"))).toBe(false);
+    });
+  });
+  /**
+   * The payoff for the whole sandboxing effort, checked end to end rather than
+   * at the classifier: what actually reaches the user is the product of the
+   * classifier, the policy and the seam in `tools/approval.ts`, and a unit test
+   * on any one of them would pass while the wiring was wrong.
+   *
+   * A fake executor rather than a real sandbox — what is under test is the
+   * decision, not E2B. `setExecutor` is a real seam, so no module mock is
+   * needed and nothing leaks into the rest of the run.
+   */
+  describe("with commands running in a sandbox", () => {
+    /** Contained, but nothing here ever runs a command through it. */
+    const sandboxed = {
+      ...localExecutor,
+      kind: "sandbox" as const,
+      async run() {
+        return { exitCode: 0, stdout: "not really run", stderr: "" };
+      },
+    };
+
+    beforeEach(async () => {
+      await useApprovalMode(ApprovalMode.AUTO_WORKSPACE);
+      setExecutor(sandboxed);
+    });
+
+    afterEach(() => {
+      // Module state outlives a test file. Left installed, every later test in
+      // the run would be graded as contained.
+      resetExecutor();
+    });
+
+    test("machine-level work stops asking", async () => {
+      let asked = false;
+      store.setPendingCommand = async () => {
+        asked = true;
+        return false;
+      };
+
+      await terminalTool.execute({ command: "chmod -R 777 /" });
+
+      expect(asked).toBe(false);
+    });
+
+    test("but deleting still asks, because the sync brings deletions home", async () => {
+      let asked = false;
+      store.setPendingCommand = async () => {
+        asked = true;
+        return false;
+      };
+
+      await terminalTool.execute({ command: "rm -rf src" });
+
+      expect(asked).toBe(true);
+    });
+
+    test("and the same command asks again once the sandbox is off", async () => {
+      // The conditional half. Without this the test above would pass just as
+      // well against a blanket relaxation.
+      resetExecutor();
+      let asked = false;
+      store.setPendingCommand = async () => {
+        asked = true;
+        return false;
+      };
+
+      await terminalTool.execute({ command: "chmod -R 777 /" });
+
+      expect(asked).toBe(true);
+    });
+
+    test("the dialog says where a command it does ask about will run", async () => {
+      let seen: { sandboxed?: boolean } | null = null;
+      store.setPendingCommand = async (command) => {
+        seen = command;
+        return false;
+      };
+
+      await terminalTool.execute({ command: "rm -rf src" });
+
+      expect(seen!.sandboxed).toBe(true);
     });
   });
 });

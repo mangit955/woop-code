@@ -353,5 +353,9 @@ describe("the diff owns the screen while it is being judged", () => {
       await expect(decision).resolves.toBe(false);
       app.unmount();
     }
-  });
+    // Three real ink renders, the largest of a 1000-item transcript, so the
+    // default 5s per-test budget is under what `waitForFrame` alone is allowed
+    // to spend (10s) — on a loaded machine this died at 5s before the helper
+    // could report which frame it was still waiting for.
+  }, 30_000);
 });

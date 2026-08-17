@@ -140,6 +140,32 @@ function mount(controller: ReturnType<typeof fakeController>) {
   return { stdout, stdin, unmount: () => instance.unmount() };
 }
 
+/**
+ * Wait for what the test is about to be true, rather than for a fixed duration.
+ *
+ * A 120ms sleep stood here and was enough on an idle machine and not enough on a
+ * busy one: a real ink render of the composer took most of that budget, so a
+ * machine also running a full `bun test` (this suite is what `prepublishOnly`
+ * runs, during a publish) read a half-drawn frame and went red on the first
+ * assertion — at ~130ms, the sleep plus overhead. The same trap is documented on
+ * `waitForFrame` in app.overlay.test.tsx, which is where this pattern comes from.
+ */
+async function waitFor(predicate: () => boolean, description: string): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`${description} did not happen within 5s`);
+}
+
+const waitForFrame = (app: { stdout: Capture }, needle: string) =>
+  waitFor(() => app.stdout.lastFrame().includes(needle), `${JSON.stringify(needle)} in the frame`);
+
+/** The composer is mounted and drawing once its own hint is on screen. */
+const waitForReady = (app: { stdout: Capture }) => waitForFrame(app, "tab ");
+
+/** Only for asserting something did *not* happen, where there is no frame to wait for. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 120));
 
 describe("Tab cycles Build and Plan", () => {
@@ -155,16 +181,16 @@ describe("Tab cycles Build and Plan", () => {
   test("a Tab press switches the controller and the store together", async () => {
     const controller = fakeController();
     const app = mount(controller);
-    await settle();
+    await waitForReady(app);
 
     app.stdin.press(TAB);
-    await settle();
+    await waitFor(() => controller.getSessionMode() === "plan", "the controller reaching plan");
 
     expect(controller.getSessionMode()).toBe("plan");
     expect(store.getState().sessionMode).toBe("plan");
 
     app.stdin.press(TAB);
-    await settle();
+    await waitFor(() => controller.getSessionMode() === "build", "the controller reaching build");
 
     expect(controller.getSessionMode()).toBe("build");
     expect(store.getState().sessionMode).toBe("build");
@@ -175,12 +201,12 @@ describe("Tab cycles Build and Plan", () => {
   test("the mode is on screen, and the hint points the other way", async () => {
     const controller = fakeController();
     const app = mount(controller);
-    await settle();
+    await waitForFrame(app, "tab plan");
 
     expect(app.stdout.lastFrame()).toContain("tab plan");
 
     app.stdin.press(TAB);
-    await settle();
+    await waitForFrame(app, "tab build");
 
     const frame = app.stdout.lastFrame();
     expect(frame).toContain("Plan");
@@ -192,10 +218,10 @@ describe("Tab cycles Build and Plan", () => {
   test("Tab does not type into the composer", async () => {
     const controller = fakeController();
     const app = mount(controller);
-    await settle();
+    await waitForReady(app);
 
     app.stdin.press(TAB);
-    await settle();
+    await waitFor(() => store.getState().sessionMode === "plan", "the store reaching plan");
 
     // ink-text-input ignores Tab; if that ever changes, a stray tab character
     // would land in the prompt and be submitted with whatever follows.
@@ -208,7 +234,7 @@ describe("Tab cycles Build and Plan", () => {
   test("the mode's colour is on screen, and only in that mode", async () => {
     const controller = fakeController();
     const app = mount(controller);
-    await settle();
+    await waitForFrame(app, "tab plan");
 
     // The bar, the label and the caret all read one helper, so the mode's colour
     // being absent means none of them followed the mode.
@@ -216,12 +242,12 @@ describe("Tab cycles Build and Plan", () => {
     expect(app.stdout.lastForegrounds()).toContain(hex(colors.primary));
 
     app.stdin.press(TAB);
-    await settle();
+    await waitForFrame(app, "tab build");
 
     expect(app.stdout.lastForegrounds()).toContain(hex(colors.agentPlan));
 
     app.stdin.press(TAB);
-    await settle();
+    await waitForFrame(app, "tab plan");
 
     expect(app.stdout.lastForegrounds()).not.toContain(hex(colors.agentPlan));
 
@@ -231,6 +257,10 @@ describe("Tab cycles Build and Plan", () => {
   test("a dialog owns Tab while it is open", async () => {
     const controller = fakeController();
     const app = mount(controller);
+    // Waited for before the dialog opens, so a composer that never mounted
+    // cannot pass this by leaving the mode untouched for the wrong reason.
+    await waitForReady(app);
+
     store.openModelPicker();
     await settle();
 

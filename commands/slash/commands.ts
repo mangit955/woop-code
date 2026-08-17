@@ -522,8 +522,7 @@ const sandboxCommand: SlashCommand = {
       return (
         `Sandbox: on${id ? ` (${id})` : " — created on the first command"}\n` +
         (pushed ? `${pushed.files.length} files sent, ${pushed.skipped.length} held back\n` : "") +
-        `\n  repl and background processes are unavailable while it is on\n` +
-        `  /sandbox off  run commands on this machine again`
+        `\n  /sandbox off  run commands on this machine again`
       );
     }
 
@@ -543,7 +542,7 @@ const sandboxCommand: SlashCommand = {
       return (
         "Sandbox on, and remembered for future sessions.\n" +
         "The next command runs in a virtual machine, and one is created when it does.\n" +
-        "Your files are sent to it; nothing it writes comes back yet.\n" +
+        "Your files are sent to it, and what a command writes comes back after it runs.\n" +
         (refusedEnv.length > 0
           ? `Not forwarded: ${refusedEnv.join(", ")} — agent and provider credentials never are.\n`
           : "")

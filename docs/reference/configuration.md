@@ -50,6 +50,7 @@ thing scoped to where you are working: it lives under
 | `selectedModel` | `string` | first model of the provider | Model id, as listed by `woopcode models` |
 | `approvalMode` | `string` | `"auto-read-only"` | One of the four [approval modes](/docs/guides/approval-modes) |
 | `retentionDays` | `number` | `30` | Days a session survives after its last turn; `0` keeps them forever |
+| `sandbox` | `boolean` | `false` | Whether sessions start with [sandboxed execution](/docs/guides/sandboxed-execution) on |
 | `providers` | `object` | three entries | Keyed by provider id |
 | `providers.<id>.type` | `string` | `"api"` | How the provider authenticates |
 | `providers.<id>.apiKey` | `string` | `""` | The stored key |
@@ -168,8 +169,39 @@ count falls back to letting the model decide — which is what `-1` already
 meant. On Gemini, budgets below roughly a thousand are ignored by the model
 rather than honoured.
 
+### Sandboxing
+
+Read only when [sandboxed execution](/docs/guides/sandboxed-execution) is on.
+`E2B_API_KEY` is the one that decides whether it can be turned on at all —
+without it, `--sandbox` and `/sandbox on` refuse rather than falling back to
+running on this machine.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `E2B_API_KEY` | unset | Required. No key, no sandbox |
+| `WOOPCODE_SANDBOX_TEMPLATE` | E2B's base image | Template id to build sandboxes from |
+| `WOOPCODE_SANDBOX_TIMEOUT_MS` | `600000` | How long a sandbox lives untouched. Refreshed before every command, so this is the window a *single* command has to finish in — ten minutes rather than E2B's five, because five is `run_terminal`'s own timeout and a command using its whole budget would race the reaper |
+| `WOOPCODE_SANDBOX_MAX_FILE_BYTES` | `1048576` | Files larger than this are not sent |
+| `WOOPCODE_SANDBOX_NETWORK` | `full` | `none` blocks all egress from the sandbox. `--sandbox-network` overrides it |
+| `WOOPCODE_SANDBOX_ENV` | unset | Comma-separated names to forward into the sandbox |
+| `WOOPCODE_SANDBOX_SETUP` | unset | A command run once after the workspace is first pushed |
+
+As with the behaviour variables above, a value that is not a positive integer is
+ignored and the default is used, and an unreadable network mode falls back to
+`full` rather than to whatever a typo happened to spell.
+
+:::warning
+`WOOPCODE_SANDBOX_ENV` is an allowlist, and it cannot be used to forward the
+agent's own credentials. `WOOPCODE_API_KEY`, `E2B_API_KEY` and any provider key
+are refused even when named explicitly, and the refusal is printed rather than
+silent — a token that was quietly not forwarded looks like a broken build much
+later.
+:::
+
 ## See also
 
+- [Sandboxed execution](/docs/guides/sandboxed-execution) — what the boundary
+  does and does not cover
 - [Configuring providers](/docs/guides/configuring-providers) — the task, not
   the schema
 - [Sessions & history](/docs/guides/sessions-and-history) — what a session

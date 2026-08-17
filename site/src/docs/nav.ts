@@ -67,6 +67,11 @@ export const NAV: NavSection[] = [
       // stops the agent changing something you did not agree to.
       { slug: "guides/plan-mode", title: "Plan mode" },
       { slug: "guides/reviewing-diffs", title: "Reviewing diffs" },
+      // Third of the same group: approval decides whether a command runs, this
+      // decides where. It reads as an escalation of approval modes rather than
+      // as a topic of its own, so it follows them rather than sitting in a
+      // section about execution.
+      { slug: "guides/sandboxed-execution", title: "Sandboxed execution" },
       { slug: "guides/working-in-a-repository", title: "Working in a repository" },
       { slug: "guides/sessions-and-history", title: "Sessions & history" },
       { slug: "guides/configuring-providers", title: "Configuring providers" },

@@ -4,6 +4,13 @@ import { takePendingImages } from "../tools/readImage";
 import { blockedInPlanMode, planModeRefusal, planModeTools } from "./planMode";
 import { isRetryableError } from "./retry";
 import { compactToolHistory, toolHistoryBudget } from "./compaction";
+import {
+  WALL_RESERVE_SEC,
+  clearDeadline,
+  deadlineReached,
+  remainingMs,
+  setDeadline,
+} from "./deadline";
 import { TurnState, normalizeToolKey } from "./turnState";
 import { recentMessages } from "../config/config";
 import { SYSTEM_PROMPT } from "../config/systemPrompt";
@@ -175,7 +182,14 @@ const MAX_TURNS = 6;
  */
 const SAME_TOOL_THRESHOLD = 2;
 
-/** Iterations left when the model is told the budget is running out. */
+/**
+ * Steps left when the model is told the budget is running out.
+ *
+ * Steps rather than seconds, because the same constant has to serve both
+ * budgets and a duration is the wrong shape across this task set: 120s is 16%
+ * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
+ * into steps instead, at the rate this turn has actually been running at.
+ */
 const REMAINING_ITERATIONS_WARNING = 5;
 
 /**
@@ -186,14 +200,19 @@ const REMAINING_ITERATIONS_WARNING = 5;
 const MAX_VERIFICATION_REMINDERS = 1;
 
 /**
- * Raised when the loop runs out of iterations.
+ * Raised when the loop runs out of budget, of either kind.
  *
  * Distinct from a generic failure because it is not one: the agent ran, it
  * simply did not finish inside its budget. Callers that report an exit status
  * use this to separate "produced an incomplete result" from "something broke",
- * which matters to any harness that treats the two differently.
+ * which matters to any harness that treats the two differently — and both
+ * budgets produce the same situation, so both answer to this one type. The
+ * subclasses exist so the message can name the knob that actually bound.
  */
-export class IterationBudgetExhaustedError extends Error {
+export class BudgetExhaustedError extends Error {}
+
+/** Raised when the loop runs out of iterations. */
+export class IterationBudgetExhaustedError extends BudgetExhaustedError {
   constructor(limit: number) {
     super(
       `Agent exceeded the maximum number of iterations (${limit}).\n\n` +
@@ -203,6 +222,27 @@ export class IterationBudgetExhaustedError extends Error {
         `  • More iterations are needed - raise WOOPCODE_MAX_ITERATIONS`,
     );
     this.name = "IterationBudgetExhaustedError";
+  }
+}
+
+/**
+ * Raised when the loop runs out of wall-clock time.
+ *
+ * Its own message rather than the iteration one, which tells the caller to
+ * raise `WOOPCODE_MAX_ITERATIONS` — advice that would send whoever reads it to
+ * the knob that did not bind, and the loop would stop at the same second again.
+ */
+export class WallBudgetExhaustedError extends BudgetExhaustedError {
+  constructor(limitSeconds: number) {
+    super(
+      `Agent ran out of wall-clock time (${limitSeconds}s, less a ${WALL_RESERVE_SEC}s reserve ` +
+        `for finishing up).\n\n` +
+        `This usually means:\n` +
+        `  • The task needs more time than the harness allows for it\n` +
+        `  • Work is partially done - judge what is on disk rather than treating this as a crash\n` +
+        `  • More time is needed - raise WOOPCODE_MAX_WALL_SEC`,
+    );
+    this.name = "WallBudgetExhaustedError";
   }
 }
 
@@ -226,6 +266,56 @@ function maxIterations(env: Record<string, string | undefined> = process.env): n
     return DEFAULT_MAX_ITERATIONS;
   }
   return parsed;
+}
+
+/**
+ * Resolves the wall-clock budget from `WOOPCODE_MAX_WALL_SEC`, in seconds.
+ *
+ * Null when unset, and that is the ordinary case: an interactive session has a
+ * person deciding when a turn has gone on too long, and giving it a clock it
+ * never asked for would end turns that were going fine. Only a harness that
+ * enforces one of its own sets this, and it passes its whole budget — the
+ * reserve is subtracted in `setDeadline`.
+ *
+ * Mirrors `maxIterations` down to the warn-and-fall-back, so a typo in a job
+ * config is visible on stderr rather than being read as "no budget".
+ */
+function maxWallSeconds(
+  env: Record<string, string | undefined> = process.env,
+): number | null {
+  const raw = env.WOOPCODE_MAX_WALL_SEC?.trim();
+  if (!raw) return null;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    process.stderr.write(
+      `⚠️  ignoring WOOPCODE_MAX_WALL_SEC=${raw} (expected a positive integer)\n`,
+    );
+    return null;
+  }
+  return parsed;
+}
+
+/**
+ * Steps this turn has left, from whichever of its two budgets is closer.
+ *
+ * The wall budget is converted into steps at the rate the turn has been running
+ * at, so one warning and one flag serve both. Before the first iteration
+ * completes there is no rate to convert with, and the iteration count stands
+ * alone — which is the right answer anyway, since no time has been spent.
+ *
+ * Exported for its own test: the arithmetic is what decides when the model is
+ * told to wrap up, and driving it through a whole turn to observe it would take
+ * a real clock and a real budget.
+ */
+export function stepsRemaining(state: TurnState, budget: number): number {
+  const byIterations = budget - state.iterations;
+
+  const mean = state.meanStepMs();
+  const left = remainingMs();
+  if (mean === undefined || left === undefined) return byIterations;
+
+  return Math.min(byIterations, Math.floor(left / mean));
 }
 
 /** Per-turn switches that are not part of the conversation. */
@@ -632,12 +722,28 @@ export async function agentLoop(
   // Read once per turn so a mid-turn environment change cannot make two
   // iterations of the same turn assemble to different rules.
   const historyBudget = toolHistoryBudget();
+  // The second budget, and the one an automated harness actually enforces. Read
+  // once per turn for the same reason, and armed before the first request so
+  // the clock covers the whole turn rather than starting after it.
+  const wallBudget = maxWallSeconds();
+  if (wallBudget !== null) setDeadline(wallBudget);
 
   const state = new TurnState();
 
   try {
     while (state.iterations < budget) {
-      state.iterations++;
+      // Checked before the iteration rather than after, so the turn stops with
+      // its reserve intact instead of starting a step it cannot finish. Inside
+      // the `try`, so it takes the same onError-then-rethrow path the iteration
+      // ceiling takes.
+      //
+      // `onBudgetExhausted` is deliberately not consulted. The ceiling can
+      // afford to ask because iterations do not tick while a human thinks; a
+      // clock does, and the only path with a handler is the interactive one,
+      // which does not set this budget in the first place.
+      if (wallBudget !== null && deadlineReached()) {
+        throw new WallBudgetExhaustedError(wallBudget);
+      }
 
       // Said to the model and to nobody else. A benchmark trial that exhausted
       // its 200 iterations was still writing at its 198th tool call, because
@@ -648,17 +754,27 @@ export async function agentLoop(
       // ended the turn as a failure and a warning was the only notice they got.
       // Now the ceiling asks them directly, so a row saying the turn is nearly
       // over is a worse version of a question they are about to be asked.
-      if (state.iterations === budget - REMAINING_ITERATIONS_WARNING) {
-        const remaining = budget - state.iterations;
+      //
+      // A flag rather than an equality on the iteration count: two budgets can
+      // each come into view, and the equality it replaces silently never fired
+      // when the ceiling was below the warning distance.
+      const stepsLeft = stepsRemaining(state, budget);
+      if (!state.windDownWarned && stepsLeft <= REMAINING_ITERATIONS_WARNING) {
+        state.windDownWarned = true;
         messages.push({
           role: "user",
+          // Floored at one: the count can round down to zero or below when the
+          // clock is what is binding, and "0 more steps" reads as a turn that
+          // is already over to a model that is about to get another one.
           content:
-            `Only ${remaining} more steps are available before this turn is stopped. ` +
+            `Only ${Math.max(stepsLeft, 1)} more steps are available before this turn is stopped. ` +
             `Finish what you have started rather than beginning anything new, ` +
             `make sure the work is in a usable state, and report what is done and ` +
             `what is not.`,
         });
       }
+
+      state.iterations++;
 
       // Measured from the same array that is sent, so the segment sizes and
       // the provider's token count describe one and the same request.
@@ -790,6 +906,10 @@ export async function agentLoop(
         }
 
         budget += BUDGET_STEP;
+        // A turn the user chose to extend has a new end, and deserves the same
+        // warning as it comes into view. Without this reset the second stretch
+        // would run to its ceiling silently.
+        state.windDownWarned = false;
       }
     }
 
@@ -815,6 +935,17 @@ export async function agentLoop(
     // turn has to still be up for the user in the next one, so `process_stop`
     // and session exit are what end those.
     closeReplSessions();
+
+    // The deadline is module state, so a turn that ended has to disarm it or
+    // the next one reads a clock that stopped counting: its wind-down would
+    // fire at the first step, and once tool timeouts clamp against this, every
+    // command would be cut to a second.
+    //
+    // Unconditional, including for a turn that armed nothing — "the loop leaves
+    // no deadline behind" is the invariant worth having, and it also restores
+    // the real clock, so a test that injected one does not leak it into the
+    // rest of the run.
+    clearDeadline();
 
     // An image read on the last call before a cancellation is never attached,
     // because the path that attaches them returns before reaching it. Dropping

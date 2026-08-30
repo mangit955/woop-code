@@ -11,7 +11,7 @@ import { registerCommands } from "./slash";
 import { isCommandTool, summarizeToolOutput } from "../tui/src/tool-display";
 import { parseApprovalMode } from "../runtime/approval";
 import { createEventLog, now } from "../runtime/eventLog";
-import { IterationBudgetExhaustedError } from "../runtime/loop";
+import { BudgetExhaustedError } from "../runtime/loop";
 import { enableSandbox } from "../runtime/sandbox";
 import { VERSION } from "../config/version";
 import { PassThrough } from "stream";
@@ -297,7 +297,7 @@ async function runHeadless(
     },
     onError(error) {
       failed = true;
-      if (error instanceof IterationBudgetExhaustedError) budgetExhausted = true;
+      if (error instanceof BudgetExhaustedError) budgetExhausted = true;
       log.write({ type: "error", ts: now(), message: error.message });
       process.stderr.write(`✖ ${error.message}\n`);
     },
@@ -320,7 +320,7 @@ async function runHeadless(
     await controller.run(prompt);
   } catch (error) {
     failed = true;
-    if (error instanceof IterationBudgetExhaustedError) budgetExhausted = true;
+    if (error instanceof BudgetExhaustedError) budgetExhausted = true;
     const message = error instanceof Error ? error.message : String(error);
     log.write({ type: "error", ts: now(), message });
     process.stderr.write(`✖ ${message}\n`);
@@ -333,8 +333,11 @@ async function runHeadless(
   process.stdout.write("\n");
   // Exit codes are a contract with automated callers:
   //   0 - the turn completed
-  //   2 - the loop ran out of iterations; work may be partially done, and the
-  //       caller should judge the result rather than treat this as a crash
+  //   2 - the loop ran out of budget, of iterations or of wall-clock time; work
+  //       may be partially done, and the caller should judge the result rather
+  //       than treat this as a crash. One code for both: a distinct one for the
+  //       deadline would be booked as an exception by any harness not yet
+  //       updated to know it, dropping those trials from the mean.
   //   1 - anything else went wrong
   process.exit(failed ? (budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0);
 }

@@ -122,8 +122,12 @@ def _whole_seconds(value: int | float | str | None) -> int | None:
         return None
 
     try:
+        # OverflowError as well as the obvious two: `json.loads` reads `1e400`
+        # and `Infinity` as `inf`, and `int(inf)` raises neither TypeError nor
+        # ValueError -- so without it those two are the one bad input that
+        # escapes as a traceback instead of the message below.
         seconds = int(float(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ValueError(
             f"Invalid value for 'agent_timeout_sec': {value!r}. "
             "Expected the task's wall-clock budget in seconds."

@@ -212,7 +212,7 @@ def test_env_accepts_every_type_ak_can_produce(
     assert env["WOOPCODE_MAX_WALL_SEC"] == "1800"
 
 
-@pytest.mark.parametrize("given", ["soon", 0, -1, ""])
+@pytest.mark.parametrize("given", ["soon", 0, -1, "", float("inf"), "1e400"])
 def test_an_unusable_timeout_fails_the_run_at_construction(
     tmp_path: Path, given: object
 ) -> None:

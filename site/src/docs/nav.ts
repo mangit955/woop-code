@@ -105,6 +105,15 @@ export const NAV: NavSection[] = [
       { slug: "architecture/how-it-works", title: "How it works" },
       { slug: "architecture/running-from-source", title: "Running from source" },
       { slug: "architecture/adding-a-tool", title: "Adding a tool" },
+      // Written as a page — frontmatter, a summary, `related` pointing at
+      // Configuration — and reachable from nowhere until it was listed here,
+      // while CLAUDE.md and harbor_woopcode/README.md both send readers to it.
+      // Architecture rather than Reference: it explains why a turn has two
+      // budgets, where Configuration states what the variable does.
+      {
+        slug: "adr/0001-wall-clock-budget-for-the-agent-loop",
+        title: "Wall-clock budget",
+      },
     ],
   },
 ];

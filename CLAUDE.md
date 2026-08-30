@@ -107,6 +107,8 @@ PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 \
 
 `-i` needs the **fully qualified** task name. A bare `overfull-hbox` fails at config validation — which is cheap, because it fails before any container or API call.
 
+A command line without `-c job.yaml` reads none of it, so both budgets fall back to `agent.py`'s defaults — `max_iterations` 200 and no wall budget. Add `--ak max_iterations=1000 --ak agent_timeout_sec=<the task's task.toml value>` to a single-task run, or it is capped at 200 steps and says nothing about the clock.
+
 Four things that are easy to get wrong:
 
 - **Both budgets bind, and at `max_iterations: 200` iterations bound first on every task measured.** Harbor enforces a per-task agent timeout from the task package's `task.toml` and raises `AgentTimeoutError`; the loop enforces `WOOPCODE_MAX_WALL_SEC` and stops on whichever binds first. Timeouts vary by 16× across five tasks, so a rule read off any one of them does not generalise — against `jobs/tb2-post-1.1`:

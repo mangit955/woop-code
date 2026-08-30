@@ -148,6 +148,22 @@ export GEMINI_API_KEY=...
 PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 -a harbor_woopcode:WoopCode -m google/gemini-3.5-flash-lite --ak source_dir=$(pwd) -l 5 --agent-setup-timeout-multiplier 2 --max-retries 2 --retry-include ApiRateLimitError
 ```
 
+A command line without `-c job.yaml` reads **none** of that file, so both
+budgets fall back to the defaults in `agent.py` — `max_iterations` 200, and no
+wall budget at all. Pass them when running a single task, or the run is capped
+at 200 steps and cannot demonstrate anything about the clock:
+
+```bash
+# One task, with its own task.toml budget
+PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 \
+  -a harbor_woopcode:WoopCode -m google/gemini-3.5-flash-lite \
+  --ak source_dir=$(pwd) --ak max_iterations=1000 --ak agent_timeout_sec=1800 \
+  -i terminal-bench/make-mips-interpreter -n 1
+```
+
+`-i` needs the fully qualified task name; a bare `make-mips-interpreter` fails
+at config validation, before any container or API call.
+
 ### Two flags worth knowing about
 
 **`--agent-setup-timeout-multiplier 2`.** Harbor allows 360s for agent setup.

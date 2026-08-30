@@ -4,11 +4,8 @@ import {
   formatTimeoutError,
   wallBudgetTimeoutNotice,
 } from "../../../tools/timeoutBudget";
-import {
-  WALL_RESERVE_SEC,
-  clearDeadline,
-  setDeadline,
-} from "../../../runtime/deadline";
+import { clearDeadline } from "../../../runtime/deadline";
+import { budgetWith } from "../shared/deadline";
 
 /**
  * The pure half of the timeout budget: the number a tool is given, and the
@@ -19,11 +16,6 @@ import {
  */
 
 afterEach(clearDeadline);
-
-/** A budget with `seconds` left on it, on a clock that does not move. */
-function budgetWith(seconds: number) {
-  setDeadline(WALL_RESERVE_SEC + seconds, { now: () => 0, startedAt: 0 });
-}
 
 const STANDING = "Run it again with a larger timeout.";
 

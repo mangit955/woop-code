@@ -34,15 +34,11 @@ const { terminalTool } = await import("../../../tools/terminal");
 const { runTestsTool } = await import("../../../tools/runTests");
 const { replTool } = await import("../../../tools/repl");
 const { closeReplSessions } = await import("../../../tools/replSession");
-const { WALL_RESERVE_SEC, clearDeadline, setDeadline } = await import(
-  "../../../runtime/deadline"
-);
+const { clearDeadline } = await import("../../../runtime/deadline");
 const { store } = await import("../../../tui/src/store/ui-store");
-
-/** A budget with `seconds` left on it, on a clock that does not move. */
-function budgetWith(seconds: number) {
-  setDeadline(WALL_RESERVE_SEC + seconds, { now: () => 0, startedAt: 0 });
-}
+// Deferred like the rest, so the redirect above is in place before anything it
+// pulls in reaches config at module scope.
+const { budgetWith } = await import("../shared/deadline");
 
 describe("tool timeouts under a wall-clock budget", () => {
   const originalSetPendingCommand = store.setPendingCommand;

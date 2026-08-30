@@ -12,7 +12,7 @@ import {
   setDeadline,
 } from "../../../runtime/deadline";
 import { TurnState } from "../../../runtime/turnState";
-import { EXIT_BUDGET_EXHAUSTED, headlessExitCode } from "../../../commands/agent";
+import { EXIT_BUDGET_EXHAUSTED, HeadlessOutcome } from "../../../commands/agent";
 import type { ProviderClient, StreamEvent } from "../../../config/types";
 import { createRuntimeTest } from "../shared/testHelpers";
 
@@ -207,34 +207,44 @@ describe("the exit-code contract", () => {
   });
 
   /**
-   * The mapping itself, walked the way `runHeadless` walks it.
+   * The mapping itself, walked through the object `runHeadless` walks it with.
    *
    * The type assertions above prove both errors answer to `BudgetExhaustedError`;
    * these prove that answering to it is what produces a 2, which is the half
-   * `harbor_woopcode/agent.py` depends on. `classify` is the line `runHeadless`
-   * runs at both of its two failure sites.
+   * `harbor_woopcode/agent.py` depends on. `record` is the production line
+   * rather than a copy of it, so a change to the classification fails here
+   * instead of leaving this passing against its own reimplementation.
    */
-  const classify = (error: unknown) => ({
-    failed: true,
-    budgetExhausted: error instanceof BudgetExhaustedError,
-  });
+  const exitCodeAfter = (error: unknown): number => {
+    const outcome = new HeadlessOutcome();
+    outcome.record(error);
+    return outcome.exitCode();
+  };
 
   test("a spent wall budget exits 2, exactly as a spent ceiling does", () => {
-    const wall = classify(new WallBudgetExhaustedError(600));
-    const ceiling = classify(new IterationBudgetExhaustedError(40));
-
-    expect(headlessExitCode(wall.failed, wall.budgetExhausted)).toBe(2);
-    expect(headlessExitCode(ceiling.failed, ceiling.budgetExhausted)).toBe(2);
+    expect(exitCodeAfter(new WallBudgetExhaustedError(600))).toBe(2);
+    expect(exitCodeAfter(new IterationBudgetExhaustedError(40))).toBe(2);
   });
 
   test("anything else that fails exits 1, and a clean turn exits 0", () => {
-    const other = classify(new Error("provider refused the request"));
+    expect(exitCodeAfter(new Error("provider refused the request"))).toBe(1);
+    expect(new HeadlessOutcome().exitCode()).toBe(0);
+  });
 
-    expect(headlessExitCode(other.failed, other.budgetExhausted)).toBe(1);
-    expect(headlessExitCode(false, false)).toBe(0);
-    // A budget noticed on a turn that did not fail cannot invent a failure —
-    // the flag is only ever read alongside `failed`.
-    expect(headlessExitCode(false, true)).toBe(0);
+  /**
+   * The combination that used to need a test, and can no longer be built.
+   *
+   * As two loose booleans, "exhausted but not failed" was reachable and pinned
+   * to 0 by assertion. `record` sets `failed` on every path, so the only way to
+   * raise `budgetExhausted` also raises `failed` — the state is excluded by the
+   * type rather than by a test remembering to cover it.
+   */
+  test("a spent budget cannot be recorded without recording the failure", () => {
+    const outcome = new HeadlessOutcome();
+    outcome.record(new WallBudgetExhaustedError(600));
+
+    expect(outcome.budgetExhausted).toBe(true);
+    expect(outcome.failed).toBe(true);
   });
 });
 

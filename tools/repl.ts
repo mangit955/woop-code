@@ -1,7 +1,7 @@
 import type { Tool } from "../config/types";
 import { requestCodeApproval } from "./approval";
 import { currentExecutor } from "../runtime/sandbox";
-import { budgetedTimeout, formatTimeoutError } from "./timeoutBudget";
+import { budgetedTimeout, formatTimeoutError, isTimeoutError } from "./timeoutBudget";
 import { REPL_LANGUAGES as LANGUAGES, isReplLanguage as isLanguage } from "./replDrivers";
 import {
   DEFAULT_EVAL_TIMEOUT_SECONDS,
@@ -117,8 +117,14 @@ This runs real code. It can write files and shell out, and is subject to the sam
       // the model rebuilds the session and runs it again with a longer one.
       // No standing advice on this path — a lost session is explained by its
       // own message — so anything but a clamped timeout returns the error bare.
-      if (message.includes("timed out")) {
-        return formatTimeoutError(message, budgeted, "");
+      //
+      // The other three throws that land here say "Evaluation cancelled", "The
+      // interpreter exited" and the repl being unavailable, so none of them can
+      // take this branch today. It is a coupling to one string in
+      // `replSession.ts`, not a live misrouting: a lost-session message that
+      // grew the words "timed out" would be answered about the wall clock.
+      if (isTimeoutError(error)) {
+        return formatTimeoutError(message, budgeted);
       }
       return `Error: ${message}`;
     }

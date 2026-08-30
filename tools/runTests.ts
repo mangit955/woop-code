@@ -2,7 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
-import { budgetedTimeout, formatTimeoutError } from "./timeoutBudget";
+import { budgetedTimeout, formatTimeoutError, isTimeoutError } from "./timeoutBudget";
 
 export const runTestsTool: Tool = {
   name: "run_tests",
@@ -45,7 +45,7 @@ export const runTestsTool: Tool = {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Tests cancelled before completion.";
       }
-      if (error instanceof Error && error.message.includes("timed out")) {
+      if (error instanceof Error && isTimeoutError(error)) {
         // The standing note guesses at a server, which is the wrong diagnosis
         // when the wall budget is what ended a suite that was running fine.
         return formatTimeoutError(

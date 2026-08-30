@@ -2,10 +2,15 @@
  * The mutable bookkeeping of a single turn.
  *
  * Extracted from `agentLoop`, where these were fifteen locals threaded through
- * a five-hundred-line body. Nothing here decides anything — the loop still owns
- * control flow — but every counter the turn summary reports lives in one place,
- * and the two predicates derived from them are written once instead of at each
- * site that needed them.
+ * a five-hundred-line body. Every counter the turn summary reports lives in one
+ * place, and the predicates derived from them are written once instead of at
+ * each site that needed them.
+ *
+ * The loop still owns control flow: nothing here ends a turn, and the two
+ * budgets are enforced in `loop.ts`. What does live here is the wind-down
+ * question — `stepsRemaining` converts the clock into steps and
+ * `shouldWarnWindDown` owns both transitions of the flag — because both read
+ * only this turn's own counters and the ceiling they are handed.
  */
 
 import { classifyInvocation, toolEffect } from "./toolEffects";
@@ -37,7 +42,7 @@ const MIN_RATE_SAMPLES = 3;
  * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
  * into steps instead, at the rate this turn has actually been running at.
  */
-export const REMAINING_ITERATIONS_WARNING = 5;
+const REMAINING_ITERATIONS_WARNING = 5;
 
 export class TurnState {
   /** Provider responses so far. One iteration may carry several tool calls, or none. */

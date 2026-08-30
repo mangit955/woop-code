@@ -44,6 +44,24 @@ export function budgetedTimeout(requestedSeconds: number): BudgetedTimeout {
 }
 
 /**
+ * Did this error come from a timeout rather than from the command itself?
+ *
+ * Kept here beside the message it selects, because the test is stringly typed
+ * and was being written out per tool — three copies of
+ * `message.includes("timed out")`, one added by each caller that grew a budget.
+ * A fourth tool spelling it differently would silently get the standing advice
+ * on a clamped kill, which is the one thing this module exists to prevent.
+ *
+ * Substring rather than an error type because the string is all there is: the
+ * executor and `replSession` both raise a plain `Error`, and typing them is a
+ * change to code these budgets do not otherwise touch.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("timed out");
+}
+
+/**
  * The message a timed-out tool returns, from whichever clock ended it.
  *
  * One function rather than the same four lines in each tool. The three that take
@@ -53,13 +71,13 @@ export function budgetedTimeout(requestedSeconds: number): BudgetedTimeout {
  *
  * `standingAdvice` is what the tool says when the clock was not involved, which
  * differs per tool: run_tests talks about servers, run_terminal about
- * process_start. `repl` has none, and an empty string leaves the bare error
- * rather than a message with two blank lines hanging off it.
+ * process_start. `repl` has none, and omitting it leaves the bare error rather
+ * than a message with two blank lines hanging off it.
  */
 export function formatTimeoutError(
   message: string,
   budgeted: BudgetedTimeout,
-  standingAdvice: string,
+  standingAdvice = "",
 ): string {
   const advice = budgeted.clamped
     ? wallBudgetTimeoutNotice(budgeted.requested, budgeted.seconds)

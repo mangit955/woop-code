@@ -2,7 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
-import { budgetedTimeout, formatTimeoutError } from "./timeoutBudget";
+import { budgetedTimeout, formatTimeoutError, isTimeoutError } from "./timeoutBudget";
 
 function startsBackgroundProcess(command: string) {
   let quote: "'" | '"' | "`" | null = null;
@@ -105,7 +105,7 @@ export const terminalTool: Tool = {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Command cancelled before completion.";
       }
-      if (error instanceof Error && error.message.includes("timed out")) {
+      if (error instanceof Error && isTimeoutError(error)) {
         // A command the budget cut short must not be told to ask for longer:
         // the number was never the constraint, and the retry spends the last of
         // the turn reaching the same end. `formatTimeoutError` picks between

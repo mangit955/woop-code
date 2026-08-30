@@ -103,6 +103,44 @@ _PROVIDER_KEY_VARS: dict[str, list[str]] = {
 _ALWAYS_FORWARDED = ["WOOPCODE_API_KEY", "WOOPCODE_PROVIDER", "GEMINI_API_KEY"]
 
 
+def _whole_seconds(value: int | float | str | None) -> int | None:
+    """Coerce a wall-clock budget to whole seconds, or reject it loudly.
+
+    Three types reach here. ``job.yaml`` gives an int; ``--ak key=value`` runs
+    the value through ``json.loads``, so ``=1800`` is an int, ``=1800.0`` a
+    float, and anything JSON cannot read stays a str. Harbor's own Cline agent
+    accepts the same three for the same reason.
+
+    Raising beats forwarding a bad value: the CLI ignores a
+    ``WOOPCODE_MAX_WALL_SEC`` it cannot parse and runs unbudgeted, warning on a
+    stderr stream that is inside the container and buried in the trial log. The
+    operator would then read a run that ignored their budget as evidence about
+    that budget. A ``ValueError`` here fails at config validation instead --
+    before any container starts or any token is spent.
+    """
+    if value is None:
+        return None
+
+    try:
+        # OverflowError as well as the obvious two: `json.loads` reads `1e400`
+        # and `Infinity` as `inf`, and `int(inf)` raises neither TypeError nor
+        # ValueError -- so without it those two are the one bad input that
+        # escapes as a traceback instead of the message below.
+        seconds = int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(
+            f"Invalid value for 'agent_timeout_sec': {value!r}. "
+            "Expected the task's wall-clock budget in seconds."
+        ) from None
+
+    if seconds < 1:
+        raise ValueError(
+            f"Invalid value for 'agent_timeout_sec': {value!r}. Must be >= 1. "
+            "Omit it to leave the loop bounded by iterations alone."
+        )
+    return seconds
+
+
 class WoopCode(BaseInstalledAgent):
     """Runs the ``woopcode`` CLI as a Harbor agent.
 
@@ -116,6 +154,17 @@ class WoopCode(BaseInstalledAgent):
             turning this off makes almost every task fail by construction.
         max_iterations: loop budget for a single task (default
             ``_DEFAULT_MAX_ITERATIONS``).
+        agent_timeout_sec: wall-clock budget for a single task, in seconds, as
+            enforced by Harbor. Forwarded verbatim -- the loop subtracts its own
+            reserve. Omitted by default, which leaves the loop bounded by
+            iterations alone, as it was before this existed.
+
+            Harbor does not hand this to the agent: ``AgentContext`` has no such
+            field, and the per-task ``timeout_sec`` is held by ``Trial``
+            (``harbor/trial/trial.py:_compute_agent_timeout_sec``). It has to be
+            supplied by the operator, which is what Harbor's own Cline agent
+            does under this same name -- so pass the number from the task
+            package's ``task.toml``.
     """
 
     # The CLI emits a structured event log that this class converts to ATIF.
@@ -184,12 +233,14 @@ class WoopCode(BaseInstalledAgent):
         source_dir: str | None = None,
         auto_approve: bool = True,
         max_iterations: int | None = None,
+        agent_timeout_sec: int | float | str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._source_dir = source_dir
         self._auto_approve = auto_approve
         self._max_iterations = max_iterations or _DEFAULT_MAX_ITERATIONS
+        self._agent_timeout_sec = _whole_seconds(agent_timeout_sec)
         # Captured in run() so the trajectory can open with the user turn; the
         # event log records the prompt too, but run() has the rendered form
         # after any prompt template has been applied.
@@ -503,6 +554,17 @@ class WoopCode(BaseInstalledAgent):
         # Raise the loop budget well above the interactive default; see
         # _DEFAULT_MAX_ITERATIONS.
         env["WOOPCODE_MAX_ITERATIONS"] = str(self._max_iterations)
+
+        # The second budget. Harbor kills the process at this number, so the
+        # loop is told it and winds down first -- one trial was otherwise
+        # stopped by its own 200th iteration at 406s of 1800, mid-work.
+        #
+        # Verbatim, and only when the operator gave one: the reserve is
+        # subtracted inside the loop (`runtime/deadline.ts`), and an absent
+        # variable there means unbudgeted, which is the behaviour every run had
+        # before this. Sending `0` instead would arm a deadline already spent.
+        if self._agent_timeout_sec is not None:
+            env["WOOPCODE_MAX_WALL_SEC"] = str(self._agent_timeout_sec)
 
         return env
 

@@ -2,6 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
+import { budgetedTimeout, formatTimeoutError, isTimeoutError } from "./timeoutBudget";
 
 export const runTestsTool: Tool = {
   name: "run_tests",
@@ -16,7 +17,7 @@ export const runTestsTool: Tool = {
         ? args.command
         : "bun test";
     
-    const timeoutSeconds = (args.timeout as number) || 60;
+    const requestedSeconds = (args.timeout as number) || 60;
 
     // Classification and policy decide whether this needs a human; the tool
     // itself knows nothing about which commands are safe.
@@ -31,16 +32,28 @@ export const runTestsTool: Tool = {
       return "Error: This command appears to start a server. Use run_tests only for test suites, not for starting servers. Servers run indefinitely and will cause timeouts.";
     }
 
+    // Read after approval rather than at the top: the clock runs while a human
+    // decides, so a number taken earlier would grant the run time that was spent
+    // waiting for permission to start it.
+    const budgeted = budgetedTimeout(requestedSeconds);
+
     try {
       return formatCommandResult(
-        await currentExecutor().run(command, timeoutSeconds, signal),
+        await currentExecutor().run(command, budgeted.seconds, signal),
       );
     } catch (error) {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Tests cancelled before completion.";
       }
-      if (error instanceof Error && error.message.includes("timed out")) {
-        return `Error: ${error.message}\n\nNote: If you're trying to verify a server starts, don't. Just create the code and let the user test it manually.`;
+      if (error instanceof Error && isTimeoutError(error)) {
+        // The standing note guesses at a server, which is the wrong diagnosis
+        // when the wall budget is what ended a suite that was running fine.
+        return formatTimeoutError(
+          error.message,
+          budgeted,
+          `Note: If you're trying to verify a server starts, don't. Just create ` +
+            `the code and let the user test it manually.`,
+        );
       }
       throw error;
     }

@@ -12,10 +12,13 @@
  * tools will need it, and threading it through would change the `Tool`
  * interface in `config/types.ts` and every tool's signature.
  *
- * `clampToBudget` has no caller yet. Until `run_terminal`, `run_tests` and
- * `repl` clamp against it the deadline is advisory — the loop checks the clock
- * between iterations, and a command started just inside the budget still runs
- * to its own 300s default. That wiring is deliberately a separate change.
+ * `clampToBudget` is read by `run_terminal`, `run_tests` and `repl` through
+ * `tools/timeoutBudget.ts`, which is where the floor of one second is stopped
+ * from *raising* a shorter timeout and where the message explaining a clamped
+ * kill lives. Without those callers the deadline would be advisory: the loop
+ * checks the clock between iterations, and a command started just inside the
+ * budget would still run to its own 300s default. `process_start` is excluded —
+ * a background process does not hold the loop, so it cannot overshoot.
  *
  * Unbudgeted until a turn says otherwise, so nothing changes for a session that
  * never sets `WOOPCODE_MAX_WALL_SEC`: every reader below answers "keep going"

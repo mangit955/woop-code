@@ -2,6 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
+import { budgetedTimeout, formatTimeoutError, isTimeoutError } from "./timeoutBudget";
 
 function startsBackgroundProcess(command: string) {
   let quote: "'" | '"' | "`" | null = null;
@@ -69,7 +70,7 @@ export const terminalTool: Tool = {
 
   async execute(args, signal) {
     const command = args.command as string;
-    const timeoutSeconds = (args.timeout as number) || DEFAULT_TIMEOUT_SECONDS;
+    const requestedSeconds = (args.timeout as number) || DEFAULT_TIMEOUT_SECONDS;
 
     if (!command) {
       throw Error("command is required");
@@ -91,20 +92,30 @@ export const terminalTool: Tool = {
       );
     }
 
+    // Read after approval rather than at the top: the clock runs while a human
+    // decides, so a number taken earlier would grant the command time that was
+    // spent waiting for permission to run at all.
+    const budgeted = budgetedTimeout(requestedSeconds);
+
     try {
       return formatCommandResult(
-        await currentExecutor().run(command, timeoutSeconds, signal),
+        await currentExecutor().run(command, budgeted.seconds, signal),
       );
     } catch (error) {
       if (error instanceof Error && error.message === "Command cancelled") {
         return "Command cancelled before completion.";
       }
-      if (error instanceof Error && error.message.includes("timed out")) {
-        return (
-          `Error: ${error.message}\n\nIf this command was never going to exit on ` +
-          `its own — a server, a watcher — start it with process_start instead and ` +
-          `read it with process_output. If it was simply slow, run it again with a ` +
-          `larger timeout.`
+      if (error instanceof Error && isTimeoutError(error)) {
+        // A command the budget cut short must not be told to ask for longer:
+        // the number was never the constraint, and the retry spends the last of
+        // the turn reaching the same end. `formatTimeoutError` picks between
+        // this advice and that one.
+        return formatTimeoutError(
+          error.message,
+          budgeted,
+          `If this command was never going to exit on its own — a server, a ` +
+            `watcher — start it with process_start instead and read it with ` +
+            `process_output. If it was simply slow, run it again with a larger timeout.`,
         );
       }
       throw error;

@@ -4,7 +4,6 @@ import {
   IterationBudgetExhaustedError,
   WallBudgetExhaustedError,
   agentLoop,
-  stepsRemaining,
 } from "../../../runtime/loop";
 import {
   WALL_RESERVE_SEC,
@@ -13,7 +12,7 @@ import {
   setDeadline,
 } from "../../../runtime/deadline";
 import { TurnState } from "../../../runtime/turnState";
-import { EXIT_BUDGET_EXHAUSTED } from "../../../commands/agent";
+import { EXIT_BUDGET_EXHAUSTED, HeadlessOutcome } from "../../../commands/agent";
 import type { ProviderClient, StreamEvent } from "../../../config/types";
 import { createRuntimeTest } from "../shared/testHelpers";
 
@@ -206,6 +205,47 @@ describe("the exit-code contract", () => {
       BudgetExhaustedError,
     );
   });
+
+  /**
+   * The mapping itself, walked through the object `runHeadless` walks it with.
+   *
+   * The type assertions above prove both errors answer to `BudgetExhaustedError`;
+   * these prove that answering to it is what produces a 2, which is the half
+   * `harbor_woopcode/agent.py` depends on. `record` is the production line
+   * rather than a copy of it, so a change to the classification fails here
+   * instead of leaving this passing against its own reimplementation.
+   */
+  const exitCodeAfter = (error: unknown): number => {
+    const outcome = new HeadlessOutcome();
+    outcome.record(error);
+    return outcome.exitCode();
+  };
+
+  test("a spent wall budget exits 2, exactly as a spent ceiling does", () => {
+    expect(exitCodeAfter(new WallBudgetExhaustedError(600))).toBe(2);
+    expect(exitCodeAfter(new IterationBudgetExhaustedError(40))).toBe(2);
+  });
+
+  test("anything else that fails exits 1, and a clean turn exits 0", () => {
+    expect(exitCodeAfter(new Error("provider refused the request"))).toBe(1);
+    expect(new HeadlessOutcome().exitCode()).toBe(0);
+  });
+
+  /**
+   * The combination that used to need a test, and can no longer be built.
+   *
+   * As two loose booleans, "exhausted but not failed" was reachable and pinned
+   * to 0 by assertion. `record` sets `failed` on every path, so the only way to
+   * raise `budgetExhausted` also raises `failed` — the state is excluded by the
+   * type rather than by a test remembering to cover it.
+   */
+  test("a spent budget cannot be recorded without recording the failure", () => {
+    const outcome = new HeadlessOutcome();
+    outcome.record(new WallBudgetExhaustedError(600));
+
+    expect(outcome.budgetExhausted).toBe(true);
+    expect(outcome.failed).toBe(true);
+  });
 });
 
 /**
@@ -231,14 +271,14 @@ describe("steps remaining", () => {
     const state = new TurnState();
 
     // Nothing has completed, so there is no rate to convert the clock with.
-    expect(stepsRemaining(state, 40)).toBe(40);
+    expect(state.stepsRemaining(40)).toBe(40);
   });
 
   test("an unbudgeted turn is counted in iterations alone", () => {
     const state = new TurnState();
     state.iterations = 35;
 
-    expect(stepsRemaining(state, 40)).toBe(5);
+    expect(state.stepsRemaining(40)).toBe(5);
   });
 
   test("the closer of the two budgets is what is reported", () => {
@@ -246,17 +286,17 @@ describe("steps remaining", () => {
     // each leaves 400s, which is twenty more steps — while the ceiling of 12
     // leaves only two.
     const state = turnAt(10, 20_000, 660);
-    expect(stepsRemaining(state, 12)).toBe(2);
+    expect(state.stepsRemaining(12)).toBe(2);
 
     // Same turn, a ceiling far away: now the clock is the binding one.
-    expect(stepsRemaining(state, 1_000)).toBe(20);
+    expect(state.stepsRemaining(1_000)).toBe(20);
   });
 
   test("a slower turn has fewer steps left in the same time", () => {
     // Twice the wall per step over the same elapsed time: 400s left at 40s a
     // step is ten, where 20s a step was twenty.
     const state = turnAt(5, 40_000, 660);
-    expect(stepsRemaining(state, 1_000)).toBe(10);
+    expect(state.stepsRemaining(1_000)).toBe(10);
   });
 
   test("time already overspent reads as no steps left", () => {
@@ -264,7 +304,85 @@ describe("steps remaining", () => {
 
     // The loop throws before it gets here; the arithmetic must still not report
     // room that does not exist.
-    expect(stepsRemaining(state, 1_000)).toBeLessThanOrEqual(0);
+    expect(state.stepsRemaining(1_000)).toBeLessThanOrEqual(0);
+  });
+
+  /**
+   * A turn `iterations` steps in that has taken `elapsedMs` in total.
+   *
+   * `turnAt` can only describe a turn whose steps all cost the same, which is
+   * the case that never goes wrong. Provider latency measured 1,742ms to
+   * 90,002ms inside one probe, so the turns worth testing are the lopsided
+   * ones.
+   */
+  function turnAfter(
+    iterations: number,
+    elapsedMs: number,
+    budgetSeconds: number,
+  ) {
+    let at = 0;
+    setDeadline(budgetSeconds, { now: () => at, startedAt: 0 });
+    const state = new TurnState();
+    at = elapsedMs;
+    state.iterations = iterations;
+    return state;
+  }
+
+  test("one slow first step does not shrink a turn to nothing", () => {
+    // job.yaml's 750s, less the reserve, is 690s. A 115s opening request —
+    // inside the range CLAUDE.md records — is the whole rate after one step:
+    // 575s left divided by a 115s mean is 5, which would wind the turn down
+    // with something like 280 steps still affordable.
+    const state = turnAfter(1, 115_000, 750);
+
+    expect(state.stepsRemaining(1_000)).toBe(999);
+  });
+
+  test("the rate is believed once enough steps have gone into it", () => {
+    // Three steps at 70s each against 600s of usable budget: 390s left at a
+    // 70s mean is five. The guard withholds an early estimate; it must not
+    // discard a settled one, or the clock would never bind at all.
+    const state = turnAfter(3, 210_000, 660);
+
+    expect(state.stepsRemaining(1_000)).toBe(5);
+  });
+});
+
+describe("the wind-down flag", () => {
+  test("it fires once as the end comes into view", () => {
+    const state = new TurnState();
+
+    expect(state.shouldWarnWindDown(6)).toBe(false);
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+    expect(state.shouldWarnWindDown(4)).toBe(false);
+    expect(state.shouldWarnWindDown(1)).toBe(false);
+  });
+
+  test("a recovered estimate takes the warning back", () => {
+    const state = new TurnState();
+
+    // A slow patch trips it...
+    expect(state.shouldWarnWindDown(3)).toBe(true);
+    // ...the turn settles, and the model is no longer winding down against a
+    // budget it is nowhere near. Latched, it would have spent the rest of the
+    // turn wrapping up.
+    expect(state.shouldWarnWindDown(400)).toBe(false);
+    expect(state.windDownWarned).toBe(false);
+
+    // And the real end still warns when it arrives.
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+  });
+
+  test("a count hovering on the boundary does not warn twice", () => {
+    const state = new TurnState();
+
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+    // Above the threshold but not clear of it: re-arming here would let 5, 6,
+    // 5 send the notice twice for one turn.
+    for (const stepsLeft of [6, 5, 7, 10, 4]) {
+      expect(state.shouldWarnWindDown(stepsLeft)).toBe(false);
+    }
+    expect(state.windDownWarned).toBe(true);
   });
 });
 

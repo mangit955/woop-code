@@ -216,8 +216,7 @@ async function runHeadless(
     prompt,
   });
 
-  let failed = false;
-  let budgetExhausted = false;
+  const outcome = new HeadlessOutcome();
   let summary: TurnSummary | undefined;
 
   const callbacks: AgentCallbacks = {
@@ -296,8 +295,7 @@ async function runHeadless(
       process.stdout.write(text);
     },
     onError(error) {
-      failed = true;
-      if (error instanceof BudgetExhaustedError) budgetExhausted = true;
+      outcome.record(error);
       log.write({ type: "error", ts: now(), message: error.message });
       process.stderr.write(`✖ ${error.message}\n`);
     },
@@ -319,8 +317,7 @@ async function runHeadless(
   try {
     await controller.run(prompt);
   } catch (error) {
-    failed = true;
-    if (error instanceof BudgetExhaustedError) budgetExhausted = true;
+    outcome.record(error);
     const message = error instanceof Error ? error.message : String(error);
     log.write({ type: "error", ts: now(), message });
     process.stderr.write(`✖ ${message}\n`);
@@ -329,21 +326,60 @@ async function runHeadless(
     await controller.dispose();
   }
 
-  log.write({ type: "run_end", ts: now(), ok: !failed, summary });
+  log.write({ type: "run_end", ts: now(), ok: !outcome.failed, summary });
   process.stdout.write("\n");
-  // Exit codes are a contract with automated callers:
-  //   0 - the turn completed
-  //   2 - the loop ran out of budget, of iterations or of wall-clock time; work
-  //       may be partially done, and the caller should judge the result rather
-  //       than treat this as a crash. One code for both: a distinct one for the
-  //       deadline would be booked as an exception by any harness not yet
-  //       updated to know it, dropping those trials from the mean.
-  //   1 - anything else went wrong
-  process.exit(failed ? (budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0);
+  process.exit(outcome.exitCode());
 }
 
-/** See the exit-code contract in `runHeadless`. */
+/** See the exit-code contract in `HeadlessOutcome.exitCode`. */
 export const EXIT_BUDGET_EXHAUSTED = 2;
+
+/**
+ * How a headless run ended, accumulated across the two places it can fail.
+ *
+ * A type rather than the pair of booleans it replaces, because those were the
+ * same type and one of their four combinations — exhausted but not failed — has
+ * no meaning. `record` is the only way to set either, and it always sets
+ * `failed`, so that combination is now unconstructible rather than merely
+ * untested. `tools/timeoutBudget.ts` makes the same argument for `BudgetedTimeout`.
+ *
+ * It also gives the classification one home. Inline at both failure sites, the
+ * `instanceof` could only be checked by a test that copied it — which asserts
+ * against the copy, and goes on passing when the original changes.
+ */
+export class HeadlessOutcome {
+  /** Whether anything went wrong at all. Drives `run_end`'s `ok`. */
+  failed = false;
+
+  /** Whether what went wrong was a spent budget rather than a fault. */
+  budgetExhausted = false;
+
+  /** Records a failure. The line `runHeadless` runs at both of its failure sites. */
+  record(error: unknown): void {
+    this.failed = true;
+    if (error instanceof BudgetExhaustedError) this.budgetExhausted = true;
+  }
+
+  /**
+   * The exit code this run reports.
+   *
+   * Exit codes are a contract with automated callers:
+   *   0 - the turn completed
+   *   2 - the loop ran out of budget, of iterations or of wall-clock time; work
+   *       may be partially done, and the caller should judge the result rather
+   *       than treat this as a crash. One code for both: a distinct one for the
+   *       deadline would be booked as an exception by any harness not yet
+   *       updated to know it, dropping those trials from the mean.
+   *   1 - anything else went wrong
+   *
+   * Reachable from a test, unlike the expression it replaces — that sat inline
+   * in a `process.exit` beside a live provider and a real session, and the
+   * contract has a second party: `harbor_woopcode/agent.py` maps 2 to success.
+   */
+  exitCode(): number {
+    return this.failed ? (this.budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0;
+  }
+}
 
 /** Runs the interactive TUI agent. */
 async function runInteractive(

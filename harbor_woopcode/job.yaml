@@ -25,7 +25,33 @@ agents:
       # the published package, and set `version` to pin it.
       source_dir: .
       # version: 0.6.1
-      max_iterations: 200
+      #
+      # With the wall clock bounding spend, this reverts to the role loop.ts
+      # claims for it -- a guard against a pathological loop with nobody
+      # watching -- so it is set high enough to stop binding first.
+      #
+      # Under this file's own 750s it cannot bind at all: 690s of usable wall at
+      # make-mips-interpreter's measured 2.03s per iteration is ~340 steps, so
+      # anything above that is equivalent here and the clock is always what
+      # stops a turn. 1000 is chosen for the case the number actually matters --
+      # a single task run with -i and its own larger --ak agent_timeout_sec,
+      # where make-mips's full 1800s affords ~885.
+      max_iterations: 1000
+      # Harbor's per-task agent timeout, forwarded verbatim as
+      # WOOPCODE_MAX_WALL_SEC; the loop subtracts its own reserve. Harbor does
+      # not hand this to the agent -- AgentContext has no such field and Trial
+      # holds timeout_sec -- so the operator supplies it, as Harbor's own Cline
+      # agent does under this same name.
+      #
+      # One kwarg covers every task in the job, and these five span 750s
+      # (overfull-hbox) to 12000s (build-pov-ray). The minimum is the only
+      # value under which no task can be hard-killed mid-work; it does cap the
+      # longer four well below what they are allowed -- build-pov-ray gets 690s
+      # of usable wall out of 12000. A five-task run under this config is
+      # therefore NOT comparable to jobs/tb2-post-1.1, which had no wall budget
+      # at all. To give one task its own budget, run it with -i and
+      # --ak agent_timeout_sec=<its task.toml value>.
+      agent_timeout_sec: 750
 
 datasets:
   - name: terminal-bench/terminal-bench-2

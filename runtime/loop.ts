@@ -8,7 +8,6 @@ import {
   WALL_RESERVE_SEC,
   clearDeadline,
   deadlineReached,
-  remainingMs,
   setDeadline,
 } from "./deadline";
 import { TurnState, normalizeToolKey } from "./turnState";
@@ -183,16 +182,6 @@ const MAX_TURNS = 6;
 const SAME_TOOL_THRESHOLD = 2;
 
 /**
- * Steps left when the model is told the budget is running out.
- *
- * Steps rather than seconds, because the same constant has to serve both
- * budgets and a duration is the wrong shape across this task set: 120s is 16%
- * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
- * into steps instead, at the rate this turn has actually been running at.
- */
-const REMAINING_ITERATIONS_WARNING = 5;
-
-/**
  * Asked once, never twice. The model may have a good reason not to verify —
  * the change may be unverifiable, or the tests may not exist — and a loop that
  * insists would spend the budget arguing rather than let the turn end.
@@ -294,28 +283,6 @@ function maxWallSeconds(
     return null;
   }
   return parsed;
-}
-
-/**
- * Steps this turn has left, from whichever of its two budgets is closer.
- *
- * The wall budget is converted into steps at the rate the turn has been running
- * at, so one warning and one flag serve both. Before the first iteration
- * completes there is no rate to convert with, and the iteration count stands
- * alone — which is the right answer anyway, since no time has been spent.
- *
- * Exported for its own test: the arithmetic is what decides when the model is
- * told to wrap up, and driving it through a whole turn to observe it would take
- * a real clock and a real budget.
- */
-export function stepsRemaining(state: TurnState, budget: number): number {
-  const byIterations = budget - state.iterations;
-
-  const mean = state.meanStepMs();
-  const left = remainingMs();
-  if (mean === undefined || left === undefined) return byIterations;
-
-  return Math.min(byIterations, Math.floor(left / mean));
 }
 
 /** Per-turn switches that are not part of the conversation. */
@@ -758,9 +725,8 @@ export async function agentLoop(
       // A flag rather than an equality on the iteration count: two budgets can
       // each come into view, and the equality it replaces silently never fired
       // when the ceiling was below the warning distance.
-      const stepsLeft = stepsRemaining(state, budget);
-      if (!state.windDownWarned && stepsLeft <= REMAINING_ITERATIONS_WARNING) {
-        state.windDownWarned = true;
+      const stepsLeft = state.stepsRemaining(budget);
+      if (state.shouldWarnWindDown(stepsLeft)) {
         messages.push({
           role: "user",
           // Floored at one: the count can round down to zero or below when the
@@ -774,6 +740,13 @@ export async function agentLoop(
         });
       }
 
+      // Counted after the warning, not before, so `stepsRemaining` reads the
+      // steps *completed* and its two budgets agree on what "left" means: the
+      // clock's `floor(left / mean)` counts the step about to start, so the
+      // iteration term has to as well. Against the equality this replaced
+      // (`iterations === budget - 5`, evaluated post-increment) the notice
+      // lands one step later and "5 more steps" now includes the one about to
+      // run, where it used to mean five *after* it.
       state.iterations++;
 
       // Measured from the same array that is sent, so the segment sizes and

@@ -120,8 +120,20 @@ Pass with `--ak key=value`, or under `kwargs:` in `job.yaml`.
 | --- | --- | --- |
 | `source_dir` | — | Install from a local checkout instead of npm. Required until the CLI changes above are published |
 | `version` | `latest` | npm version to install. Pin for reproducible numbers |
-| `max_iterations` | `200` | Loop budget per task |
+| `max_iterations` | `200` | Loop budget per task, in steps |
+| `agent_timeout_sec` | — | Loop budget per task, in wall seconds, forwarded verbatim as `WOOPCODE_MAX_WALL_SEC`. Unset leaves the loop bounded by iterations alone |
 | `auto_approve` | `True` | Must stay on; there is no human to approve edits |
+
+Harbor does not hand the agent its own timeout — `AgentContext` has no such
+field, and `task.config.agent.timeout_sec` is held by `Trial`
+(`harbor/trial/trial.py:_compute_agent_timeout_sec`). So `agent_timeout_sec` has
+to be supplied by whoever starts the run, which is what Harbor's own Cline agent
+does under this same name. Read the number from the task package's `task.toml`
+and pass it whole; the reserve is subtracted inside the loop
+(`runtime/deadline.ts`), so a published number traces back to `task.toml` with
+no arithmetic in between. Because the kwarg applies to every task in a job,
+`job.yaml` carries the shortest timeout in its five-task set;
+`docs/adr/0001-wall-clock-budget-for-the-agent-loop.md` has the per-task table.
 
 ## Running
 
@@ -135,6 +147,22 @@ PYTHONPATH=. python3 -m pytest harbor_woopcode/test_agent.py -q
 export GEMINI_API_KEY=...
 PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 -a harbor_woopcode:WoopCode -m google/gemini-3.5-flash-lite --ak source_dir=$(pwd) -l 5 --agent-setup-timeout-multiplier 2 --max-retries 2 --retry-include ApiRateLimitError
 ```
+
+A command line without `-c job.yaml` reads **none** of that file, so both
+budgets fall back to the defaults in `agent.py` — `max_iterations` 200, and no
+wall budget at all. Pass them when running a single task, or the run is capped
+at 200 steps and cannot demonstrate anything about the clock:
+
+```bash
+# One task, with its own task.toml budget
+PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 \
+  -a harbor_woopcode:WoopCode -m google/gemini-3.5-flash-lite \
+  --ak source_dir=$(pwd) --ak max_iterations=1000 --ak agent_timeout_sec=1800 \
+  -i terminal-bench/make-mips-interpreter -n 1
+```
+
+`-i` needs the fully qualified task name; a bare `make-mips-interpreter` fails
+at config validation, before any container or API call.
 
 ### Two flags worth knowing about
 

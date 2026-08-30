@@ -2,15 +2,47 @@
  * The mutable bookkeeping of a single turn.
  *
  * Extracted from `agentLoop`, where these were fifteen locals threaded through
- * a five-hundred-line body. Nothing here decides anything — the loop still owns
- * control flow — but every counter the turn summary reports lives in one place,
- * and the two predicates derived from them are written once instead of at each
- * site that needed them.
+ * a five-hundred-line body. Every counter the turn summary reports lives in one
+ * place, and the predicates derived from them are written once instead of at
+ * each site that needed them.
+ *
+ * The loop still owns control flow: nothing here ends a turn, and the two
+ * budgets are enforced in `loop.ts`. What does live here is the wind-down
+ * question — `stepsRemaining` converts the clock into steps and
+ * `shouldWarnWindDown` owns both transitions of the flag — because both read
+ * only this turn's own counters and the ceiling they are handed.
  */
 
 import { classifyInvocation, toolEffect } from "./toolEffects";
-import { now } from "./deadline";
+import { now, remainingMs } from "./deadline";
 import type { TurnSummary } from "../config/types";
+
+/**
+ * Completed iterations before the measured rate is believed.
+ *
+ * `meanStepMs` divides elapsed by iterations, so after one step the mean *is*
+ * that step. CLAUDE.md records provider latency ranging 1,742ms to 90,002ms
+ * within a single probe, so one slow first request is enough to make a turn
+ * with hundreds of steps of budget look like it has five: at 115s for step one
+ * against `job.yaml`'s 690s of usable wall, `floor(575000 / 115000)` is 5, and
+ * the model is told to wrap up with ~280 steps actually affordable.
+ *
+ * Three, because the mean recovers fast once ordinary steps land beside the
+ * spike — the same case at step four reads 18 — and because a threshold high
+ * enough to smooth a 90s outlier completely would suppress the warning on any
+ * turn short enough to need it early.
+ */
+const MIN_RATE_SAMPLES = 3;
+
+/**
+ * Steps left when the model is told the budget is running out.
+ *
+ * Steps rather than seconds, because the same constant has to serve both
+ * budgets and a duration is the wrong shape across this task set: 120s is 16%
+ * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
+ * into steps instead, at the rate this turn has actually been running at.
+ */
+const REMAINING_ITERATIONS_WARNING = 5;
 
 export class TurnState {
   /** Provider responses so far. One iteration may carry several tool calls, or none. */
@@ -34,6 +66,59 @@ export class TurnState {
    * below the warning distance.
    */
   windDownWarned = false;
+
+  /**
+   * Steps this turn has left, from whichever of its two budgets is closer.
+   *
+   * The wall budget is converted into steps at the rate the turn has been
+   * running at, so one warning and one flag serve both. Before the first
+   * iteration completes there is no rate to convert with, and the iteration
+   * count stands alone — which is the right answer anyway, since no time has
+   * been spent.
+   *
+   * The rate is ignored until `MIN_RATE_SAMPLES` steps have gone into it. The
+   * iteration ceiling still applies throughout, so an early turn is never told
+   * it has *more* than it has; what the guard withholds is only the ability of
+   * one slow step to end a turn that has hours left.
+   *
+   * On `TurnState` rather than in `loop.ts`, beside `meanStepMs` and the flag
+   * this feeds: it reads nothing of the loop's but the ceiling it is passed.
+   */
+  stepsRemaining(budget: number): number {
+    const byIterations = budget - this.iterations;
+
+    const mean = this.meanStepMs();
+    const left = remainingMs();
+    if (mean === undefined || left === undefined) return byIterations;
+    if (this.iterations < MIN_RATE_SAMPLES) return byIterations;
+
+    return Math.min(byIterations, Math.floor(left / mean));
+  }
+
+  /**
+   * Should the model be told, now, that this turn is winding down?
+   *
+   * Owns both transitions of `windDownWarned`, because the interesting one is
+   * the way back. The step count the clock contributes is derived from a rate
+   * measured on this turn, and a rate moves: a slow patch early can trip the
+   * warning, and a latch would leave the model winding down for the rest of a
+   * turn it is nowhere near the end of — the failure the wall budget exists to
+   * prevent, reached from the other side. `MIN_RATE_SAMPLES` above keeps most
+   * bad estimates out; this clears the ones that get through.
+   *
+   * Re-arming at twice the threshold rather than at the threshold, so a count
+   * hovering on the boundary cannot warn, clear and warn again.
+   */
+  shouldWarnWindDown(stepsLeft: number): boolean {
+    if (!this.windDownWarned) {
+      if (stepsLeft > REMAINING_ITERATIONS_WARNING) return false;
+      this.windDownWarned = true;
+      return true;
+    }
+
+    if (stepsLeft > REMAINING_ITERATIONS_WARNING * 2) this.windDownWarned = false;
+    return false;
+  }
 
   /**
    * Tools actually run.

@@ -98,8 +98,23 @@ describe("classifyCode — what interpreter source does", () => {
       expect(classifyCode(code).writes).toBe(true);
     });
 
+    test("a bare system() does", () => {
+      // Bare so that Perl's and Ruby's form is caught on the `run_terminal`
+      // path, which shares this pattern.
+      expect(codeShellsOut("system('make')")).toBe(true);
+      expect(codeShellsOut("my $rc = system('make');")).toBe(true);
+    });
+
     test("ordinary source does not", () => {
       expect(codeShellsOut("total = sum(values)")).toBe(false);
+    });
+
+    test("a qualified system() does not", () => {
+      // `platform.system()` names the operating system and reads nothing, and
+      // it is common enough in inspection code that grading it as a subshell
+      // would refuse ordinary plan-mode reads.
+      expect(codeShellsOut("print(platform.system())")).toBe(false);
+      expect(codeShellsOut("root = filesystem(path)")).toBe(false);
     });
   });
 

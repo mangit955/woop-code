@@ -1,5 +1,13 @@
 import { describe, test, expect } from "bun:test";
 import { classifyCommand, commandOf } from "../../../runtime/toolEffects";
+import { blockedInPlanMode } from "../../../runtime/planMode";
+
+/** A `run_terminal` command captured verbatim from a benchmark trial log. */
+async function trialCommand(name: string): Promise<string> {
+  return await Bun.file(
+    new URL(`../fixtures/inline-scripts/${name}.sh`, import.meta.url),
+  ).text();
+}
 
 describe("commands that change files", () => {
   // Taken verbatim from a benchmark run, where the agent used the file tools
@@ -33,6 +41,65 @@ describe("commands that change files", () => {
   test("redirecting to stderr is not a file write", () => {
     // `2>&1` and `>&2` are the common false positives for a naive `>` match.
     expect(classifyCommand("make 2>&1 >&2").writes).toBe(false);
+  });
+});
+
+/**
+ * Inline scripts, which plan mode's second gate rests on.
+ *
+ * `run_terminal` stays available while planning, so an interpreter invoked with
+ * `-c`/`-e` is the way a write reaches disk with the writing tools withheld. The
+ * whole script sits inside one quoted run, so nothing below is visible to the
+ * segment rules — these patterns are the only thing looking at it.
+ */
+describe("inline scripts that change files", () => {
+  test.each([
+    // Perl's idiom is a redirect inside the mode string, not a `w`.
+    ["perl two-arg open for writing", `perl -e 'open(OUT, ">input.tex"); print OUT $t;'`],
+    ["perl two-arg open for appending", `perl -e 'open(LOG, ">>run.log"); print LOG $t;'`],
+    ["perl three-arg open", `perl -e 'open(my $fh, ">", $file) or die;'`],
+    ["ruby File.write", `ruby -e 'File.write("out.txt", data)'`],
+    // Shelling out builds its argument at runtime, so there is nothing to read.
+    ["perl system", `perl -e 'system("pdflatex main.tex > /dev/null 2>&1");'`],
+    ["perl qx", `perl -e 'my $out = qx(make -j4);'`],
+    ["python subprocess", `python3 -c "import subprocess; subprocess.run(['make'])"`],
+    ["node child_process", `node -e "require('child_process').execSync('make')"`],
+    ["python os.system", `python3 -c "import os; os.system('make')"`],
+  ])("%s writes", (_label, command) => {
+    expect(classifyCommand(command).writes).toBe(true);
+  });
+
+  test.each([
+    // The `>` addition must not read a read-mode open as a write.
+    ["perl open for reading", `perl -e 'open(F, "<synonyms.txt"); while (<F>) { print; }'`],
+    ["ruby File.read", `ruby -e 'puts File.read("notes.txt")'`],
+    ["a comparison", `node -e "if (width > 100) console.log('wide')"`],
+    ["a right shift", `python3 -c "print(value >> 16)"`],
+    // Backticks are why the shell-out test is a list of named calls rather than
+    // anything that runs a program: a template literal is not a subshell.
+    ["a template literal", "node -e 'console.log(`width ${w}`)'"],
+    ["reading a file", `python3 -c "print(open('notes.txt').read())"`],
+    // `system` qualified by something other than `os` is usually not a subshell.
+    ["platform.system", `python3 -c "import platform; print(platform.system())"`],
+  ])("%s does not write", (_label, command) => {
+    expect(classifyCommand(command).writes).toBe(false);
+  });
+
+  test("the perl script that got through, verbatim", async () => {
+    // jobs/tb2-post-1.1/overfull-hbox__Jk3CkEc, call 30 of 58: thirteen scripts
+    // of this shape rewrote input.tex through `open(OUT, ">input.tex")` and ran
+    // pdflatex through `system(...)`. The classifier flagged none of them.
+    const command = await trialCommand("perl-overfull-hbox");
+    expect(classifyCommand(command).writes).toBe(true);
+    expect(blockedInPlanMode("run_terminal", { command })).toBe(true);
+  });
+
+  test("its read-only sibling from the same trial still passes", async () => {
+    // Call 27, three iterations earlier: the same parsing preamble, reading
+    // both files and printing. Plan mode has to keep letting this through.
+    const command = await trialCommand("perl-overfull-hbox-read");
+    expect(classifyCommand(command).writes).toBe(false);
+    expect(blockedInPlanMode("run_terminal", { command })).toBe(false);
   });
 });
 

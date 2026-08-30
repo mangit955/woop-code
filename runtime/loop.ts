@@ -777,6 +777,12 @@ function finishTurn(
   // unspent and nobody to catch a wrong answer. `useTools` is required because
   // a conversational turn is offered no tools at all, and telling it to go run
   // a command would be an instruction it cannot carry out.
+  //
+  // `windDownWarned` suppresses the gate while the model is under a warning to
+  // start nothing new, and that suppression is temporary, not a latch for the
+  // turn: `shouldWarnWindDown` clears the flag once the step estimate recovers
+  // past twice the threshold, and the gate can fire on a later response in the
+  // same turn. Both directions are covered in requirementGate.test.ts.
   const askForRequirements =
     gates.unattended &&
     gates.useTools &&

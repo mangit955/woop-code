@@ -36,7 +36,9 @@ _Avoid_: the prompt, the first message, the task
 **Window**:
 The tail of the transcript actually sent to the provider, counted in
 conversation turns rather than messages. Distinct from the transcript, which is
-everything the turn has accumulated.
+everything the turn has accumulated. Its turn ceiling bounds the tail, not the
+whole window: a pinned turn-initiating message rides outside it, so a window can
+hold one turn more than the ceiling names, and never two.
 
 ### Ending a turn
 

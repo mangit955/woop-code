@@ -83,6 +83,13 @@ question being worked on has left the request. The loop captures the
 turn-initiating message when it is entered and `recentMessages` carries it back
 in when the window has moved past it.
 
+This makes the turn ceiling a bound on the *tail* rather than on the window: a
+pinned request carries one conversation turn more than `MAX_TURNS` names, and
+never two. That is the only exception in a budget every other context decision
+treats as absolute, so it is written down here as well as at `recentMessages` —
+the extra message is one prompt, carrying no tool results, and it is prepended
+only when it has genuinely fallen out of the tail.
+
 Rejected: **quoting the task into the gate's message instead.** Self-contained
 and needs no context change, but a long turn still argues from a question it
 cannot see. Rejected: **pinning `messages[0]`.** Wrong for an interactive
@@ -94,6 +101,14 @@ on: the check a turn most needs to re-run is usually the one it has already run
 twice, where the loop answers that the result is already in the conversation —
 pointing at output the window dropped long ago. An amnesty rather than an
 exemption, since the gate fires once and only above the step floor.
+
+The reset is wholesale — every previously exhausted call may run again, not only
+the one the gate is asking about — so what bounds it is that it happens once and
+that suppression resumes immediately: the threshold counts again from zero, and
+a third identical call after the gate is refused exactly as it would have been
+before. A narrower amnesty, scoped to calls that classified as verification,
+was considered and rejected: `TurnState` does not record a classification per
+key, and adding one buys a distinction the step floor already pays for.
 
 ## How it will be judged
 

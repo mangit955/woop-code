@@ -600,4 +600,51 @@ describe("both finish gates on one response", () => {
       ),
     ).toBe(false);
   });
+
+  /**
+   * The amnesty's cost, bounded.
+   *
+   * Clearing the ledger lets *every* previously exhausted call run again, not
+   * only the one the gate is asking about — so the guard against a turn that
+   * spends its tail replaying expensive commands is that the reset is one-shot.
+   * The gate fires once, and the threshold starts counting again from zero the
+   * moment it does. This is the half the test above does not show.
+   */
+  test("the duplicate threshold applies again immediately after the amnesty", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "no overfull boxes found");
+
+    const check = { command: "pdflatex doc.tex | grep -i overfull" };
+    const call = (id: string) => [
+      createToolCallEvent("run_terminal", check, id),
+      createDoneEvent(),
+    ];
+
+    const provider = createStreamingProvider([
+      // Two before the gate, which exhausts the threshold.
+      call("c1"),
+      call("c2"),
+      [createTextEvent("No overfull boxes. Done."), createDoneEvent()],
+      // Three after it. The amnesty buys the first two; the third is refused
+      // by the same rule that refused the pre-gate repeat.
+      call("c3"),
+      call("c4"),
+      call("c5"),
+      [createTextEvent("Re-checked, with output."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    // Four executions from six attempts: two before the gate, two after, and
+    // the sixth skipped. A turn cannot loop on one command any more freely
+    // after the gate than before it.
+    expect(summaryOf(callbacks).toolCounts.run_terminal).toBe(4);
+    expect(
+      messages.filter(
+        (m) => m.role === "tool" && m.content.includes("Skipped duplicate"),
+      ),
+    ).toHaveLength(1);
+  });
 });

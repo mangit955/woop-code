@@ -77,6 +77,29 @@ describe("pinning it into the window", () => {
     expect(recentMessages(transcript, 3)).not.toContain(transcript[0]!);
   });
 
+  /**
+   * The one exception to the turn ceiling, stated as arithmetic.
+   *
+   * Everything else that budgets context treats `MAX_TURNS` as a hard boundary,
+   * so the pin's cost is written down here rather than left to be discovered by
+   * someone sizing a prompt from the constant alone: a pinned request carries
+   * one more conversation turn than was asked for, and never two.
+   */
+  test("a pinned window carries exactly one turn more than the ceiling", () => {
+    const turns = (messages: Message[]) =>
+      messages.filter((m) => m.role === "user" && !m.images?.length).length;
+
+    for (const maxTurns of [1, 2, 3]) {
+      expect(turns(recentMessages(transcript, maxTurns, 0))).toBe(maxTurns + 1);
+    }
+
+    // And the ceiling is intact without a pin, which is what makes the line
+    // above an exception rather than an off-by-one.
+    for (const maxTurns of [1, 2, 3]) {
+      expect(turns(recentMessages(transcript, maxTurns))).toBe(maxTurns);
+    }
+  });
+
   test("a window that already holds the task is untouched", () => {
     // Byte-identical to the unpinned assembly, so a short conversation — every
     // interactive turn, and the first several steps of a headless one — is

@@ -514,6 +514,13 @@ export function turnInitiatingIndex(messages: Message[]): number | undefined {
  * The window sent to the provider: the last `maxTurns` conversation turns, plus
  * the message that started the turn wherever that has fallen out of them.
  *
+ * **`maxTurns` is a bound on the tail, not on the window.** A pinned request
+ * carries `maxTurns + 1` conversation turns, and never more — the one exception
+ * in a budget that is otherwise a hard boundary, and the only place in this
+ * file where the number of turns sent exceeds the number asked for. It is worth
+ * stating because every other context decision treats that ceiling as absolute:
+ * a reader sizing a prompt from `MAX_TURNS` alone will be one message short.
+ *
  * The pin exists because the loop itself pushes user messages — the wind-down
  * warning, the finish gates, a truncated-stream resume — and every one of them
  * counts as a turn here. Six of those and the window no longer holds the
@@ -521,8 +528,9 @@ export function turnInitiatingIndex(messages: Message[]): number | undefined {
  * prompt, and the gate that asks a model to re-read its task would otherwise be
  * naming something the model can no longer see.
  *
- * Only ever prepended when it is genuinely outside the window, so a short
- * conversation assembles exactly as it did before this existed.
+ * The extra message is the cheapest in the window — one prompt, no tool results
+ * — and it is only ever prepended when it is genuinely outside the tail, so a
+ * short conversation assembles exactly as it did before this existed.
  */
 export function recentMessages(
   message: Message[],

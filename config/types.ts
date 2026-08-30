@@ -291,6 +291,11 @@ export interface AgentCallbacks {
    * nobody is there to ask, so the loop raises `IterationBudgetExhaustedError`
    * as it always has. Headless runs deliberately do not implement it, which is
    * what keeps their exit-code contract.
+   *
+   * The step ceiling is the only budget that asks. A wall-clock deadline
+   * (`WOOPCODE_MAX_WALL_SEC`) never consults this and raises
+   * `WallBudgetExhaustedError` directly: iterations do not tick while a human
+   * thinks about the question, and a clock does.
    */
   onBudgetExhausted?(info: { steps: number }): Promise<BudgetDecision>;
   /** Reported once per completed iteration, before the next one starts. */

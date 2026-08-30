@@ -164,14 +164,17 @@ describe("running out of budget", () => {
     expect(budgetNotices(messages)[0]!.content).toContain("Only 5 more steps");
   });
 
-  test("a budget too small to warn in still runs and still ends", async () => {
-    // The threshold is five from the end, so a budget of two never reaches it.
-    // The turn must still exhaust cleanly rather than warn about a negative
-    // number of remaining steps.
+  test("a budget below the warning distance is warned about immediately", async () => {
+    // The notice used to be an equality against the iteration count, which
+    // silently never fired when the whole ceiling was below the five steps of
+    // warning — the turns with least room to spare were the ones told nothing.
+    // It is a threshold now, so a budget of two is announced at the first step.
     process.env.WOOPCODE_MAX_ITERATIONS = "2";
 
     const { messages } = await runKeepingMessages();
-    expect(budgetNotices(messages)).toHaveLength(0);
+
+    expect(budgetNotices(messages)).toHaveLength(1);
+    expect(budgetNotices(messages)[0]!.content).toContain("Only 2 more steps");
   });
 });
 

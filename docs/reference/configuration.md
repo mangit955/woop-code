@@ -142,6 +142,7 @@ the run.
 | --- | --- | --- |
 | `WOOPCODE_PROVIDER` | `google` | Pairs with `WOOPCODE_API_KEY` |
 | `WOOPCODE_MAX_ITERATIONS` | `40` | Steps a turn may take before it stops to ask whether to keep going. Interactively the ceiling is a checkpoint, so it is set to catch a stuck loop rather than to ration requests — the provider rations those itself, and answering the checkpoint grants another `40`. A headless run has nobody to ask, so this is the whole budget and exhausting it exits `2` |
+| `WOOPCODE_MAX_WALL_SEC` | unset (off) | Wall-clock seconds a turn may take, counted from process start. Pass the whole budget the harness enforces; a reserve is held back internally so the last step, the final answer and the session write still land. The loop stops on whichever budget binds first, and a spent clock exits `2` like a spent ceiling. Unset interactively, where a person decides when a turn has gone on too long |
 | `WOOPCODE_MAX_ATTEMPTS` | `3` | Tries per provider request before the error surfaces |
 | `WOOPCODE_TOOL_HISTORY_BUDGET` | unset (off) | Characters of tool history to keep before older results are compacted. Off by default — see the measurements in `runtime/compaction.ts` |
 | `WOOPCODE_THINKING_BUDGET` | `-1` | Reasoning depth; see below |

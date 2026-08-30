@@ -9,11 +9,31 @@
  */
 
 import { classifyInvocation, toolEffect } from "./toolEffects";
+import { now } from "./deadline";
 import type { TurnSummary } from "../config/types";
 
 export class TurnState {
   /** Provider responses so far. One iteration may carry several tool calls, or none. */
   iterations = 0;
+
+  /**
+   * When the turn began, read from the deadline's clock rather than `Date`.
+   *
+   * The same clock the wall budget is measured on, so a test that injects one
+   * moves both — an elapsed time taken from `Date.now()` while the deadline ran
+   * on a fake would report a rate for a turn that never happened.
+   */
+  readonly startedAt = now();
+
+  /**
+   * Whether the model has been told this turn is winding down.
+   *
+   * A flag rather than the equality test it replaces (`iterations === budget -
+   * REMAINING_ITERATIONS_WARNING`), because two budgets can each come into view
+   * and an equality on one of them silently never fired when the ceiling was
+   * below the warning distance.
+   */
+  windDownWarned = false;
 
   /**
    * Tools actually run.
@@ -106,6 +126,24 @@ export class TurnState {
         break;
       }
     }
+  }
+
+  /**
+   * Wall milliseconds one step of this turn costs, measured on this turn.
+   *
+   * Elapsed over iterations, deliberately **not** an average of the provider's
+   * `durationMs`: a step is the request plus every tool it went on to run, and
+   * the two differ by about half — `make-mips-interpreter` measured 1.77s of
+   * provider time against 2.03s of wall per iteration.
+   *
+   * Undefined before an iteration has completed, and while no time has passed,
+   * because neither can be divided into a rate. Callers read that as "no
+   * estimate yet" and fall back to the iteration count.
+   */
+  meanStepMs(): number | undefined {
+    const elapsed = now() - this.startedAt;
+    if (this.iterations === 0 || elapsed <= 0) return undefined;
+    return elapsed / this.iterations;
   }
 
   /**

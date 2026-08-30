@@ -70,6 +70,15 @@ const buildRepositoryContext = mock(async () => mockRepoContext);
 // any later test asserting on real persistence is silently testing this instead.
 const actualConfig = await import("../../../config/config");
 
+/**
+ * Captured before registration, for the reason `realSessions` below is.
+ *
+ * A namespace object's properties follow the module registry, so reading
+ * `actualConfig.recentMessages` after the stub is installed hands back the stub
+ * and the delegation below would call itself until the stack ran out.
+ */
+const realRecentMessages = actualConfig.recentMessages;
+
 // The execution log is stubbed for the same reason the conversation is: the
 // controller persists both after every turn, and the spread above kept the real
 // writer — so these tests were writing the developer's own
@@ -79,7 +88,13 @@ let mockExecutionRecords: unknown[] = [];
 mock.module("../../../config/config", () => ({
   ...actualConfig,
   buildRepositoryContext,
-  recentMessages: (messages: Message[], maxTurns: number) => messages,
+  // Gated on `stubActive` like the session stubs, and for the same reason: a
+  // module mock lasts the whole run, so an ungated identity window here is
+  // installed while *other* files exercise the real one. It made the task-pin
+  // tests fail against this stub — and worse, it would have made their positive
+  // assertions pass vacuously, since an identity window contains everything.
+  recentMessages: (messages: Message[], maxTurns: number, pinnedIndex?: number) =>
+    stubActive ? messages : realRecentMessages(messages, maxTurns, pinnedIndex),
 }));
 
 // Sessions are stubbed as one in-memory record. `getConversation` and

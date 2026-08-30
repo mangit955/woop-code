@@ -11,7 +11,7 @@ import {
   setDeadline,
 } from "./deadline";
 import { TurnState, normalizeToolKey } from "./turnState";
-import { recentMessages } from "../config/config";
+import { recentMessages, turnInitiatingIndex } from "../config/config";
 import { SYSTEM_PROMPT } from "../config/systemPrompt";
 import type {
   AgentCallbacks,
@@ -727,6 +727,12 @@ export async function agentLoop(
   const wallBudget = maxWallSeconds();
   if (wallBudget !== null) setDeadline(wallBudget);
 
+  // Captured before the first request, because afterwards it cannot be
+  // recovered: every message the loop pushes is a user message too, and from
+  // the array alone the question being answered is indistinguishable from the
+  // reminders about answering it.
+  const taskIndex = turnInitiatingIndex(messages);
+
   const state = new TurnState();
 
   try {
@@ -787,7 +793,7 @@ export async function agentLoop(
       // turned it off. When enabled it applies to the request only, because the
       // execution log is built from `messages` after the turn and shrinking
       // what is sent is not the same as forgetting what happened.
-      const windowed = recentMessages(messages, MAX_TURNS);
+      const windowed = recentMessages(messages, MAX_TURNS, taskIndex);
       const sentMessages =
         historyBudget === null
           ? windowed

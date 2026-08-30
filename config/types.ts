@@ -123,6 +123,17 @@ export interface TurnSummary {
   salvagedIterations: number;
   /** Times the turn was asked to check its own edits before finishing. */
   verificationReminders: number;
+  /** Times the turn was asked to re-check the task's requirements before finishing. */
+  requirementReminders: number;
+  /**
+   * Whether a tool ran after the requirement gate fired.
+   *
+   * Absent when the gate never fired, which is a different thing from firing to
+   * no effect: the failure this gate is aimed at is a model that answers the
+   * question in prose, from memory, and runs nothing — and in the score alone
+   * that is indistinguishable from a run where the gate never mattered.
+   */
+  requirementGateActedOn?: boolean;
   toolCalls: number;
   /**
    * Index of the last tool execution that changed the workspace, counting from

@@ -491,9 +491,51 @@ function isConversationTurn(message: Message | undefined): boolean {
   return message?.role === "user" && !message.images?.length;
 }
 
+/**
+ * Where the message that started this turn sits in the transcript.
+ *
+ * The last real conversation turn at the moment the loop is entered: in a
+ * headless run that is the task statement, and in the TUI it is what the user
+ * just typed. Captured as an index rather than a reference because the array
+ * only ever grows by pushing, so the index stays true for the whole turn while
+ * an identity check would rest on nothing written down.
+ *
+ * Undefined for a transcript with no conversation turn in it at all, which is
+ * read as "nothing to pin" rather than defaulting to the first message.
+ */
+export function turnInitiatingIndex(messages: Message[]): number | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (isConversationTurn(messages[i])) return i;
+  }
+  return undefined;
+}
+
+/**
+ * The window sent to the provider: the last `maxTurns` conversation turns, plus
+ * the message that started the turn wherever that has fallen out of them.
+ *
+ * **`maxTurns` is a bound on the tail, not on the window.** A pinned request
+ * carries `maxTurns + 1` conversation turns, and never more — the one exception
+ * in a budget that is otherwise a hard boundary, and the only place in this
+ * file where the number of turns sent exceeds the number asked for. It is worth
+ * stating because every other context decision treats that ceiling as absolute:
+ * a reader sizing a prompt from `MAX_TURNS` alone will be one message short.
+ *
+ * The pin exists because the loop itself pushes user messages — the wind-down
+ * warning, the finish gates, a truncated-stream resume — and every one of them
+ * counts as a turn here. Six of those and the window no longer holds the
+ * question being answered: a benchmark trial ran 200 iterations off a single
+ * prompt, and the gate that asks a model to re-read its task would otherwise be
+ * naming something the model can no longer see.
+ *
+ * The extra message is the cheapest in the window — one prompt, no tool results
+ * — and it is only ever prepended when it is genuinely outside the tail, so a
+ * short conversation assembles exactly as it did before this existed.
+ */
 export function recentMessages(
   message: Message[],
   maxTurns: number,
+  pinnedIndex?: number,
 ): Message[] {
   if (maxTurns <= 0 || message.length === 0) {
     return [];
@@ -513,5 +555,16 @@ export function recentMessages(
     }
   }
 
-  return message.slice(startIndex);
+  const window = message.slice(startIndex);
+
+  if (
+    pinnedIndex === undefined ||
+    pinnedIndex >= startIndex ||
+    pinnedIndex < 0 ||
+    pinnedIndex >= message.length
+  ) {
+    return window;
+  }
+
+  return [message[pinnedIndex]!, ...window];
 }

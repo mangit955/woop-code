@@ -49,9 +49,24 @@ const baseline = (step: ReplayStep) =>
  */
 const COMPACTION_BUDGET = toolHistoryBudget() ?? SUGGESTED_TOOL_HISTORY_BUDGET;
 
+/**
+ * Where the pin lands in a recording.
+ *
+ * Every fixture is one headless trial answering a single prompt, which
+ * `reconstruct` puts at index 0. The loop captures the *last* conversation turn
+ * present when it is entered, and at entry there is only this one — so the two
+ * agree here, and the harness must not use `turnInitiatingIndex` on a
+ * mid-turn transcript, where the last conversation turn is a reminder the loop
+ * pushed rather than the task.
+ */
+const PINNED_INDEX = 0;
+
 const current = (step: ReplayStep) =>
   measureSegments(
-    compactToolHistory(recentMessages(step.messages, MAX_TURNS), COMPACTION_BUDGET),
+    compactToolHistory(
+      recentMessages(step.messages, MAX_TURNS, PINNED_INDEX),
+      COMPACTION_BUDGET,
+    ),
     "x".repeat(step.repoContextChars),
   );
 

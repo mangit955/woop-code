@@ -1,33 +1,55 @@
-import { describe, test, expect, mock } from "bun:test";
+/**
+ * Everything a turn records about its own work, and the gates that read it:
+ * effect classification, the summary, the verification reminder, and the two
+ * finish gates meeting on one response.
+ *
+ * Four concerns in one file, deliberately. `mock.module` lasts the whole run and
+ * the last registration of a module wins for every file, so the tool registry is
+ * mocked in as few places as possible — splitting these out would mean a second
+ * file stubbing `../../../tools`, and whichever registered last would hand its
+ * registry to the other. The cases that need no tool live in
+ * `requirementGate.test.ts` and `taskPin.test.ts` for the same reason.
+ */
+import { describe, test, expect, mock, afterEach } from "bun:test";
 import { agentLoop } from "../../../runtime/loop";
+import { clearDeadline } from "../../../runtime/deadline";
+import { budgetDrivenBy } from "../shared/deadline";
 import { toolEffect } from "../../../runtime/toolEffects";
 import { toolRegistry } from "../../../tools";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
-import { createRuntimeTest, createStreamingProvider } from "../shared/testHelpers";
+import {
+  createRuntimeTest,
+  createStreamingProvider,
+  turnSummaryOf as summaryOf,
+} from "../shared/testHelpers";
 import {
   createDoneEvent,
   createTextEvent,
   createToolCallEvent,
 } from "../shared/factories";
-import type { TurnSummary } from "../../../config/types";
+import type { Message } from "../../../config/types";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
 const actualTools = await import("../../../tools");
 mock.module("../../../tools", () => ({ ...actualTools, getTool }));
 
-function summaryOf(callbacks: {
-  getCallsByName(name: string): Array<{ args: any[] }>;
-}): TurnSummary {
-  const calls = callbacks.getCallsByName("onTurnSummary");
-  expect(calls.length).toBe(1);
-  return calls[0]!.args[0] as TurnSummary;
-}
-
 /** Registers a tool that succeeds, replacing any previous one of that name. */
 function registerTool(name: string, output = "ok") {
   mockToolRegistry.register(new MockTool(name, output));
 }
+
+const ORIGINAL_WALL = process.env.WOOPCODE_MAX_WALL_SEC;
+
+afterEach(() => {
+  if (ORIGINAL_WALL === undefined) delete process.env.WOOPCODE_MAX_WALL_SEC;
+  else process.env.WOOPCODE_MAX_WALL_SEC = ORIGINAL_WALL;
+
+  // Module state outlives a test. The clock goes back with the deadline: a fake
+  // one left installed would freeze elapsed time for every file that runs after
+  // this one.
+  clearDeadline();
+});
 
 describe("tool effect classification", () => {
   test("classifies every registered tool", () => {
@@ -411,5 +433,218 @@ describe("agentLoop - asking the turn to verify its edits", () => {
 
     expect(result).toBe("No tests exist for this file.");
     expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
+  });
+
+  /**
+   * The reminder costs a round trip, and a round trip has to be affordable.
+   *
+   * Iterations are not the binding budget here — 38 of 40 are left — but the
+   * request that produced the answer spent the last of the clock. Injecting
+   * anyway sends the loop round to a deadline check that throws, and a turn
+   * holding a finished answer exits as `WallBudgetExhaustedError` with status
+   * 2. The guard this covers reads both budgets; the one it replaced read only
+   * the iteration count, so the case was reachable on every wall-budgeted run.
+   */
+  test("the reminder is withheld when the clock has nothing left", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    // An hour of iterations and a second and a half of clock.
+    const clock = budgetDrivenBy(3600, 1_500);
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        // Each request costs a second of the 1.5 remaining, so the second one
+        // ends past the deadline — the shape of a turn whose final answer
+        // arrived on the last of its time.
+        clock.advance(1_000);
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Fixed.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const result = await agentLoop(provider, messages, "", callbacks);
+
+    expect(result).toBe("Fixed.");
+    expect(summaryOf(callbacks).verificationReminders).toBe(0);
+    // Still recorded as unverified: the turn is not being told this was fine,
+    // only that there was no time left to ask about it.
+    expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
+  });
+});
+
+describe("both finish gates on one response", () => {
+  /** The two gates' messages, by their openings. */
+  const asks = (messages: Message[], opening: string) =>
+    messages.filter((m) => m.role === "user" && m.content.includes(opening));
+
+  const VERIFY_OPENING = "have not run anything";
+  const REQUIREMENT_OPENING = "go back to the task statement above";
+
+  /** Edit something, then declare victory without running anything. */
+  const editThenClaim = () =>
+    createStreamingProvider([
+      [createToolCallEvent("edit_file", { path: "a.ts" }, "c1"), createDoneEvent()],
+      [createTextEvent("All done."), createDoneEvent()],
+    ]);
+
+  test("an unattended turn that edited blindly gets one message, not two", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    await agentLoop(editThenClaim(), messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    // One user message carrying both asks. A second injection would cost
+    // another of the six turns the window keeps, which is the scarce resource
+    // on the long turns this gate fires in.
+    const injected = messages.filter(
+      (m): m is Extract<Message, { role: "user" }> =>
+        m.role === "user" &&
+        (m.content.includes(VERIFY_OPENING) || m.content.includes(REQUIREMENT_OPENING)),
+    );
+    expect(injected).toHaveLength(1);
+    expect(injected[0]!.content).toContain(VERIFY_OPENING);
+    expect(injected[0]!.content).toContain(REQUIREMENT_OPENING);
+
+    const summary = summaryOf(callbacks);
+    expect(summary.verificationReminders).toBe(1);
+    expect(summary.requirementReminders).toBe(1);
+
+    // The live channel names both. One message reaches the model, but this is
+    // what a headless operator watches on stderr and what lands in the event
+    // log — a turn where both gates fired must not read as one where only the
+    // verification gate did.
+    const statuses = callbacks
+      .getCallsByName("onStatus")
+      .map((call) => String(call.args[0]));
+    const notice = statuses.find((status) => status.includes("asking the agent"));
+    expect(notice).toContain("files changed without a check");
+    expect(notice).toContain("finishing early with budget left");
+  });
+
+  test("an attended turn that edited blindly still gets only the verify ask", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    await agentLoop(editThenClaim(), messages, "", callbacks);
+
+    expect(asks(messages, VERIFY_OPENING)).toHaveLength(1);
+    expect(asks(messages, REQUIREMENT_OPENING)).toHaveLength(0);
+  });
+
+  test("a tool run after the gate is recorded as acting on it", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_tests", "3 pass 0 fail");
+
+    const provider = createStreamingProvider([
+      [createTextEvent("Looks right to me."), createDoneEvent()],
+      // The gate landed and the model went and checked.
+      [createToolCallEvent("run_tests", { command: "bun test" }, "c1"), createDoneEvent()],
+      [createTextEvent("Verified against the stated requirements."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    const summary = summaryOf(callbacks);
+    expect(summary.requirementReminders).toBe(1);
+    expect(summary.requirementGateActedOn).toBe(true);
+  });
+
+  /**
+   * The gate demands output the duplicate threshold would refuse.
+   *
+   * `overfull-hbox` ran its chosen check three times and still scored zero. Told
+   * to prove a requirement it cannot prove, the model's next move is very often
+   * that same command — which `executeToolCall` answers with "the result for
+   * these exact arguments is already in the conversation", pointing at output
+   * the window dropped long ago. So the gate clears the ledger as it fires.
+   */
+  test("a repeat of an already-exhausted command runs again after the gate", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "no overfull boxes found");
+
+    const check = { command: "pdflatex doc.tex | grep -i overfull" };
+    const provider = createStreamingProvider([
+      // Twice, which exhausts the threshold, then an answer.
+      [createToolCallEvent("run_terminal", check, "c1"), createDoneEvent()],
+      [createToolCallEvent("run_terminal", check, "c2"), createDoneEvent()],
+      [createTextEvent("No overfull boxes. Done."), createDoneEvent()],
+      // After the gate: the same command again, which without the amnesty is
+      // skipped as a duplicate and executes nothing.
+      [createToolCallEvent("run_terminal", check, "c4"), createDoneEvent()],
+      [createTextEvent("Re-checked, with output."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    const summary = summaryOf(callbacks);
+    expect(summary.requirementReminders).toBe(1);
+    // Three executions, not two: the post-gate repeat actually ran.
+    expect(summary.toolCounts.run_terminal).toBe(3);
+    expect(summary.requirementGateActedOn).toBe(true);
+    expect(
+      messages.some(
+        (m) => m.role === "tool" && m.content.includes("Skipped duplicate"),
+      ),
+    ).toBe(false);
+  });
+
+  /**
+   * The amnesty's cost, bounded.
+   *
+   * Clearing the ledger lets *every* previously exhausted call run again, not
+   * only the one the gate is asking about — so the guard against a turn that
+   * spends its tail replaying expensive commands is that the reset is one-shot.
+   * The gate fires once, and the threshold starts counting again from zero the
+   * moment it does. This is the half the test above does not show.
+   */
+  test("the duplicate threshold applies again immediately after the amnesty", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "no overfull boxes found");
+
+    const check = { command: "pdflatex doc.tex | grep -i overfull" };
+    const call = (id: string) => [
+      createToolCallEvent("run_terminal", check, id),
+      createDoneEvent(),
+    ];
+
+    const provider = createStreamingProvider([
+      // Two before the gate, which exhausts the threshold.
+      call("c1"),
+      call("c2"),
+      [createTextEvent("No overfull boxes. Done."), createDoneEvent()],
+      // Three after it. The amnesty buys the first two; the third is refused
+      // by the same rule that refused the pre-gate repeat.
+      call("c3"),
+      call("c4"),
+      call("c5"),
+      [createTextEvent("Re-checked, with output."), createDoneEvent()],
+    ]);
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    // Four executions from six attempts: two before the gate, two after, and
+    // the sixth skipped. A turn cannot loop on one command any more freely
+    // after the gate than before it.
+    expect(summaryOf(callbacks).toolCounts.run_terminal).toBe(4);
+    expect(
+      messages.filter(
+        (m) => m.role === "tool" && m.content.includes("Skipped duplicate"),
+      ),
+    ).toHaveLength(1);
   });
 });

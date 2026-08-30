@@ -894,4 +894,13 @@ class WoopCode(BaseInstalledAgent):
             # anything afterwards. Absent on a run from a CLI that predates the
             # summary, which is not the same as False.
             "woopcode_unverified_edits": summary.get("unverifiedEdits"),
+            # The requirement gate, in two parts, because they answer different
+            # questions of a job: how often a trial tried to stop early, and
+            # how often being asked actually sent it back to run something.
+            # A gate that fires and is answered in prose changes nothing, and
+            # in the score alone that is invisible.
+            "woopcode_requirement_reminders": summary.get("requirementReminders"),
+            "woopcode_requirement_gate_acted_on": summary.get(
+                "requirementGateActedOn"
+            ),
         }

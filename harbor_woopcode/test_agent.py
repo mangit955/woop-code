@@ -115,6 +115,8 @@ RUN_WITH_USAGE = [
             "retries": 1,
             "salvagedIterations": 0,
             "verificationReminders": 0,
+            "requirementReminders": 1,
+            "requirementGateActedOn": False,
             "toolCalls": 1,
             "lastWriteStep": 1,
             "toolCounts": {"create_file": 1},
@@ -534,6 +536,33 @@ def test_unverified_edits_is_read_from_the_run_summary(tmp_path: Path) -> None:
 
     assert context.metadata is not None
     assert context.metadata["woopcode_unverified_edits"] is True
+
+
+def test_the_requirement_gate_is_read_from_the_run_summary(tmp_path: Path) -> None:
+    """Fired, and answered in prose.
+
+    The two are separate metadata keys because they answer different questions
+    of a job: how often a trial tried to stop early, and how often being asked
+    sent it back to run something. A gate that fires and changes nothing is
+    invisible in the score.
+    """
+    write_events(tmp_path, RUN_WITH_USAGE)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_requirement_reminders"] == 1
+    assert context.metadata["woopcode_requirement_gate_acted_on"] is False
+
+
+def test_the_requirement_gate_is_none_when_it_never_fired(tmp_path: Path) -> None:
+    """Never asked is not the same as asked and ignored."""
+    write_events(tmp_path, SIMPLE_RUN)
+    context = AgentContext()
+    make_agent(tmp_path).populate_context_post_run(context)
+
+    assert context.metadata is not None
+    assert context.metadata["woopcode_requirement_gate_acted_on"] is None
 
 
 def test_unverified_edits_is_none_without_a_summary(tmp_path: Path) -> None:

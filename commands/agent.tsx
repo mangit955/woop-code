@@ -331,19 +331,36 @@ async function runHeadless(
 
   log.write({ type: "run_end", ts: now(), ok: !failed, summary });
   process.stdout.write("\n");
-  // Exit codes are a contract with automated callers:
-  //   0 - the turn completed
-  //   2 - the loop ran out of budget, of iterations or of wall-clock time; work
-  //       may be partially done, and the caller should judge the result rather
-  //       than treat this as a crash. One code for both: a distinct one for the
-  //       deadline would be booked as an exception by any harness not yet
-  //       updated to know it, dropping those trials from the mean.
-  //   1 - anything else went wrong
-  process.exit(failed ? (budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0);
+  process.exit(headlessExitCode(failed, budgetExhausted));
 }
 
-/** See the exit-code contract in `runHeadless`. */
+/** See the exit-code contract in `headlessExitCode`. */
 export const EXIT_BUDGET_EXHAUSTED = 2;
+
+/**
+ * The exit code a headless run reports, given how it ended.
+ *
+ * Exit codes are a contract with automated callers:
+ *   0 - the turn completed
+ *   2 - the loop ran out of budget, of iterations or of wall-clock time; work
+ *       may be partially done, and the caller should judge the result rather
+ *       than treat this as a crash. One code for both: a distinct one for the
+ *       deadline would be booked as an exception by any harness not yet
+ *       updated to know it, dropping those trials from the mean.
+ *   1 - anything else went wrong
+ *
+ * A function rather than the expression it replaces, because the contract has
+ * a second party — `harbor_woopcode/agent.py` maps 2 to success — and inline in
+ * a `process.exit` beside a live provider and a real session, nothing could
+ * reach it. `budgetExhausted` is set from `error instanceof BudgetExhaustedError`
+ * at both of the two places a turn can fail.
+ */
+export function headlessExitCode(
+  failed: boolean,
+  budgetExhausted: boolean,
+): number {
+  return failed ? (budgetExhausted ? EXIT_BUDGET_EXHAUSTED : 1) : 0;
+}
 
 /** Runs the interactive TUI agent. */
 async function runInteractive(

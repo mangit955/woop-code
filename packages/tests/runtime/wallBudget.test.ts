@@ -4,7 +4,6 @@ import {
   IterationBudgetExhaustedError,
   WallBudgetExhaustedError,
   agentLoop,
-  stepsRemaining,
 } from "../../../runtime/loop";
 import {
   WALL_RESERVE_SEC,
@@ -13,7 +12,7 @@ import {
   setDeadline,
 } from "../../../runtime/deadline";
 import { TurnState } from "../../../runtime/turnState";
-import { EXIT_BUDGET_EXHAUSTED } from "../../../commands/agent";
+import { EXIT_BUDGET_EXHAUSTED, headlessExitCode } from "../../../commands/agent";
 import type { ProviderClient, StreamEvent } from "../../../config/types";
 import { createRuntimeTest } from "../shared/testHelpers";
 
@@ -206,6 +205,37 @@ describe("the exit-code contract", () => {
       BudgetExhaustedError,
     );
   });
+
+  /**
+   * The mapping itself, walked the way `runHeadless` walks it.
+   *
+   * The type assertions above prove both errors answer to `BudgetExhaustedError`;
+   * these prove that answering to it is what produces a 2, which is the half
+   * `harbor_woopcode/agent.py` depends on. `classify` is the line `runHeadless`
+   * runs at both of its two failure sites.
+   */
+  const classify = (error: unknown) => ({
+    failed: true,
+    budgetExhausted: error instanceof BudgetExhaustedError,
+  });
+
+  test("a spent wall budget exits 2, exactly as a spent ceiling does", () => {
+    const wall = classify(new WallBudgetExhaustedError(600));
+    const ceiling = classify(new IterationBudgetExhaustedError(40));
+
+    expect(headlessExitCode(wall.failed, wall.budgetExhausted)).toBe(2);
+    expect(headlessExitCode(ceiling.failed, ceiling.budgetExhausted)).toBe(2);
+  });
+
+  test("anything else that fails exits 1, and a clean turn exits 0", () => {
+    const other = classify(new Error("provider refused the request"));
+
+    expect(headlessExitCode(other.failed, other.budgetExhausted)).toBe(1);
+    expect(headlessExitCode(false, false)).toBe(0);
+    // A budget noticed on a turn that did not fail cannot invent a failure —
+    // the flag is only ever read alongside `failed`.
+    expect(headlessExitCode(false, true)).toBe(0);
+  });
 });
 
 /**
@@ -231,14 +261,14 @@ describe("steps remaining", () => {
     const state = new TurnState();
 
     // Nothing has completed, so there is no rate to convert the clock with.
-    expect(stepsRemaining(state, 40)).toBe(40);
+    expect(state.stepsRemaining(40)).toBe(40);
   });
 
   test("an unbudgeted turn is counted in iterations alone", () => {
     const state = new TurnState();
     state.iterations = 35;
 
-    expect(stepsRemaining(state, 40)).toBe(5);
+    expect(state.stepsRemaining(40)).toBe(5);
   });
 
   test("the closer of the two budgets is what is reported", () => {
@@ -246,17 +276,17 @@ describe("steps remaining", () => {
     // each leaves 400s, which is twenty more steps — while the ceiling of 12
     // leaves only two.
     const state = turnAt(10, 20_000, 660);
-    expect(stepsRemaining(state, 12)).toBe(2);
+    expect(state.stepsRemaining(12)).toBe(2);
 
     // Same turn, a ceiling far away: now the clock is the binding one.
-    expect(stepsRemaining(state, 1_000)).toBe(20);
+    expect(state.stepsRemaining(1_000)).toBe(20);
   });
 
   test("a slower turn has fewer steps left in the same time", () => {
     // Twice the wall per step over the same elapsed time: 400s left at 40s a
     // step is ten, where 20s a step was twenty.
     const state = turnAt(5, 40_000, 660);
-    expect(stepsRemaining(state, 1_000)).toBe(10);
+    expect(state.stepsRemaining(1_000)).toBe(10);
   });
 
   test("time already overspent reads as no steps left", () => {
@@ -264,7 +294,7 @@ describe("steps remaining", () => {
 
     // The loop throws before it gets here; the arithmetic must still not report
     // room that does not exist.
-    expect(stepsRemaining(state, 1_000)).toBeLessThanOrEqual(0);
+    expect(state.stepsRemaining(1_000)).toBeLessThanOrEqual(0);
   });
 
   /**
@@ -295,7 +325,7 @@ describe("steps remaining", () => {
     // with something like 280 steps still affordable.
     const state = turnAfter(1, 115_000, 750);
 
-    expect(stepsRemaining(state, 1_000)).toBe(999);
+    expect(state.stepsRemaining(1_000)).toBe(999);
   });
 
   test("the rate is believed once enough steps have gone into it", () => {
@@ -304,7 +334,7 @@ describe("steps remaining", () => {
     // discard a settled one, or the clock would never bind at all.
     const state = turnAfter(3, 210_000, 660);
 
-    expect(stepsRemaining(state, 1_000)).toBe(5);
+    expect(state.stepsRemaining(1_000)).toBe(5);
   });
 });
 

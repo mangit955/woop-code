@@ -115,6 +115,17 @@ describe("classifyCode — what interpreter source does", () => {
       // would refuse ordinary plan-mode reads.
       expect(codeShellsOut("print(platform.system())")).toBe(false);
       expect(codeShellsOut("root = filesystem(path)")).toBe(false);
+      expect(codeShellsOut("$obj->system(1)")).toBe(false);
+    });
+
+    test("qx with a bracket delimiter does, with a slash does not", () => {
+      // `qx`, `qy`, `qz` and `qw` are a quaternion's components, so a slash
+      // after `qx` is division far more often than it is Perl's backtick
+      // synonym — and refusing arithmetic is the worse of the two failures.
+      expect(codeShellsOut("my $out = qx(make -j4);")).toBe(true);
+      expect(codeShellsOut("my $out = qx{make -j4};")).toBe(true);
+      expect(codeShellsOut("norm = qx / qw")).toBe(false);
+      expect(codeShellsOut("x, y = qx/n, qy/n")).toBe(false);
     });
   });
 

@@ -81,6 +81,9 @@ describe("inline scripts that change files", () => {
     ["reading a file", `python3 -c "print(open('notes.txt').read())"`],
     // `system` qualified by something other than `os` is usually not a subshell.
     ["platform.system", `python3 -c "import platform; print(platform.system())"`],
+    ["a method named system", `perl -e 'my $rc = $obj->system(1);'`],
+    // qx/qy/qz/qw are a quaternion's components, so this is division.
+    ["quaternion arithmetic", `python3 -c "print(qx / qw, qy/n)"`],
   ])("%s does not write", (_label, command) => {
     expect(classifyCommand(command).writes).toBe(false);
   });

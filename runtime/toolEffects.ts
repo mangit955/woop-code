@@ -269,15 +269,23 @@ export function codeOf(args: Record<string, unknown>): string {
  *
  * Perl and Ruby spell it bare, so `system(` is matched unqualified — but only
  * where nothing precedes it, because a qualified one is usually something else
- * entirely: `platform.system()` names the operating system and reads nothing.
- * `os.system` is therefore listed by name rather than reached by the bare rule.
+ * entirely: `platform.system()` names the operating system and reads nothing,
+ * and `$obj->system(1)` is a method that happens to share the name. `os.system`
+ * is therefore listed by name rather than reached by the bare rule.
  *
- * A backtick is deliberately absent even though it runs a program in both of
- * those languages: `node -e 'console.log(`w ${x}`)'` is a template literal, and
- * reading it as a subshell would refuse ordinary plan-mode reads.
+ * Two spellings that do run a program are deliberately absent, because their
+ * delimiters are ambiguous with arithmetic in the languages that share this
+ * pattern, and refusing an ordinary plan-mode read is the worse failure:
+ *
+ *  - A backtick, which is a template literal in JavaScript:
+ *    `node -e 'console.log(`w ${x}`)'`.
+ *  - `qx` with a slash delimiter, because `qx`, `qy`, `qz` and `qw` are the
+ *    standard names for a quaternion's components, so `norm = qx / qw` and
+ *    `qx/n, qy/n` are division. Only `qx(` and `qx{` are matched, which no
+ *    arithmetic produces.
  */
 const CODE_SUBPROCESS =
-  /(\bsubprocess\b|\bos\.system\s*\(|(?<![.\w])system\s*\(|\bos\.popen\s*\(|\bqx\s*[({/]|\bchild_process\b|\bexecSync\s*\(|\bspawnSync\s*\(|Bun\.\$)/;
+  /(\bsubprocess\b|\bos\.system\s*\(|(?<![.\w>])system\s*\(|\bos\.popen\s*\(|\bqx\s*[({]|\bchild_process\b|\bexecSync\s*\(|\bspawnSync\s*\(|Bun\.\$)/;
 
 /**
  * Source that checks something works.

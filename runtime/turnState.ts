@@ -12,6 +12,16 @@ import { classifyInvocation, toolEffect } from "./toolEffects";
 import { now } from "./deadline";
 import type { TurnSummary } from "../config/types";
 
+/**
+ * Steps left when the model is told the budget is running out.
+ *
+ * Steps rather than seconds, because the same constant has to serve both
+ * budgets and a duration is the wrong shape across this task set: 120s is 16%
+ * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
+ * into steps instead, at the rate this turn has actually been running at.
+ */
+export const REMAINING_ITERATIONS_WARNING = 5;
+
 export class TurnState {
   /** Provider responses so far. One iteration may carry several tool calls, or none. */
   iterations = 0;
@@ -34,6 +44,31 @@ export class TurnState {
    * below the warning distance.
    */
   windDownWarned = false;
+
+  /**
+   * Should the model be told, now, that this turn is winding down?
+   *
+   * Owns both transitions of `windDownWarned`, because the interesting one is
+   * the way back. The step count the clock contributes is derived from a rate
+   * measured on this turn, and a rate moves: a slow patch early can trip the
+   * warning, and a latch would leave the model winding down for the rest of a
+   * turn it is nowhere near the end of — the failure the wall budget exists to
+   * prevent, reached from the other side. `MIN_RATE_SAMPLES` in `loop.ts` keeps
+   * most bad estimates out; this clears the ones that get through.
+   *
+   * Re-arming at twice the threshold rather than at the threshold, so a count
+   * hovering on the boundary cannot warn, clear and warn again.
+   */
+  shouldWarnWindDown(stepsLeft: number): boolean {
+    if (!this.windDownWarned) {
+      if (stepsLeft > REMAINING_ITERATIONS_WARNING) return false;
+      this.windDownWarned = true;
+      return true;
+    }
+
+    if (stepsLeft > REMAINING_ITERATIONS_WARNING * 2) this.windDownWarned = false;
+    return false;
+  }
 
   /**
    * Tools actually run.

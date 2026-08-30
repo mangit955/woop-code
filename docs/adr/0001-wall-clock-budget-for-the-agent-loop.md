@@ -107,6 +107,27 @@ one message and one flag. A constant expressed in seconds was rejected as the
 wrong shape across this task set — 120s is 16% of `overfull-hbox`'s budget and
 1% of `build-pov-ray`'s.
 
+The rate that conversion runs on is measured on the turn itself, so it is
+unreliable exactly when there is least of it. `meanStepMs` after one step *is*
+that step, and provider latency has measured 1,742ms to 90,002ms inside a single
+probe — so one slow opening request made a turn with 690s of budget read as five
+steps from the end, and a latched flag would have left the model winding down
+for the rest of it. That is this document's own failure reached from the other
+side, so the rate is ignored until `MIN_RATE_SAMPLES` steps have gone into it
+(the mean recovers by the fourth), and the flag re-arms if the estimate comes
+back above twice the threshold.
+
+## What it costs the prompt
+
+`bun run replay:baseline` over the ten fixtures in
+`packages/tests/fixtures/replay`, before and after: **byte-identical**, peak
+prompt characters unchanged on every fixture (mean 126,563, max 219,570).
+
+Expected, and worth stating rather than assuming. Nothing here rewrites
+history — the wind-down adds at most one short user message to a turn, and only
+to turns that reach it, which no fixture does. The harness measures characters
+and cannot speak to cache rates; it says so itself.
+
 ## Consequences
 
 - `WOOPCODE_MAX_WALL_SEC` and the exit-code behaviour become a contract with

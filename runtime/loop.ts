@@ -183,16 +183,6 @@ const MAX_TURNS = 6;
 const SAME_TOOL_THRESHOLD = 2;
 
 /**
- * Steps left when the model is told the budget is running out.
- *
- * Steps rather than seconds, because the same constant has to serve both
- * budgets and a duration is the wrong shape across this task set: 120s is 16%
- * of `overfull-hbox`'s budget and 1% of `build-pov-ray`'s. Time is converted
- * into steps instead, at the rate this turn has actually been running at.
- */
-const REMAINING_ITERATIONS_WARNING = 5;
-
-/**
  * Asked once, never twice. The model may have a good reason not to verify —
  * the change may be unverifiable, or the tests may not exist — and a loop that
  * insists would spend the budget arguing rather than let the turn end.
@@ -297,12 +287,34 @@ function maxWallSeconds(
 }
 
 /**
+ * Completed iterations before the measured rate is believed.
+ *
+ * `meanStepMs` divides elapsed by iterations, so after one step the mean *is*
+ * that step. CLAUDE.md records provider latency ranging 1,742ms to 90,002ms
+ * within a single probe, so one slow first request is enough to make a turn
+ * with hundreds of steps of budget look like it has five: at 115s for step one
+ * against `job.yaml`'s 690s of usable wall, `floor(575000 / 115000)` is 5, and
+ * the model is told to wrap up with ~280 steps actually affordable.
+ *
+ * Three, because the mean recovers fast once ordinary steps land beside the
+ * spike — the same case at step four reads 18 — and because a threshold high
+ * enough to smooth a 90s outlier completely would suppress the warning on any
+ * turn short enough to need it early.
+ */
+const MIN_RATE_SAMPLES = 3;
+
+/**
  * Steps this turn has left, from whichever of its two budgets is closer.
  *
  * The wall budget is converted into steps at the rate the turn has been running
  * at, so one warning and one flag serve both. Before the first iteration
  * completes there is no rate to convert with, and the iteration count stands
  * alone — which is the right answer anyway, since no time has been spent.
+ *
+ * The rate is ignored until `MIN_RATE_SAMPLES` steps have gone into it. The
+ * iteration ceiling still applies throughout, so an early turn is never told it
+ * has *more* than it has; what the guard withholds is only the ability of one
+ * slow step to end a turn that has hours left.
  *
  * Exported for its own test: the arithmetic is what decides when the model is
  * told to wrap up, and driving it through a whole turn to observe it would take
@@ -314,6 +326,7 @@ export function stepsRemaining(state: TurnState, budget: number): number {
   const mean = state.meanStepMs();
   const left = remainingMs();
   if (mean === undefined || left === undefined) return byIterations;
+  if (state.iterations < MIN_RATE_SAMPLES) return byIterations;
 
   return Math.min(byIterations, Math.floor(left / mean));
 }
@@ -759,8 +772,7 @@ export async function agentLoop(
       // each come into view, and the equality it replaces silently never fired
       // when the ceiling was below the warning distance.
       const stepsLeft = stepsRemaining(state, budget);
-      if (!state.windDownWarned && stepsLeft <= REMAINING_ITERATIONS_WARNING) {
-        state.windDownWarned = true;
+      if (state.shouldWarnWindDown(stepsLeft)) {
         messages.push({
           role: "user",
           // Floored at one: the count can round down to zero or below when the
@@ -774,6 +786,13 @@ export async function agentLoop(
         });
       }
 
+      // Counted after the warning, not before, so `stepsRemaining` reads the
+      // steps *completed* and its two budgets agree on what "left" means: the
+      // clock's `floor(left / mean)` counts the step about to start, so the
+      // iteration term has to as well. Against the equality this replaced
+      // (`iterations === budget - 5`, evaluated post-increment) the notice
+      // lands one step later and "5 more steps" now includes the one about to
+      // run, where it used to mean five *after* it.
       state.iterations++;
 
       // Measured from the same array that is sent, so the segment sizes and

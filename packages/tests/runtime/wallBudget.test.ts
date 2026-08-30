@@ -266,6 +266,84 @@ describe("steps remaining", () => {
     // room that does not exist.
     expect(stepsRemaining(state, 1_000)).toBeLessThanOrEqual(0);
   });
+
+  /**
+   * A turn `iterations` steps in that has taken `elapsedMs` in total.
+   *
+   * `turnAt` can only describe a turn whose steps all cost the same, which is
+   * the case that never goes wrong. Provider latency measured 1,742ms to
+   * 90,002ms inside one probe, so the turns worth testing are the lopsided
+   * ones.
+   */
+  function turnAfter(
+    iterations: number,
+    elapsedMs: number,
+    budgetSeconds: number,
+  ) {
+    let at = 0;
+    setDeadline(budgetSeconds, { now: () => at, startedAt: 0 });
+    const state = new TurnState();
+    at = elapsedMs;
+    state.iterations = iterations;
+    return state;
+  }
+
+  test("one slow first step does not shrink a turn to nothing", () => {
+    // job.yaml's 750s, less the reserve, is 690s. A 115s opening request —
+    // inside the range CLAUDE.md records — is the whole rate after one step:
+    // 575s left divided by a 115s mean is 5, which would wind the turn down
+    // with something like 280 steps still affordable.
+    const state = turnAfter(1, 115_000, 750);
+
+    expect(stepsRemaining(state, 1_000)).toBe(999);
+  });
+
+  test("the rate is believed once enough steps have gone into it", () => {
+    // Three steps at 70s each against 600s of usable budget: 390s left at a
+    // 70s mean is five. The guard withholds an early estimate; it must not
+    // discard a settled one, or the clock would never bind at all.
+    const state = turnAfter(3, 210_000, 660);
+
+    expect(stepsRemaining(state, 1_000)).toBe(5);
+  });
+});
+
+describe("the wind-down flag", () => {
+  test("it fires once as the end comes into view", () => {
+    const state = new TurnState();
+
+    expect(state.shouldWarnWindDown(6)).toBe(false);
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+    expect(state.shouldWarnWindDown(4)).toBe(false);
+    expect(state.shouldWarnWindDown(1)).toBe(false);
+  });
+
+  test("a recovered estimate takes the warning back", () => {
+    const state = new TurnState();
+
+    // A slow patch trips it...
+    expect(state.shouldWarnWindDown(3)).toBe(true);
+    // ...the turn settles, and the model is no longer winding down against a
+    // budget it is nowhere near. Latched, it would have spent the rest of the
+    // turn wrapping up.
+    expect(state.shouldWarnWindDown(400)).toBe(false);
+    expect(state.windDownWarned).toBe(false);
+
+    // And the real end still warns when it arrives.
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+  });
+
+  test("a count hovering on the boundary does not warn twice", () => {
+    const state = new TurnState();
+
+    expect(state.shouldWarnWindDown(5)).toBe(true);
+    // Above the threshold but not clear of it: re-arming here would let 5, 6,
+    // 5 send the notice twice for one turn.
+    for (const stepsLeft of [6, 5, 7, 10, 4]) {
+      expect(state.shouldWarnWindDown(stepsLeft)).toBe(false);
+    }
+    expect(state.windDownWarned).toBe(true);
+  });
 });
 
 describe("the wind-down warning", () => {

@@ -268,11 +268,18 @@ const REQUIREMENT_REMINDER =
  */
 function canAffordAnotherRound(
   state: TurnState,
-  budget: number,
+  iterationCeiling: number,
   minSteps: number,
+  wallBudgeted: boolean,
 ): boolean {
-  if (deadlineReached()) return false;
-  return state.stepsRemaining(budget) >= minSteps;
+  // Guarded on `wallBudgeted` for the same reason the loop's own check is
+  // (`wallBudget !== null && deadlineReached()`): the deadline is module state,
+  // so an unbudgeted turn that inherited an armed one would have both gates
+  // silently withheld while the loop itself ran on, never throwing. The
+  // `finally` that disarms makes that unreachable today; the guard costs a
+  // parameter and stops the two readers of one clock disagreeing about it.
+  if (wallBudgeted && deadlineReached()) return false;
+  return state.stepsRemaining(iterationCeiling) >= minSteps;
 }
 
 /**
@@ -706,6 +713,8 @@ interface FinishGates {
   unattended: boolean;
   /** The turn has tools at all. A conversational turn is given none. */
   useTools: boolean;
+  /** This turn set a wall budget, so the deadline is its own to read. */
+  wallBudgeted: boolean;
 }
 
 /**
@@ -757,7 +766,12 @@ function finishTurn(
   const askToVerify =
     state.hasUnverifiedEdits() &&
     state.verificationReminders < MAX_VERIFICATION_REMINDERS &&
-    canAffordAnotherRound(state, maxIterations, VERIFICATION_GATE_MIN_STEPS);
+    canAffordAnotherRound(
+      state,
+      maxIterations,
+      VERIFICATION_GATE_MIN_STEPS,
+      gates.wallBudgeted,
+    );
 
   // The turn is about to end early, confidently, with most of its budget
   // unspent and nobody to catch a wrong answer. `useTools` is required because
@@ -768,27 +782,35 @@ function finishTurn(
     gates.useTools &&
     state.requirementReminders < MAX_REQUIREMENT_REMINDERS &&
     !state.windDownWarned &&
-    canAffordAnotherRound(state, maxIterations, REQUIREMENT_GATE_MIN_STEPS);
+    canAffordAnotherRound(
+      state,
+      maxIterations,
+      REQUIREMENT_GATE_MIN_STEPS,
+      gates.wallBudgeted,
+    );
 
   if (askToVerify || askForRequirements) {
     const asks: string[] = [];
+    // The status names every gate that fired, not just the first. One message
+    // goes to the model, but this is the live channel — headless writes it to
+    // stderr and to the event log — and a run where both fired must not read
+    // as a run where only the verification gate did.
+    const reasons: string[] = [];
 
     if (askToVerify) {
       state.verificationReminders++;
       asks.push(VERIFICATION_REMINDER);
+      reasons.push("files changed without a check");
     }
 
     if (askForRequirements) {
       state.noteRequirementGate();
       asks.push(REQUIREMENT_REMINDER);
+      reasons.push("finishing early with budget left");
     }
 
     messages.push({ role: "user", content: asks.join("\n\n") });
-    callbacks.onStatus?.(
-      askToVerify
-        ? "⚠️  files changed without a check - asking the agent to verify"
-        : "⚠️  finishing early with budget left - asking the agent to check the task's requirements",
-    );
+    callbacks.onStatus?.(`⚠️  ${reasons.join(", ")} - asking the agent to check its work`);
     return { kind: "continue" };
   }
 
@@ -952,7 +974,7 @@ export async function agentLoop(
           state,
           assistantText,
           budget,
-          { unattended, useTools },
+          { unattended, useTools, wallBudgeted: wallBudget !== null },
           truncated,
         );
 

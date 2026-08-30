@@ -205,6 +205,11 @@ async function runHeadless(
 
   const selectedModel = await resolveModel(options.model);
   store.setSelectedModel(selectedModel);
+  // Half of "nobody is watching this run". This half is the approval path's,
+  // read through the store; the other half is `controller.setUnattended` below,
+  // which is the loop's. They are not merged because `runtime/loop.ts` must not
+  // import the interface's store — so the one fact is stated twice, on purpose,
+  // and each site names the other.
   store.setNonInteractive({ autoApprove });
 
   const log = createEventLog(options.events);
@@ -302,9 +307,9 @@ async function runHeadless(
   };
 
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks, baseUrl);
-  // Nobody is reading the answer as it streams, so the loop's finish gates
-  // apply. Set beside the store's flag above, which says the same thing to the
-  // approval path.
+  // The other half of the fact stated at `store.setNonInteractive` above:
+  // nobody is reading the answer as it streams, so the loop's finish gates
+  // apply to this run.
   controller.setUnattended(true);
   await controller.initialize(options.session);
 

@@ -15,14 +15,15 @@
  */
 import { describe, test, expect, afterEach } from "bun:test";
 import { agentLoop } from "../../../runtime/loop";
+import { clearDeadline } from "../../../runtime/deadline";
+import { budgetDrivenBy, type DrivenBudget } from "../shared/deadline";
+import { createDoneEvent, createTextEvent } from "../shared/factories";
 import {
-  WALL_RESERVE_SEC,
-  clearDeadline,
-  remainingMs,
-  setDeadline,
-} from "../../../runtime/deadline";
-import { createRuntimeTest } from "../shared/testHelpers";
-import type { Message, ProviderClient, StreamEvent, TurnSummary } from "../../../config/types";
+  createRuntimeTest,
+  createStreamingProvider,
+  turnSummaryOf,
+} from "../shared/testHelpers";
+import type { Message, ProviderClient, StreamEvent } from "../../../config/types";
 
 const ORIGINAL_ITERATIONS = process.env.WOOPCODE_MAX_ITERATIONS;
 const ORIGINAL_WALL = process.env.WOOPCODE_MAX_WALL_SEC;
@@ -37,14 +38,6 @@ afterEach(() => {
   clearDeadline();
 });
 
-function summaryOf(callbacks: {
-  getCallsByName(name: string): Array<{ args: any[] }>;
-}): TurnSummary {
-  const calls = callbacks.getCallsByName("onTurnSummary");
-  expect(calls.length).toBe(1);
-  return calls[0]!.args[0] as TurnSummary;
-}
-
 /** The gate's message, identified by its opening rather than by the whole text. */
 const requirementAsks = (messages: Message[]) =>
   messages.filter(
@@ -52,16 +45,10 @@ const requirementAsks = (messages: Message[]) =>
   );
 
 /** A model that answers in words, calling nothing — the shape the gate exists for. */
-function talkingProvider(replies: string[]): ProviderClient {
-  let n = 0;
-  return {
-    async *stream(): AsyncGenerator<StreamEvent> {
-      yield { type: "text", content: replies[Math.min(n, replies.length - 1)]! };
-      n++;
-      yield { type: "done" } as StreamEvent;
-    },
-  } as unknown as ProviderClient;
-}
+const talkingProvider = (replies: string[]): ProviderClient =>
+  createStreamingProvider(
+    replies.map((reply) => [createTextEvent(reply), createDoneEvent()]),
+  );
 
 async function runUnattended(
   provider: ProviderClient,
@@ -78,7 +65,7 @@ async function runUnattended(
     options.useTools ?? true,
     { unattended: options.unattended ?? true },
   );
-  return { text, messages, summary: summaryOf(callbacks) };
+  return { text, messages, summary: turnSummaryOf(callbacks) };
 }
 
 describe("the requirement gate", () => {
@@ -172,45 +159,30 @@ describe("the requirement gate against the wind-down warning", () => {
    * then holds the clock still so the mean falls as the iteration count climbs
    * and the estimate climbs back through the latch's re-arm point.
    */
-  function pacedProvider(finishAt: number): ProviderClient {
+  function pacedProvider(clock: DrivenBudget, finishAt: number): ProviderClient {
     let n = 0;
     return {
       async *stream(): AsyncGenerator<StreamEvent> {
         n++;
-        if (n <= 3) advance(10_000);
+        if (n <= 3) clock.advance(10_000);
 
-        yield { type: "text", content: `step ${n}` };
+        yield createTextEvent(`step ${n}`);
         if (n >= finishAt) {
-          yield { type: "done" } as StreamEvent;
+          yield createDoneEvent();
           return;
         }
         // Salvaged and resumed, so the turn continues without a tool.
         throw new Error("socket hang up");
       },
-    } as unknown as ProviderClient;
-  }
-
-  let fakeNow = 0;
-  const advance = (ms: number) => {
-    fakeNow += ms;
-  };
-
-  /** Arms a 70s budget on a clock the test drives. */
-  function armClock() {
-    const wallSeconds = WALL_RESERVE_SEC + 70;
-    setDeadline(wallSeconds);
-    const deadlineAt = Date.now() + remainingMs()!;
-    fakeNow = deadlineAt - 70_000;
-    setDeadline(wallSeconds, { now: () => fakeNow });
-    process.env.WOOPCODE_MAX_WALL_SEC = String(wallSeconds);
+    } as ProviderClient;
   }
 
   test("a turn still under the wind-down warning is not asked", async () => {
-    armClock();
+    const clock = budgetDrivenBy(70, 70_000);
 
     // Finishing at step 8: ten steps' worth of clock left, which clears the
     // gate's floor, while the flag set at step four has not yet re-armed.
-    const { messages, summary } = await runUnattended(pacedProvider(8));
+    const { messages, summary } = await runUnattended(pacedProvider(clock, 8));
 
     expect(summary.iterations).toBe(8);
     expect(requirementAsks(messages)).toHaveLength(0);
@@ -218,12 +190,12 @@ describe("the requirement gate against the wind-down warning", () => {
   });
 
   test("once the estimate recovers and the warning clears, it is asked", async () => {
-    armClock();
+    const clock = budgetDrivenBy(70, 70_000);
 
     // The same clock, the same rate, two steps later — by which point the
     // estimate has passed the re-arm point and the flag is down. The only
     // difference between this and the test above is the latch.
-    const { messages, summary } = await runUnattended(pacedProvider(10));
+    const { messages, summary } = await runUnattended(pacedProvider(clock, 10));
 
     // Eleven, not ten: the eleventh iteration is the round trip the gate bought,
     // which is the whole point of it and the difference from the test above.

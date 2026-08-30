@@ -1,4 +1,4 @@
-import type { Message, StreamEvent } from "../../../config/types";
+import type { Message, StreamEvent, TurnSummary } from "../../../config/types";
 import { MockProviderClient, MockToolRegistry, CallbackSpy } from "./mocks";
 import { createUserMessage } from "./factories";
 
@@ -35,6 +35,23 @@ export function createStreamingProvider(iterations: StreamEvent[][]): any {
   const builder = new StreamingProviderBuilder();
   iterations.forEach((events) => builder.iteration(events));
   return builder.build();
+}
+
+/**
+ * The single turn summary a completed loop reported.
+ *
+ * Asserts there was exactly one before returning it: a turn emits its summary
+ * once however it ended, so two means something ran the loop twice and every
+ * assertion after this point would be reading the wrong turn.
+ */
+export function turnSummaryOf(callbacks: {
+  getCallsByName(name: string): Array<{ args: any[] }>;
+}): TurnSummary {
+  const calls = callbacks.getCallsByName("onTurnSummary");
+  if (calls.length !== 1) {
+    throw new Error(`expected one turn summary, got ${calls.length}`);
+  }
+  return calls[0]!.args[0] as TurnSummary;
 }
 
 /**

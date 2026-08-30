@@ -109,6 +109,19 @@ the gate fires. That reads as "afterwards" rather than "at some point" because
 the count never decreases and the gate fires from a response that called no
 tool, so nothing can move it in between.
 
+Every mechanism here was proved by reverting it and watching its test go red,
+because a regression test that has never failed proves nothing. Each revert was
+confirmed applied before the suite ran:
+
+| reverted | what went red |
+| --- | --- |
+| the clock guard on the verification gate | `WallBudgetExhaustedError` in place of the finished answer |
+| the pin | the task absent from every request after the sixth injection |
+| the requirement gate's `unattended` condition | seven tests, while the three negative ones stayed green |
+| the duplicate amnesty | two executions of the repeated check instead of three |
+| the composed status line | the merged notice naming only the verification gate |
+| the trial metadata keys | `KeyError` in the harness tests |
+
 The replay harness cannot speak to any of this. Its recordings hold one
 conversation turn each — the loop's injected messages were never written to the
 event log — so the pin never fires there and the baseline is unchanged by

@@ -1,34 +1,38 @@
+/**
+ * Everything a turn records about its own work, and the gates that read it:
+ * effect classification, the summary, the verification reminder, and the two
+ * finish gates meeting on one response.
+ *
+ * Four concerns in one file, deliberately. `mock.module` lasts the whole run and
+ * the last registration of a module wins for every file, so the tool registry is
+ * mocked in as few places as possible — splitting these out would mean a second
+ * file stubbing `../../../tools`, and whichever registered last would hand its
+ * registry to the other. The cases that need no tool live in
+ * `requirementGate.test.ts` and `taskPin.test.ts` for the same reason.
+ */
 import { describe, test, expect, mock, afterEach } from "bun:test";
 import { agentLoop } from "../../../runtime/loop";
-import {
-  WALL_RESERVE_SEC,
-  clearDeadline,
-  remainingMs,
-  setDeadline,
-} from "../../../runtime/deadline";
+import { clearDeadline } from "../../../runtime/deadline";
+import { budgetDrivenBy } from "../shared/deadline";
 import { toolEffect } from "../../../runtime/toolEffects";
 import { toolRegistry } from "../../../tools";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
-import { createRuntimeTest, createStreamingProvider } from "../shared/testHelpers";
+import {
+  createRuntimeTest,
+  createStreamingProvider,
+  turnSummaryOf as summaryOf,
+} from "../shared/testHelpers";
 import {
   createDoneEvent,
   createTextEvent,
   createToolCallEvent,
 } from "../shared/factories";
-import type { Message, TurnSummary } from "../../../config/types";
+import type { Message } from "../../../config/types";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
 const actualTools = await import("../../../tools");
 mock.module("../../../tools", () => ({ ...actualTools, getTool }));
-
-function summaryOf(callbacks: {
-  getCallsByName(name: string): Array<{ args: any[] }>;
-}): TurnSummary {
-  const calls = callbacks.getCallsByName("onTurnSummary");
-  expect(calls.length).toBe(1);
-  return calls[0]!.args[0] as TurnSummary;
-}
 
 /** Registers a tool that succeeds, replacing any previous one of that name. */
 function registerTool(name: string, output = "ok") {
@@ -445,16 +449,8 @@ describe("agentLoop - asking the turn to verify its edits", () => {
     const { callbacks, messages } = createRuntimeTest();
     registerTool("edit_file", "Edit applied");
 
-    // Armed once on the real clock to learn where the deadline lands, then
-    // re-armed on a fake one positioned 1.5s short of it. `setDeadline`
-    // computes from the process start either way, so both calls place it at
-    // the same instant and only the clock reading it changes.
-    const wallSeconds = WALL_RESERVE_SEC + 3600;
-    setDeadline(wallSeconds);
-    const deadlineAt = Date.now() + remainingMs()!;
-    let fakeNow = deadlineAt - 1_500;
-    setDeadline(wallSeconds, { now: () => fakeNow });
-    process.env.WOOPCODE_MAX_WALL_SEC = String(wallSeconds);
+    // An hour of iterations and a second and a half of clock.
+    const clock = budgetDrivenBy(3600, 1_500);
 
     let n = 0;
     const provider = {
@@ -462,7 +458,7 @@ describe("agentLoop - asking the turn to verify its edits", () => {
         // Each request costs a second of the 1.5 remaining, so the second one
         // ends past the deadline — the shape of a turn whose final answer
         // arrived on the last of its time.
-        fakeNow += 1_000;
+        clock.advance(1_000);
         if (n++ === 0) {
           yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
           yield createDoneEvent();
@@ -491,24 +487,18 @@ describe("both finish gates on one response", () => {
   const VERIFY_OPENING = "have not run anything";
   const REQUIREMENT_OPENING = "go back to the task statement above";
 
+  /** Edit something, then declare victory without running anything. */
+  const editThenClaim = () =>
+    createStreamingProvider([
+      [createToolCallEvent("edit_file", { path: "a.ts" }, "c1"), createDoneEvent()],
+      [createTextEvent("All done."), createDoneEvent()],
+    ]);
+
   test("an unattended turn that edited blindly gets one message, not two", async () => {
     const { callbacks, messages } = createRuntimeTest();
     registerTool("edit_file", "Edit applied");
 
-    let n = 0;
-    const provider = {
-      async *stream() {
-        if (n++ === 0) {
-          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
-          yield createDoneEvent();
-          return;
-        }
-        yield createTextEvent("All done.");
-        yield createDoneEvent();
-      },
-    } as any;
-
-    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+    await agentLoop(editThenClaim(), messages, "", callbacks, undefined, true, {
       unattended: true,
     });
 
@@ -527,26 +517,24 @@ describe("both finish gates on one response", () => {
     const summary = summaryOf(callbacks);
     expect(summary.verificationReminders).toBe(1);
     expect(summary.requirementReminders).toBe(1);
+
+    // The live channel names both. One message reaches the model, but this is
+    // what a headless operator watches on stderr and what lands in the event
+    // log — a turn where both gates fired must not read as one where only the
+    // verification gate did.
+    const statuses = callbacks
+      .getCallsByName("onStatus")
+      .map((call) => String(call.args[0]));
+    const notice = statuses.find((status) => status.includes("asking the agent"));
+    expect(notice).toContain("files changed without a check");
+    expect(notice).toContain("finishing early with budget left");
   });
 
   test("an attended turn that edited blindly still gets only the verify ask", async () => {
     const { callbacks, messages } = createRuntimeTest();
     registerTool("edit_file", "Edit applied");
 
-    let n = 0;
-    const provider = {
-      async *stream() {
-        if (n++ === 0) {
-          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
-          yield createDoneEvent();
-          return;
-        }
-        yield createTextEvent("All done.");
-        yield createDoneEvent();
-      },
-    } as any;
-
-    await agentLoop(provider, messages, "", callbacks);
+    await agentLoop(editThenClaim(), messages, "", callbacks);
 
     expect(asks(messages, VERIFY_OPENING)).toHaveLength(1);
     expect(asks(messages, REQUIREMENT_OPENING)).toHaveLength(0);
@@ -556,25 +544,12 @@ describe("both finish gates on one response", () => {
     const { callbacks, messages } = createRuntimeTest();
     registerTool("run_tests", "3 pass 0 fail");
 
-    let n = 0;
-    const provider = {
-      async *stream() {
-        n++;
-        if (n === 1) {
-          yield createTextEvent("Looks right to me.");
-          yield createDoneEvent();
-          return;
-        }
-        if (n === 2) {
-          // The gate landed and the model went and checked.
-          yield createToolCallEvent("run_tests", { command: "bun test" }, "c1");
-          yield createDoneEvent();
-          return;
-        }
-        yield createTextEvent("Verified against the stated requirements.");
-        yield createDoneEvent();
-      },
-    } as any;
+    const provider = createStreamingProvider([
+      [createTextEvent("Looks right to me."), createDoneEvent()],
+      // The gate landed and the model went and checked.
+      [createToolCallEvent("run_tests", { command: "bun test" }, "c1"), createDoneEvent()],
+      [createTextEvent("Verified against the stated requirements."), createDoneEvent()],
+    ]);
 
     await agentLoop(provider, messages, "", callbacks, undefined, true, {
       unattended: true,
@@ -599,32 +574,16 @@ describe("both finish gates on one response", () => {
     registerTool("run_terminal", "no overfull boxes found");
 
     const check = { command: "pdflatex doc.tex | grep -i overfull" };
-    let n = 0;
-    const provider = {
-      async *stream() {
-        n++;
-        // Twice, which exhausts the threshold, then an answer.
-        if (n <= 2) {
-          yield createToolCallEvent("run_terminal", check, `c${n}`);
-          yield createDoneEvent();
-          return;
-        }
-        if (n === 3) {
-          yield createTextEvent("No overfull boxes. Done.");
-          yield createDoneEvent();
-          return;
-        }
-        // After the gate: the same command again, which without the amnesty is
-        // skipped as a duplicate and executes nothing.
-        if (n === 4) {
-          yield createToolCallEvent("run_terminal", check, "c4");
-          yield createDoneEvent();
-          return;
-        }
-        yield createTextEvent("Re-checked, with output.");
-        yield createDoneEvent();
-      },
-    } as any;
+    const provider = createStreamingProvider([
+      // Twice, which exhausts the threshold, then an answer.
+      [createToolCallEvent("run_terminal", check, "c1"), createDoneEvent()],
+      [createToolCallEvent("run_terminal", check, "c2"), createDoneEvent()],
+      [createTextEvent("No overfull boxes. Done."), createDoneEvent()],
+      // After the gate: the same command again, which without the amnesty is
+      // skipped as a duplicate and executes nothing.
+      [createToolCallEvent("run_terminal", check, "c4"), createDoneEvent()],
+      [createTextEvent("Re-checked, with output."), createDoneEvent()],
+    ]);
 
     await agentLoop(provider, messages, "", callbacks, undefined, true, {
       unattended: true,

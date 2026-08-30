@@ -25,7 +25,24 @@ agents:
       # the published package, and set `version` to pin it.
       source_dir: .
       # version: 0.6.1
-      max_iterations: 200
+      #
+      # With the wall clock bounding spend, this reverts to the role loop.ts
+      # claims for it -- a guard against a pathological loop with nobody
+      # watching. 1000 clears the ~885 that make-mips-interpreter's 1800s
+      # affords at its measured 2.03s per iteration, so it stops binding first.
+      max_iterations: 1000
+      # Harbor's per-task agent timeout, forwarded verbatim as
+      # WOOPCODE_MAX_WALL_SEC; the loop subtracts its own reserve. Harbor does
+      # not hand this to the agent -- AgentContext has no such field and Trial
+      # holds timeout_sec -- so the operator supplies it, as Harbor's own Cline
+      # agent does under this same name.
+      #
+      # One kwarg covers every task in the job, and these five span 750s
+      # (overfull-hbox) to 12000s (build-pov-ray). The minimum is the only
+      # value under which no task can be hard-killed mid-work; it does cap the
+      # longer four well below what they are allowed. To give one task its own
+      # budget, run it with -i and --ak agent_timeout_sec=<its task.toml value>.
+      agent_timeout_sec: 750
 
 datasets:
   - name: terminal-bench/terminal-bench-2

@@ -173,6 +173,59 @@ def test_env_raises_the_iteration_budget(tmp_path: Path) -> None:
     assert env["WOOPCODE_MAX_ITERATIONS"] == "99"
 
 
+def test_env_forwards_the_wall_budget_verbatim(tmp_path: Path) -> None:
+    """The loop subtracts its own reserve, so nothing is subtracted here.
+
+    Arithmetic in this file would split the safety margin across two
+    repositories and stop a published number tracing back to the task's
+    ``task.toml``.
+    """
+    env = make_agent(tmp_path, agent_timeout_sec=1800)._build_env()
+    assert env["WOOPCODE_MAX_WALL_SEC"] == "1800"
+
+
+def test_env_omits_the_wall_budget_when_no_timeout_is_given(
+    tmp_path: Path,
+) -> None:
+    """Harbor never hands the agent its timeout; an operator has to.
+
+    Absent rather than zero or empty: the loop treats an unset variable as
+    unbudgeted, and either of the other two would be an ignored value with a
+    warning, or a deadline already spent before the first iteration.
+    """
+    assert "WOOPCODE_MAX_WALL_SEC" not in make_agent(tmp_path)._build_env()
+
+
+@pytest.mark.parametrize("given", [1800, 1800.0, "1800"])
+def test_env_accepts_every_type_ak_can_produce(
+    tmp_path: Path, given: object
+) -> None:
+    """``--ak`` runs its value through ``json.loads``.
+
+    So ``agent_timeout_sec=1800`` arrives as an int, ``1800.0`` as a float, and
+    a quoted value as a str, while ``job.yaml`` supplies an int. All four have
+    to reach the CLI as the same whole number of seconds -- ``str(1800.0)`` is
+    ``"1800.0"``, which is not what a variable documented as seconds should
+    carry.
+    """
+    env = make_agent(tmp_path, agent_timeout_sec=given)._build_env()
+    assert env["WOOPCODE_MAX_WALL_SEC"] == "1800"
+
+
+@pytest.mark.parametrize("given", ["soon", 0, -1, ""])
+def test_an_unusable_timeout_fails_the_run_at_construction(
+    tmp_path: Path, given: object
+) -> None:
+    """Fail here, before any container or API call, not inside the trial.
+
+    Forwarded as-is, the loop would warn on stderr and run unbudgeted -- and
+    the operator would read a trial that silently ignored the budget they
+    asked for as evidence about the budget.
+    """
+    with pytest.raises(ValueError, match="agent_timeout_sec"):
+        make_agent(tmp_path, agent_timeout_sec=given)
+
+
 def test_env_forwards_only_the_provider_key(tmp_path: Path) -> None:
     agent = make_agent(
         tmp_path,

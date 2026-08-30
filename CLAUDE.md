@@ -109,7 +109,17 @@ PYTHONPATH=. harbor run -d terminal-bench/terminal-bench-2 \
 
 Four things that are easy to get wrong:
 
-- **Wall clock is the binding budget, not iterations.** `job.yaml` sets `max_iterations: 200`, but Harbor enforces a per-task agent timeout from the task package and raises `AgentTimeoutError` — 750s for `overfull-hbox`. The baseline run used 191s of that for 59 iterations, so 200 iterations is only reachable if each averages under ~3.7s. Nothing in the loop knows about this budget; the iteration counter is the only one it can see.
+- **Both budgets bind, and at `max_iterations: 200` iterations bound first on every task measured.** Harbor enforces a per-task agent timeout from the task package's `task.toml` and raises `AgentTimeoutError`; the loop enforces `WOOPCODE_MAX_WALL_SEC` and stops on whichever binds first. Timeouts vary by 16× across five tasks, so a rule read off any one of them does not generalise — against `jobs/tb2-post-1.1`:
+
+  | task | timeout | wall used | unused | iterations | what stopped it |
+  | --- | --- | --- | --- | --- | --- |
+  | build-pov-ray | 12000s | 287s | 98% | 79 | model chose to |
+  | circuit-fibsqrt | 3600s | 400s | 89% | 165 | model chose to |
+  | make-mips-interpreter | 1800s | 406s | **77%** | **200** | **our ceiling** |
+  | overfull-hbox | 750s | 192s | 74% | 59 | model chose to |
+  | video-processing | 3600s | 261s | 93% | 83 | model chose to |
+
+  `make-mips-interpreter` was killed by its own 200th iteration at 406s of 1800, mid-work, with `exception_info: null` proving Harbor's timeout never fired — so `job.yaml` sets `max_iterations: 1000` and the ceiling reverts to guarding a pathological loop. Harbor does **not** hand the agent its timeout: `AgentContext` has no such field and `Trial` holds `timeout_sec`, so an operator supplies it as `agent_timeout_sec`, which `agent.py` forwards verbatim. `docs/adr/0001-wall-clock-budget-for-the-agent-loop.md` has the measurements and the rejected alternatives.
 - **`agent_timeout_sec: null` in a job's `lock.json` does not mean there is no timeout.** It means that run never hit one. The value only appears in `result.json`'s `exception_info` after it fires.
 - **Judge a change on the recorded `durationMs`, not on wall clock.** The loop stamps it around the provider request only, so it is the comparable number; total trial time includes container setup, tool execution and the verifier. Confusing the two once turned a 1.5s baseline into a reported 11s.
 - **Provider latency varies enormously and will masquerade as a regression.** The same request shape has measured 1,519ms median across 59 iterations on one day and ~63s on another, and within a single 15-request probe the same configuration ranged from 1,742ms to 90,002ms depending on position in the sequence. Before blaming a code change, check whether latency tracks position rather than the change, and whether the effect is anti-correlated with what you think causes it.
@@ -118,7 +128,7 @@ Reading a trajectory, `run_end`'s `ok: true` means the loop finished, not that t
 
 ## Environment variables
 
-`WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`, `WOOPCODE_DEMO_URL`. Bun loads `.env` automatically — no `dotenv`.
+`WOOPCODE_API_KEY`, `WOOPCODE_PROVIDER`, `WOOPCODE_MAX_ITERATIONS`, `WOOPCODE_MAX_WALL_SEC`, `WOOPCODE_MAX_ATTEMPTS` (retry), `WOOPCODE_TOOL_HISTORY_BUDGET`, `WOOPCODE_THINKING_BUDGET`, `WOOPCODE_NON_INTERACTIVE`, `WOOPCODE_DEMO_URL`. Bun loads `.env` automatically — no `dotenv`.
 
 Sandboxing: `E2B_API_KEY`, `WOOPCODE_SANDBOX_TEMPLATE`, `WOOPCODE_SANDBOX_TIMEOUT_MS`, `WOOPCODE_SANDBOX_MAX_FILE_BYTES`, `WOOPCODE_SANDBOX_NETWORK`, `WOOPCODE_SANDBOX_ENV`, `WOOPCODE_SANDBOX_SETUP`.
 

@@ -189,6 +189,38 @@ const SAME_TOOL_THRESHOLD = 2;
 const MAX_VERIFICATION_REMINDERS = 1;
 
 /**
+ * Steps the verification reminder needs before it is worth asking.
+ *
+ * Two, really — run the check, report what it printed — plus one for the answer
+ * the model was about to give. What the floor actually guards against is a
+ * reminder injected against a clock with nothing left: the turn continues, the
+ * deadline check at the top of the next iteration fires, and a turn that had a
+ * finished answer in hand ends as `WallBudgetExhaustedError` and exit status 2
+ * instead. The old guard was `iterations < budget`, which cannot see a clock at
+ * all, so the case was reachable on every wall-budgeted run.
+ */
+const VERIFICATION_GATE_MIN_STEPS = 3;
+
+/**
+ * Can the turn afford another round trip, and the work it is about to ask for?
+ *
+ * `stepsRemaining` answers for both budgets at once — it is the iteration
+ * ceiling floored by the clock, converted at the rate this turn has been
+ * running at — and the deadline is consulted directly as well, because that
+ * conversion is deliberately not trusted until `MIN_RATE_SAMPLES` steps have
+ * gone into it. Without the direct check, a turn that edited and finished
+ * within two iterations of a nearly-spent budget would still be sent round.
+ */
+function canAffordAnotherRound(
+  state: TurnState,
+  budget: number,
+  minSteps: number,
+): boolean {
+  if (deadlineReached()) return false;
+  return state.stepsRemaining(budget) >= minSteps;
+}
+
+/**
  * Raised when the loop runs out of budget, of either kind.
  *
  * Distinct from a generic failure because it is not one: the agent ran, it
@@ -642,7 +674,7 @@ function finishTurn(
   if (
     state.hasUnverifiedEdits() &&
     state.verificationReminders < MAX_VERIFICATION_REMINDERS &&
-    state.iterations < maxIterations
+    canAffordAnotherRound(state, maxIterations, VERIFICATION_GATE_MIN_STEPS)
   ) {
     state.verificationReminders++;
     messages.push({

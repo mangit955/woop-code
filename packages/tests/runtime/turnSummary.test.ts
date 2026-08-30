@@ -1,5 +1,11 @@
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect, mock, afterEach } from "bun:test";
 import { agentLoop } from "../../../runtime/loop";
+import {
+  WALL_RESERVE_SEC,
+  clearDeadline,
+  remainingMs,
+  setDeadline,
+} from "../../../runtime/deadline";
 import { toolEffect } from "../../../runtime/toolEffects";
 import { toolRegistry } from "../../../tools";
 import { MockTool, MockToolRegistry } from "../shared/mocks";
@@ -28,6 +34,18 @@ function summaryOf(callbacks: {
 function registerTool(name: string, output = "ok") {
   mockToolRegistry.register(new MockTool(name, output));
 }
+
+const ORIGINAL_WALL = process.env.WOOPCODE_MAX_WALL_SEC;
+
+afterEach(() => {
+  if (ORIGINAL_WALL === undefined) delete process.env.WOOPCODE_MAX_WALL_SEC;
+  else process.env.WOOPCODE_MAX_WALL_SEC = ORIGINAL_WALL;
+
+  // Module state outlives a test. The clock goes back with the deadline: a fake
+  // one left installed would freeze elapsed time for every file that runs after
+  // this one.
+  clearDeadline();
+});
 
 describe("tool effect classification", () => {
   test("classifies every registered tool", () => {
@@ -410,6 +428,57 @@ describe("agentLoop - asking the turn to verify its edits", () => {
     const result = await agentLoop(provider, messages, "", callbacks);
 
     expect(result).toBe("No tests exist for this file.");
+    expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
+  });
+
+  /**
+   * The reminder costs a round trip, and a round trip has to be affordable.
+   *
+   * Iterations are not the binding budget here — 38 of 40 are left — but the
+   * request that produced the answer spent the last of the clock. Injecting
+   * anyway sends the loop round to a deadline check that throws, and a turn
+   * holding a finished answer exits as `WallBudgetExhaustedError` with status
+   * 2. The guard this covers reads both budgets; the one it replaced read only
+   * the iteration count, so the case was reachable on every wall-budgeted run.
+   */
+  test("the reminder is withheld when the clock has nothing left", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    // Armed once on the real clock to learn where the deadline lands, then
+    // re-armed on a fake one positioned 1.5s short of it. `setDeadline`
+    // computes from the process start either way, so both calls place it at
+    // the same instant and only the clock reading it changes.
+    const wallSeconds = WALL_RESERVE_SEC + 3600;
+    setDeadline(wallSeconds);
+    const deadlineAt = Date.now() + remainingMs()!;
+    let fakeNow = deadlineAt - 1_500;
+    setDeadline(wallSeconds, { now: () => fakeNow });
+    process.env.WOOPCODE_MAX_WALL_SEC = String(wallSeconds);
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        // Each request costs a second of the 1.5 remaining, so the second one
+        // ends past the deadline — the shape of a turn whose final answer
+        // arrived on the last of its time.
+        fakeNow += 1_000;
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Fixed.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    const result = await agentLoop(provider, messages, "", callbacks);
+
+    expect(result).toBe("Fixed.");
+    expect(summaryOf(callbacks).verificationReminders).toBe(0);
+    // Still recorded as unverified: the turn is not being told this was fine,
+    // only that there was no time left to ask about it.
     expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
   });
 });

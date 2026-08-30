@@ -98,8 +98,8 @@ export class TurnState {
    * measured on this turn, and a rate moves: a slow patch early can trip the
    * warning, and a latch would leave the model winding down for the rest of a
    * turn it is nowhere near the end of — the failure the wall budget exists to
-   * prevent, reached from the other side. `MIN_RATE_SAMPLES` in `loop.ts` keeps
-   * most bad estimates out; this clears the ones that get through.
+   * prevent, reached from the other side. `MIN_RATE_SAMPLES` above keeps most
+   * bad estimates out; this clears the ones that get through.
    *
    * Re-arming at twice the threshold rather than at the threshold, so a count
    * hovering on the boundary cannot warn, clear and warn again.

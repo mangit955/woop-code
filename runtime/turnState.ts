@@ -146,6 +146,29 @@ export class TurnState {
    */
   verificationReminders = 0;
 
+  /**
+   * Turns asked to re-check the task's requirements before finishing.
+   *
+   * The reminder above fires on evidence the loop can see — files changed,
+   * nothing run. This one fires on what it cannot: a turn that verified
+   * something, thoroughly, that the task never asked for. Two of three failed
+   * trials in a benchmark run ended that way with most of both budgets unspent,
+   * one of them having run its chosen check three times.
+   */
+  requirementReminders = 0;
+
+  /**
+   * Tool calls executed when the requirement gate fired, or undefined if it
+   * never did.
+   *
+   * The comparison is sound in one direction only, which is the direction that
+   * matters: `toolCallsExecuted` never decreases, and the gate fires from
+   * `finishTurn`, which is reached only on a response that called no tool — so
+   * nothing can move this count between the snapshot and the injection, and any
+   * later increase happened after it.
+   */
+  private toolCallsAtRequirementGate: number | undefined;
+
   /** How many times each tool ran, by name. */
   readonly toolCounts: Record<string, number> = {};
 
@@ -232,6 +255,37 @@ export class TurnState {
   }
 
   /**
+   * Records the requirement gate firing, and clears the way for it to be obeyed.
+   *
+   * The duplicate threshold is reset because the gate's demand collides with it
+   * head-on: the turn is being told to produce command output for requirements
+   * it cannot prove, and the check it most needs to re-run is usually the one it
+   * has already run twice — where `executeToolCall` answers "the result for
+   * these exact arguments is already in the conversation", pointing at output
+   * that six turns of window have long since dropped. An amnesty rather than an
+   * exemption, because the gate fires once and needs `REQUIREMENT_GATE_MIN_STEPS`
+   * of budget behind it, so the loop cannot spend a long tail repeating itself.
+   */
+  noteRequirementGate(): void {
+    this.requirementReminders++;
+    this.toolCallsAtRequirementGate = this.toolCallsExecuted;
+    this.executedTools.clear();
+  }
+
+  /**
+   * Did anything actually run after the requirement gate fired?
+   *
+   * Undefined when it never fired. Note that a call skipped as a duplicate is
+   * not counted in `toolCallsExecuted` — after the amnesty above that takes
+   * three identical attempts, which is a model ignoring the gate rather than
+   * obeying it.
+   */
+  requirementGateActedOn(): boolean | undefined {
+    if (this.toolCallsAtRequirementGate === undefined) return undefined;
+    return this.toolCallsExecuted > this.toolCallsAtRequirementGate;
+  }
+
+  /**
    * Did this turn change files and then run nothing to check them?
    *
    * Read in two places — once to decide whether to ask the model to verify,
@@ -252,6 +306,12 @@ export class TurnState {
       retries: this.retries,
       salvagedIterations: this.salvagedIterations,
       verificationReminders: this.verificationReminders,
+      requirementReminders: this.requirementReminders,
+      // Omitted rather than reported as false when the gate never fired, so
+      // "asked and ignored" cannot be read off a run as "never asked".
+      ...(this.requirementGateActedOn() === undefined
+        ? {}
+        : { requirementGateActedOn: this.requirementGateActedOn() }),
       toolCalls: this.toolCallsExecuted,
       lastWriteStep: this.lastWriteStep,
       lastShellStep: this.lastShellStep,

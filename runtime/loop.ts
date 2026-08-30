@@ -201,6 +201,61 @@ const MAX_VERIFICATION_REMINDERS = 1;
  */
 const VERIFICATION_GATE_MIN_STEPS = 3;
 
+/** Asked once, for the same reason the verification reminder is. */
+const MAX_REQUIREMENT_REMINDERS = 1;
+
+/**
+ * Steps the requirement gate needs before it is worth asking.
+ *
+ * Twice `REMAINING_ITERATIONS_WARNING`, deliberately. This gate asks the model
+ * to enumerate a task's requirements and run a command for each one it cannot
+ * prove, which is work — and at the warning threshold the loop is telling it
+ * the opposite, to finish what it started and begin nothing new. Two
+ * instructions in one request, contradicting each other. The distance keeps
+ * them apart, and `windDownWarned` covers the case the distance cannot: a rate
+ * that dipped, warned, and recovered leaves the model told to wrap up while the
+ * count reads healthy again.
+ */
+const REQUIREMENT_GATE_MIN_STEPS = 10;
+
+/**
+ * What the turn is told when it has changed files and checked nothing.
+ *
+ * Kept as constants because the two gates can fire on the same response, in
+ * which case the model gets one message rather than a round trip each — window
+ * slots are the scarce thing here, since every message the loop pushes counts
+ * as one of the six turns `recentMessages` keeps.
+ */
+const VERIFICATION_REMINDER =
+  "You changed files and have not run anything since. Run the project's " +
+  "tests, build or type check to confirm the change works, then report the " +
+  "result. If it genuinely cannot be verified — no test exists, or the " +
+  "tooling is unavailable — say so plainly and finish. Do not claim it was " +
+  "verified unless a command actually ran.";
+
+/**
+ * What the turn is told when it is about to finish with budget to spare.
+ *
+ * Aimed at a specific, observed failure rather than at carelessness in general:
+ * a trial verified its work three times over and still scored zero, because the
+ * task constrained *which* wording was allowed and every check it ran tested
+ * only that something was present. So the message names that class outright —
+ * constraints on what is not allowed, and on the form of the answer — and
+ * refuses recollection as evidence, since the turn being interrupted is one
+ * whose recollection is already wrong.
+ *
+ * "Above" is load-bearing and true: the task statement is pinned into the
+ * window for the life of the turn.
+ */
+const REQUIREMENT_REMINDER =
+  "Before finishing: go back to the task statement above and list every " +
+  "requirement it states, including constraints on what is not allowed or what " +
+  "form the answer must take. For each one, quote the exact command and output " +
+  "that proves it holds. Do not answer from memory or from what you believe you " +
+  "did — if you cannot point at output from a command in this session, run the " +
+  "command now. If a requirement genuinely cannot be checked by a command, say " +
+  "which and why, then finish.";
+
 /**
  * Can the turn afford another round trip, and the work it is about to ask for?
  *
@@ -328,6 +383,18 @@ export interface AgentLoopOptions {
    * agent is working therefore takes effect on the next turn.
    */
   planMode?: boolean;
+  /**
+   * Nobody is reading the answer as it arrives.
+   *
+   * Set by the headless path, which is the one where a wrong answer stands: an
+   * interactive user reads the claim and says what was missed, and the loop can
+   * be corrected in the next turn for the cost of one sentence. Named for the
+   * property the loop cares about rather than for the interface, because
+   * `loop.ts` deliberately knows nothing about interfaces — and inferring it
+   * from a missing optional callback would hand the behaviour to every embedder
+   * that happened not to pass one.
+   */
+  unattended?: boolean;
 }
 
 type ToolCallEvent = Extract<StreamEvent, { type: "tool_call" }>;
@@ -633,13 +700,28 @@ async function executeToolCall(
 /** Whether the turn is over, or the loop should ask the model once more. */
 type TurnEnding = { kind: "continue" } | { kind: "done"; text: string };
 
+/** What the turn may be asked before it is allowed to end. */
+interface FinishGates {
+  /** Nobody is reading the answer; see AgentLoopOptions.unattended. */
+  unattended: boolean;
+  /** The turn has tools at all. A conversational turn is given none. */
+  useTools: boolean;
+}
+
 /**
  * Decides what happens when the model responds without calling any tool.
  *
- * Usually that means it is finished. Twice it does not: a stream that died
- * mid-sentence has to be resumed, and a turn that changed files without
- * checking them is asked once to verify. Both push a user message and go round
- * again, which is why this returns an instruction rather than a value.
+ * Usually that means it is finished. Three times it does not: a stream that
+ * died mid-sentence has to be resumed, a turn that changed files without
+ * checking them is asked once to verify, and an unattended turn with budget to
+ * spare is asked once to prove it satisfied what was actually asked for. Each
+ * pushes a user message and goes round again, which is why this returns an
+ * instruction rather than a value.
+ *
+ * The two gates are evaluated together and answered with one message, because
+ * they are cheap in round trips and expensive in window: a second injection
+ * costs one of the six turns the window keeps, and the reason the second gate
+ * exists at all is a turn that had lost sight of its own question.
  */
 function finishTurn(
   messages: Message[],
@@ -647,6 +729,7 @@ function finishTurn(
   state: TurnState,
   assistantText: string,
   maxIterations: number,
+  gates: FinishGates,
   truncated?: Error,
 ): TurnEnding {
   messages.push({ role: "assistant", content: assistantText });
@@ -671,23 +754,40 @@ function finishTurn(
 
   // The turn is about to end having changed files with nothing run afterwards
   // to check them. Ask once, then let it finish either way.
-  if (
+  const askToVerify =
     state.hasUnverifiedEdits() &&
     state.verificationReminders < MAX_VERIFICATION_REMINDERS &&
-    canAffordAnotherRound(state, maxIterations, VERIFICATION_GATE_MIN_STEPS)
-  ) {
-    state.verificationReminders++;
-    messages.push({
-      role: "user",
-      content:
-        "You changed files and have not run anything since. Run the project's " +
-        "tests, build or type check to confirm the change works, then report the " +
-        "result. If it genuinely cannot be verified — no test exists, or the " +
-        "tooling is unavailable — say so plainly and finish. Do not claim it was " +
-        "verified unless a command actually ran.",
-    });
+    canAffordAnotherRound(state, maxIterations, VERIFICATION_GATE_MIN_STEPS);
+
+  // The turn is about to end early, confidently, with most of its budget
+  // unspent and nobody to catch a wrong answer. `useTools` is required because
+  // a conversational turn is offered no tools at all, and telling it to go run
+  // a command would be an instruction it cannot carry out.
+  const askForRequirements =
+    gates.unattended &&
+    gates.useTools &&
+    state.requirementReminders < MAX_REQUIREMENT_REMINDERS &&
+    !state.windDownWarned &&
+    canAffordAnotherRound(state, maxIterations, REQUIREMENT_GATE_MIN_STEPS);
+
+  if (askToVerify || askForRequirements) {
+    const asks: string[] = [];
+
+    if (askToVerify) {
+      state.verificationReminders++;
+      asks.push(VERIFICATION_REMINDER);
+    }
+
+    if (askForRequirements) {
+      state.noteRequirementGate();
+      asks.push(REQUIREMENT_REMINDER);
+    }
+
+    messages.push({ role: "user", content: asks.join("\n\n") });
     callbacks.onStatus?.(
-      "⚠️  files changed without a check - asking the agent to verify",
+      askToVerify
+        ? "⚠️  files changed without a check - asking the agent to verify"
+        : "⚠️  finishing early with budget left - asking the agent to check the task's requirements",
     );
     return { kind: "continue" };
   }
@@ -711,6 +811,9 @@ export async function agentLoop(
   const BUDGET_STEP = maxIterations();
   let budget = BUDGET_STEP;
   const planMode = options.planMode === true;
+  // Read once per turn, like every other switch here: the finish gates consult
+  // it at the end of a turn that may have started under a different caller.
+  const unattended = options.unattended === true;
   // Withholding the writing tools is the first of plan mode's two gates. The
   // second is the refusal below, which is what covers a write reaching the disk
   // through run_terminal — a tool this list has to keep.
@@ -849,6 +952,7 @@ export async function agentLoop(
           state,
           assistantText,
           budget,
+          { unattended, useTools },
           truncated,
         );
 

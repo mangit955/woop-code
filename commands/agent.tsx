@@ -302,6 +302,10 @@ async function runHeadless(
   };
 
   const controller = new AgentController(provider, apiKey, selectedModel, callbacks, baseUrl);
+  // Nobody is reading the answer as it streams, so the loop's finish gates
+  // apply. Set beside the store's flag above, which says the same thing to the
+  // approval path.
+  controller.setUnattended(true);
   await controller.initialize(options.session);
 
   // On stderr, not stdout: stdout is the agent's answer and a caller pipes it.

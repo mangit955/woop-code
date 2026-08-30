@@ -103,6 +103,8 @@ export class AgentController {
    * first edit of the next session.
    */
   private sessionMode: SessionMode = "build";
+  /** See setUnattended. False for the TUI, true for `-p`. */
+  private unattended = false;
   /**
    * The session this turn belongs to. Null until `initialize`, and null for the
    * lifetime of a run started with persistence off.
@@ -174,6 +176,19 @@ export class AgentController {
   private describeTurnError(error: Error): Error {
     const demo = demoExhaustionMessage(error, { baseUrl: this.baseUrl });
     return demo ? new Error(demo) : error;
+  }
+
+  /**
+   * Declares that nobody is watching this session's turns.
+   *
+   * Set by the headless path only, beside the store's own non-interactive flag.
+   * A property rather than an argument to `run`, because it is true of the
+   * session rather than of one prompt — and deliberately not inferred inside
+   * the loop from a missing callback, which would extend the behaviour to every
+   * embedder that happens not to pass one.
+   */
+  setUnattended(unattended: boolean) {
+    this.unattended = unattended;
   }
 
   getSessionMode() {
@@ -291,7 +306,7 @@ export class AgentController {
         !conversational,
         // Snapshotted as the turn starts, so a Tab pressed while it runs applies
         // to the next turn rather than changing the rules underneath this one.
-        { planMode: this.isPlanMode() },
+        { planMode: this.isPlanMode(), unattended: this.unattended },
       );
 
       const assistantText = response || this.pendingAssistantText;

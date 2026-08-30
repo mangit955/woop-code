@@ -170,6 +170,8 @@ describe("event log", () => {
         retries: 0,
         salvagedIterations: 0,
         verificationReminders: 0,
+        requirementReminders: 1,
+        requirementGateActedOn: true,
         toolCalls: 1,
         lastWriteStep: 1,
         lastShellStep: undefined,
@@ -181,9 +183,15 @@ describe("event log", () => {
     const [record] = readEvents(path);
     const summary = record!.summary as Record<string, unknown>;
     expect(summary.unverifiedEdits).toBe(true);
+    // The pair a benchmark run is read through: whether the gate fired, and
+    // whether anything ran once it had.
+    expect(summary.requirementReminders).toBe(1);
+    expect(summary.requirementGateActedOn).toBe(true);
     expect(Object.keys(summary).sort()).toEqual([
       "iterations",
       "lastWriteStep",
+      "requirementGateActedOn",
+      "requirementReminders",
       "retries",
       "salvagedIterations",
       "toolCalls",

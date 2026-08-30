@@ -15,7 +15,7 @@ import {
   createTextEvent,
   createToolCallEvent,
 } from "../shared/factories";
-import type { TurnSummary } from "../../../config/types";
+import type { Message, TurnSummary } from "../../../config/types";
 
 const mockToolRegistry = new MockToolRegistry();
 const getTool = mock((name: string) => mockToolRegistry.get(name));
@@ -480,5 +480,165 @@ describe("agentLoop - asking the turn to verify its edits", () => {
     // Still recorded as unverified: the turn is not being told this was fine,
     // only that there was no time left to ask about it.
     expect(summaryOf(callbacks).unverifiedEdits).toBe(true);
+  });
+});
+
+describe("both finish gates on one response", () => {
+  /** The two gates' messages, by their openings. */
+  const asks = (messages: Message[], opening: string) =>
+    messages.filter((m) => m.role === "user" && m.content.includes(opening));
+
+  const VERIFY_OPENING = "have not run anything";
+  const REQUIREMENT_OPENING = "go back to the task statement above";
+
+  test("an unattended turn that edited blindly gets one message, not two", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("All done.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    // One user message carrying both asks. A second injection would cost
+    // another of the six turns the window keeps, which is the scarce resource
+    // on the long turns this gate fires in.
+    const injected = messages.filter(
+      (m): m is Extract<Message, { role: "user" }> =>
+        m.role === "user" &&
+        (m.content.includes(VERIFY_OPENING) || m.content.includes(REQUIREMENT_OPENING)),
+    );
+    expect(injected).toHaveLength(1);
+    expect(injected[0]!.content).toContain(VERIFY_OPENING);
+    expect(injected[0]!.content).toContain(REQUIREMENT_OPENING);
+
+    const summary = summaryOf(callbacks);
+    expect(summary.verificationReminders).toBe(1);
+    expect(summary.requirementReminders).toBe(1);
+  });
+
+  test("an attended turn that edited blindly still gets only the verify ask", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("edit_file", "Edit applied");
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        if (n++ === 0) {
+          yield createToolCallEvent("edit_file", { path: "a.ts" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("All done.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "", callbacks);
+
+    expect(asks(messages, VERIFY_OPENING)).toHaveLength(1);
+    expect(asks(messages, REQUIREMENT_OPENING)).toHaveLength(0);
+  });
+
+  test("a tool run after the gate is recorded as acting on it", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_tests", "3 pass 0 fail");
+
+    let n = 0;
+    const provider = {
+      async *stream() {
+        n++;
+        if (n === 1) {
+          yield createTextEvent("Looks right to me.");
+          yield createDoneEvent();
+          return;
+        }
+        if (n === 2) {
+          // The gate landed and the model went and checked.
+          yield createToolCallEvent("run_tests", { command: "bun test" }, "c1");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Verified against the stated requirements.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    const summary = summaryOf(callbacks);
+    expect(summary.requirementReminders).toBe(1);
+    expect(summary.requirementGateActedOn).toBe(true);
+  });
+
+  /**
+   * The gate demands output the duplicate threshold would refuse.
+   *
+   * `overfull-hbox` ran its chosen check three times and still scored zero. Told
+   * to prove a requirement it cannot prove, the model's next move is very often
+   * that same command — which `executeToolCall` answers with "the result for
+   * these exact arguments is already in the conversation", pointing at output
+   * the window dropped long ago. So the gate clears the ledger as it fires.
+   */
+  test("a repeat of an already-exhausted command runs again after the gate", async () => {
+    const { callbacks, messages } = createRuntimeTest();
+    registerTool("run_terminal", "no overfull boxes found");
+
+    const check = { command: "pdflatex doc.tex | grep -i overfull" };
+    let n = 0;
+    const provider = {
+      async *stream() {
+        n++;
+        // Twice, which exhausts the threshold, then an answer.
+        if (n <= 2) {
+          yield createToolCallEvent("run_terminal", check, `c${n}`);
+          yield createDoneEvent();
+          return;
+        }
+        if (n === 3) {
+          yield createTextEvent("No overfull boxes. Done.");
+          yield createDoneEvent();
+          return;
+        }
+        // After the gate: the same command again, which without the amnesty is
+        // skipped as a duplicate and executes nothing.
+        if (n === 4) {
+          yield createToolCallEvent("run_terminal", check, "c4");
+          yield createDoneEvent();
+          return;
+        }
+        yield createTextEvent("Re-checked, with output.");
+        yield createDoneEvent();
+      },
+    } as any;
+
+    await agentLoop(provider, messages, "", callbacks, undefined, true, {
+      unattended: true,
+    });
+
+    const summary = summaryOf(callbacks);
+    expect(summary.requirementReminders).toBe(1);
+    // Three executions, not two: the post-gate repeat actually ran.
+    expect(summary.toolCounts.run_terminal).toBe(3);
+    expect(summary.requirementGateActedOn).toBe(true);
+    expect(
+      messages.some(
+        (m) => m.role === "tool" && m.content.includes("Skipped duplicate"),
+      ),
+    ).toBe(false);
   });
 });

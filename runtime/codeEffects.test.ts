@@ -98,8 +98,34 @@ describe("classifyCode — what interpreter source does", () => {
       expect(classifyCode(code).writes).toBe(true);
     });
 
+    test("a bare system() does", () => {
+      // Bare so that Perl's and Ruby's form is caught on the `run_terminal`
+      // path, which shares this pattern.
+      expect(codeShellsOut("system('make')")).toBe(true);
+      expect(codeShellsOut("my $rc = system('make');")).toBe(true);
+    });
+
     test("ordinary source does not", () => {
       expect(codeShellsOut("total = sum(values)")).toBe(false);
+    });
+
+    test("a qualified system() does not", () => {
+      // `platform.system()` names the operating system and reads nothing, and
+      // it is common enough in inspection code that grading it as a subshell
+      // would refuse ordinary plan-mode reads.
+      expect(codeShellsOut("print(platform.system())")).toBe(false);
+      expect(codeShellsOut("root = filesystem(path)")).toBe(false);
+      expect(codeShellsOut("$obj->system(1)")).toBe(false);
+    });
+
+    test("qx with a bracket delimiter does, with a slash does not", () => {
+      // `qx`, `qy`, `qz` and `qw` are a quaternion's components, so a slash
+      // after `qx` is division far more often than it is Perl's backtick
+      // synonym — and refusing arithmetic is the worse of the two failures.
+      expect(codeShellsOut("my $out = qx(make -j4);")).toBe(true);
+      expect(codeShellsOut("my $out = qx{make -j4};")).toBe(true);
+      expect(codeShellsOut("norm = qx / qw")).toBe(false);
+      expect(codeShellsOut("x, y = qx/n, qy/n")).toBe(false);
     });
   });
 

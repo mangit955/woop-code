@@ -158,9 +158,15 @@ const INLINE_SCRIPT = /\b(python3?|node|bun|deno|ruby|perl)\b[^|;]*\s-(c|e)\b/;
  * Checked against the raw command, before quoted runs are stripped — the whole
  * script lives inside those quotes. Restricted to calls that name a file, so
  * `process.stdout.write` is not mistaken for one.
+ *
+ * The mode string is the signal, and not every language spells it with a letter:
+ * Perl writes `open(OUT, ">input.tex")` and appends with `">>"`, so `>` sits
+ * alongside `w` and `a`. It is only read immediately after the opening quote of
+ * an argument to `open`, which is why `open(F, "<synonyms.txt")` and a bare
+ * `width > 100` are both untouched.
  */
 const INLINE_WRITE =
-  /(\bopen\s*\([^)]*['"][wa]|writeFileSync|\bwriteFile\s*\(|\bfs\.write|Bun\.write|write_text|shutil\.(copy|move)|os\.(remove|rename|makedirs|mkdir))/;
+  /(\bopen\s*\([^)]*['"][wa>]|writeFileSync|\bwriteFile\s*\(|\bfs\.write|Bun\.write|write_text|\bFile\.write\b|shutil\.(copy|move)|os\.(remove|rename|makedirs|mkdir))/;
 
 export function classifyCommand(command: string): CommandEffect {
   if (!command.trim()) return { writes: false, verifies: false };
@@ -171,7 +177,17 @@ export function classifyCommand(command: string): CommandEffect {
   // The benchmark run leaned heavily on inline scripts — 110 node and 106
   // python3 invocations — so a file written from inside one is a real edit
   // path, not an edge case.
-  if (INLINE_SCRIPT.test(command) && INLINE_WRITE.test(command)) {
+  //
+  // Shelling out counts as writing here for the reason `codeShellsOut` gives:
+  // the argument is built at runtime, so there is nothing to read and
+  // unrecognised means destructive. `CODE_SUBPROCESS` is the same test the REPL
+  // path already applies to source, and an inline script is the shorter-lived
+  // version of a REPL session. Both run against the raw command, before quoted
+  // runs are stripped, because the script lives inside those quotes.
+  if (
+    INLINE_SCRIPT.test(command) &&
+    (INLINE_WRITE.test(command) || CODE_SUBPROCESS.test(command))
+  ) {
     writes = true;
   }
 
@@ -250,9 +266,26 @@ export function codeOf(args: Record<string, unknown>): string {
  *  - Does it shell out? A `subprocess.run`, `os.system` or `execSync` can run
  *    anything at all, and the argument is usually built at runtime, so there is
  *    nothing here to read. Unrecognised means destructive, as everywhere else.
+ *
+ * Perl and Ruby spell it bare, so `system(` is matched unqualified — but only
+ * where nothing precedes it, because a qualified one is usually something else
+ * entirely: `platform.system()` names the operating system and reads nothing,
+ * and `$obj->system(1)` is a method that happens to share the name. `os.system`
+ * is therefore listed by name rather than reached by the bare rule.
+ *
+ * Two spellings that do run a program are deliberately absent, because their
+ * delimiters are ambiguous with arithmetic in the languages that share this
+ * pattern, and refusing an ordinary plan-mode read is the worse failure:
+ *
+ *  - A backtick, which is a template literal in JavaScript:
+ *    `node -e 'console.log(`w ${x}`)'`.
+ *  - `qx` with a slash delimiter, because `qx`, `qy`, `qz` and `qw` are the
+ *    standard names for a quaternion's components, so `norm = qx / qw` and
+ *    `qx/n, qy/n` are division. Only `qx(` and `qx{` are matched, which no
+ *    arithmetic produces.
  */
 const CODE_SUBPROCESS =
-  /(\bsubprocess\b|\bos\.system\s*\(|\bos\.popen\s*\(|\bchild_process\b|\bexecSync\s*\(|\bspawnSync\s*\(|Bun\.\$)/;
+  /(\bsubprocess\b|\bos\.system\s*\(|(?<![.\w>])system\s*\(|\bos\.popen\s*\(|\bqx\s*[({]|\bchild_process\b|\bexecSync\s*\(|\bspawnSync\s*\(|Bun\.\$)/;
 
 /**
  * Source that checks something works.

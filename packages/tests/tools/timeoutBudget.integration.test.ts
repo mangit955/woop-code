@@ -1,10 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach, afterAll } from "bun:test";
-import { terminalTool } from "../../../tools/terminal";
-import { runTestsTool } from "../../../tools/runTests";
-import { replTool } from "../../../tools/repl";
-import { closeReplSessions } from "../../../tools/replSession";
-import { WALL_RESERVE_SEC, clearDeadline, setDeadline } from "../../../runtime/deadline";
-import { store } from "../../../tui/src/store/ui-store";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * INTEGRATION TESTS for tool timeouts under the wall-clock budget.
@@ -17,7 +14,30 @@ import { store } from "../../../tui/src/store/ui-store";
  * The clock is frozen rather than advanced: what a command is granted is decided
  * once, when it starts, so a still clock reproduces every case and keeps the
  * elapsed time these tests spend to about a second each.
+ *
+ * Every tool here runs through `requestCommandApproval`, which reads the
+ * configured mode through `getApprovalMode()` — so config reads go to a temp
+ * directory rather than the developer's real `~/.config/woopcode`. Stubbing
+ * `setPendingCommand` is not enough on its own: it answers the prompt, it does
+ * not stop the mode being read from disk. `approval.integration.test.ts` is the
+ * sibling this follows, including the reason the redirect is restored in
+ * `afterAll` and never in `afterEach`.
  */
+const previousConfigHome = process.env.XDG_CONFIG_HOME;
+const temporaryConfigHome = mkdtempSync(join(tmpdir(), "woopcode-timeout-"));
+process.env.XDG_CONFIG_HOME = temporaryConfigHome;
+
+// Imported after the redirect is in place: a static import is bound at load,
+// which for anything reading config at module scope would be before the line
+// above ever ran.
+const { terminalTool } = await import("../../../tools/terminal");
+const { runTestsTool } = await import("../../../tools/runTests");
+const { replTool } = await import("../../../tools/repl");
+const { closeReplSessions } = await import("../../../tools/replSession");
+const { WALL_RESERVE_SEC, clearDeadline, setDeadline } = await import(
+  "../../../runtime/deadline"
+);
+const { store } = await import("../../../tui/src/store/ui-store");
 
 /** A budget with `seconds` left on it, on a clock that does not move. */
 function budgetWith(seconds: number) {
@@ -42,6 +62,13 @@ describe("tool timeouts under a wall-clock budget", () => {
 
   afterAll(() => {
     closeReplSessions();
+
+    // Restored once, at the end. Doing it per test would drop the redirect
+    // after the first one on any machine that does not set the variable — the
+    // normal case — and point every later config read at the real directory.
+    if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = previousConfigHome;
+    rmSync(temporaryConfigHome, { recursive: true, force: true });
   });
 
   describe("run_terminal", () => {
@@ -49,16 +76,22 @@ describe("tool timeouts under a wall-clock budget", () => {
       budgetWith(1.5);
       const start = Date.now();
 
-      const result = await terminalTool.execute({ command: "sleep 5", timeout: 60 });
+      const result = await terminalTool.execute({ command: "sleep 30", timeout: 60 });
 
       expect(result).toContain("Command timed out after 1 seconds");
-      expect(Date.now() - start).toBeLessThan(4000);
+      // The message says what the clamp granted; this says the process really
+      // stopped there. `sleep 30` rather than a shorter one so the two outcomes
+      // are 1s and 30s apart: a runner would have to stall fourteen seconds to
+      // make this flake, where the gap between 1s and 5s is inside the noise a
+      // loaded CI box produces. That noise is what broke the cancellation test
+      // on macOS.
+      expect(Date.now() - start).toBeLessThan(15_000);
     });
 
     test("says the clock ran out, not that the timeout was too small", async () => {
       budgetWith(1.5);
 
-      const result = await terminalTool.execute({ command: "sleep 5", timeout: 60 });
+      const result = await terminalTool.execute({ command: "sleep 30", timeout: 60 });
 
       // The standing advice is to retry with a larger timeout, which would burn
       // the last seconds of the budget on a command that cannot finish.
@@ -94,12 +127,13 @@ describe("tool timeouts under a wall-clock budget", () => {
       budgetWith(1.5);
       const start = Date.now();
 
-      const result = await runTestsTool.execute({ command: "sleep 5", timeout: 60 });
+      const result = await runTestsTool.execute({ command: "sleep 30", timeout: 60 });
 
       expect(result).toContain("Command timed out after 1 seconds");
       expect(result).toContain("wall-clock budget");
       expect(result).not.toContain("verify a server starts");
-      expect(Date.now() - start).toBeLessThan(4000);
+      // 1s against 30s, for the reason the run_terminal case gives.
+      expect(Date.now() - start).toBeLessThan(15_000);
     });
 
     test("an unbudgeted session keeps the standing advice", async () => {

@@ -143,6 +143,16 @@ describe("tool timeouts under a wall-clock budget", () => {
       expect(result).toContain("verify a server starts");
       expect(result).not.toContain("wall-clock budget");
     });
+
+    test("leaves a timeout that already fits inside the budget alone", async () => {
+      budgetWith(600);
+
+      const result = await runTestsTool.execute({ command: "sleep 2", timeout: 0.05 });
+
+      expect(result).toContain("Command timed out after 0.05 seconds");
+      expect(result).toContain("verify a server starts");
+      expect(result).not.toContain("wall-clock budget");
+    });
   });
 
   describe("repl", () => {
@@ -170,6 +180,22 @@ describe("tool timeouts under a wall-clock budget", () => {
         timeout: 1,
       });
 
+      expect(result).toContain("timed out after 1 seconds");
+      expect(result).not.toContain("wall-clock budget");
+    });
+
+    test("leaves a timeout that already fits inside the budget alone", async () => {
+      budgetWith(600);
+
+      const result = await replTool.execute({
+        language: "python",
+        code: "import time; time.sleep(30)",
+        timeout: 1,
+      });
+
+      // A budget far larger than the request clamps nothing, and the answer is
+      // the bare error this path has always returned — no standing advice to
+      // swap the wall notice in for.
       expect(result).toContain("timed out after 1 seconds");
       expect(result).not.toContain("wall-clock budget");
     });

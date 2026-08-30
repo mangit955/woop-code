@@ -1,7 +1,7 @@
 import type { Tool } from "../config/types";
 import { requestCodeApproval } from "./approval";
 import { currentExecutor } from "../runtime/sandbox";
-import { budgetedTimeout, wallBudgetTimeoutNotice } from "./timeoutBudget";
+import { budgetedTimeout, formatTimeoutError } from "./timeoutBudget";
 import { REPL_LANGUAGES as LANGUAGES, isReplLanguage as isLanguage } from "./replDrivers";
 import {
   DEFAULT_EVAL_TIMEOUT_SECONDS,
@@ -97,7 +97,7 @@ This runs real code. It can write files and shell out, and is subject to the sam
     // Read after approval, so time spent waiting for a human is not granted to
     // the evaluation that follows it.
     const requestedSeconds = timeout ?? DEFAULT_EVAL_TIMEOUT_SECONDS;
-    const { seconds: timeoutSeconds, clamped } = budgetedTimeout(requestedSeconds);
+    const budgeted = budgetedTimeout(requestedSeconds);
 
     let output: string;
     let note: string;
@@ -105,7 +105,7 @@ This runs real code. It can write files and shell out, and is subject to the sam
     try {
       ({ output, note, started } = await evaluate(language, code, {
         restart: args.restart === true,
-        timeoutSeconds,
+        timeoutSeconds: budgeted.seconds,
         signal,
       }));
     } catch (error) {
@@ -115,8 +115,10 @@ This runs real code. It can write files and shell out, and is subject to the sam
       const message = error instanceof Error ? error.message : String(error);
       // Which clock ran out matters: told only that its evaluation timed out,
       // the model rebuilds the session and runs it again with a longer one.
-      if (clamped && message.includes("timed out")) {
-        return `Error: ${message}\n\n${wallBudgetTimeoutNotice(requestedSeconds, timeoutSeconds)}`;
+      // No standing advice on this path — a lost session is explained by its
+      // own message — so anything but a clamped timeout returns the error bare.
+      if (message.includes("timed out")) {
+        return formatTimeoutError(message, budgeted, "");
       }
       return `Error: ${message}`;
     }

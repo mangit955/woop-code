@@ -2,7 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
-import { budgetedTimeout, wallBudgetTimeoutNotice } from "./timeoutBudget";
+import { budgetedTimeout, formatTimeoutError } from "./timeoutBudget";
 
 export const runTestsTool: Tool = {
   name: "run_tests",
@@ -35,11 +35,11 @@ export const runTestsTool: Tool = {
     // Read after approval rather than at the top: the clock runs while a human
     // decides, so a number taken earlier would grant the run time that was spent
     // waiting for permission to start it.
-    const { seconds: timeoutSeconds, clamped } = budgetedTimeout(requestedSeconds);
+    const budgeted = budgetedTimeout(requestedSeconds);
 
     try {
       return formatCommandResult(
-        await currentExecutor().run(command, timeoutSeconds, signal),
+        await currentExecutor().run(command, budgeted.seconds, signal),
       );
     } catch (error) {
       if (error instanceof Error && error.message === "Command cancelled") {
@@ -48,10 +48,12 @@ export const runTestsTool: Tool = {
       if (error instanceof Error && error.message.includes("timed out")) {
         // The standing note guesses at a server, which is the wrong diagnosis
         // when the wall budget is what ended a suite that was running fine.
-        if (clamped) {
-          return `Error: ${error.message}\n\n${wallBudgetTimeoutNotice(requestedSeconds, timeoutSeconds)}`;
-        }
-        return `Error: ${error.message}\n\nNote: If you're trying to verify a server starts, don't. Just create the code and let the user test it manually.`;
+        return formatTimeoutError(
+          error.message,
+          budgeted,
+          `Note: If you're trying to verify a server starts, don't. Just create ` +
+            `the code and let the user test it manually.`,
+        );
       }
       throw error;
     }

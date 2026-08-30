@@ -4,11 +4,10 @@ import { clampToBudget, remainingMs } from "../runtime/deadline";
  * How long a tool may actually run, given what is left of the turn's wall
  * budget, and whether that is less than it asked for.
  *
- * Without this the deadline is advisory. The loop checks the clock between
- * iterations, but a command started just inside the budget runs to its own
- * timeout regardless — `run_terminal` defaults to 300s, which is 40% of
- * `overfull-hbox`'s entire 750s budget, so one straddling call is enough for the
- * harness to hard-kill the process before the wind-down happens.
+ * Without this the deadline is advisory — `runtime/deadline.ts` documents why,
+ * and this module is the half of it the tools see: the number to hand the
+ * executor, and the sentence to give the model when that number is what ended
+ * the call.
  *
  * `process_start` deliberately does not use this: a background process does not
  * hold the loop, so it cannot overshoot the deadline.
@@ -16,6 +15,14 @@ import { clampToBudget, remainingMs } from "../runtime/deadline";
 export type BudgetedTimeout = {
   /** Seconds to hand the executor. */
   seconds: number;
+  /**
+   * Seconds the caller asked for.
+   *
+   * Carried rather than left to each caller to hold separately: every call site
+   * needs both numbers to explain a clamped kill, and the two travelling apart
+   * is how one of them gets passed in the wrong order.
+   */
+  requested: number;
   /** Whether the budget, rather than the caller, decided that number. */
   clamped: boolean;
 };
@@ -33,7 +40,32 @@ export function budgetedTimeout(requestedSeconds: number): BudgetedTimeout {
   // That floor must not *raise* a timeout the caller deliberately made shorter,
   // so the request stays the ceiling and `clamped` only ever means "lowered".
   const seconds = Math.min(requestedSeconds, clampToBudget(requestedSeconds));
-  return { seconds, clamped: seconds < requestedSeconds };
+  return { seconds, requested: requestedSeconds, clamped: seconds < requestedSeconds };
+}
+
+/**
+ * The message a timed-out tool returns, from whichever clock ended it.
+ *
+ * One function rather than the same four lines in each tool. The three that take
+ * a timeout had identical copies, and nothing would have stopped a fourth from
+ * being written without the budget branch at all — the failure mode `TOOL_EFFECTS`
+ * avoids by making a missing entry mean `unclassified` rather than nothing.
+ *
+ * `standingAdvice` is what the tool says when the clock was not involved, which
+ * differs per tool: run_tests talks about servers, run_terminal about
+ * process_start. `repl` has none, and an empty string leaves the bare error
+ * rather than a message with two blank lines hanging off it.
+ */
+export function formatTimeoutError(
+  message: string,
+  budgeted: BudgetedTimeout,
+  standingAdvice: string,
+): string {
+  const advice = budgeted.clamped
+    ? wallBudgetTimeoutNotice(budgeted.requested, budgeted.seconds)
+    : standingAdvice;
+
+  return advice ? `Error: ${message}\n\n${advice}` : `Error: ${message}`;
 }
 
 /**
@@ -45,17 +77,30 @@ export function budgetedTimeout(requestedSeconds: number): BudgetedTimeout {
  * than a log line — it is what the model reads next — so it says which budget
  * ended the call, what the call was actually granted, and how much is left to
  * spend on saying where the work got to.
+ *
+ * It reports what the command was *granted* rather than what was "left when it
+ * started", because those come apart: `clampToBudget` floors at one second, so
+ * a command starting on an already-overspent clock is granted 1s when nothing
+ * was left. Granted is true by construction; left was not.
  */
 export function wallBudgetTimeoutNotice(
   requestedSeconds: number,
   grantedSeconds: number,
 ): string {
-  const left = Math.max(0, Math.round((remainingMs() ?? 0) / 1000));
+  const left = remainingMs();
+
+  // Omitted rather than guessed when the deadline has been cleared between the
+  // command starting and its error surfacing. `?? 0` would state "about 0s
+  // remain" — a confident wrong number, where saying nothing is merely quiet.
+  const remaining =
+    left === undefined
+      ? ""
+      : ` About ${Math.max(0, Math.round(left / 1000))}s of the turn remain.`;
 
   return (
     `The turn's wall-clock budget ended this, not the ${requestedSeconds}s timeout ` +
-    `requested: only ${grantedSeconds}s of budget were left when it started, and about ` +
-    `${left}s remain now. Running it again with more time cannot work — the same clock ` +
-    `cuts the next call shorter still. Spend what is left reporting where the work got to.`
+    `requested: the budget allowed it only ${grantedSeconds}s.${remaining} ` +
+    `Running it again with more time cannot work — the same clock cuts the next ` +
+    `call shorter still. Spend what is left reporting where the work got to.`
   );
 }

@@ -8,7 +8,6 @@ import {
   WALL_RESERVE_SEC,
   clearDeadline,
   deadlineReached,
-  remainingMs,
   setDeadline,
 } from "./deadline";
 import { TurnState, normalizeToolKey } from "./turnState";
@@ -284,51 +283,6 @@ function maxWallSeconds(
     return null;
   }
   return parsed;
-}
-
-/**
- * Completed iterations before the measured rate is believed.
- *
- * `meanStepMs` divides elapsed by iterations, so after one step the mean *is*
- * that step. CLAUDE.md records provider latency ranging 1,742ms to 90,002ms
- * within a single probe, so one slow first request is enough to make a turn
- * with hundreds of steps of budget look like it has five: at 115s for step one
- * against `job.yaml`'s 690s of usable wall, `floor(575000 / 115000)` is 5, and
- * the model is told to wrap up with ~280 steps actually affordable.
- *
- * Three, because the mean recovers fast once ordinary steps land beside the
- * spike — the same case at step four reads 18 — and because a threshold high
- * enough to smooth a 90s outlier completely would suppress the warning on any
- * turn short enough to need it early.
- */
-const MIN_RATE_SAMPLES = 3;
-
-/**
- * Steps this turn has left, from whichever of its two budgets is closer.
- *
- * The wall budget is converted into steps at the rate the turn has been running
- * at, so one warning and one flag serve both. Before the first iteration
- * completes there is no rate to convert with, and the iteration count stands
- * alone — which is the right answer anyway, since no time has been spent.
- *
- * The rate is ignored until `MIN_RATE_SAMPLES` steps have gone into it. The
- * iteration ceiling still applies throughout, so an early turn is never told it
- * has *more* than it has; what the guard withholds is only the ability of one
- * slow step to end a turn that has hours left.
- *
- * Exported for its own test: the arithmetic is what decides when the model is
- * told to wrap up, and driving it through a whole turn to observe it would take
- * a real clock and a real budget.
- */
-export function stepsRemaining(state: TurnState, budget: number): number {
-  const byIterations = budget - state.iterations;
-
-  const mean = state.meanStepMs();
-  const left = remainingMs();
-  if (mean === undefined || left === undefined) return byIterations;
-  if (state.iterations < MIN_RATE_SAMPLES) return byIterations;
-
-  return Math.min(byIterations, Math.floor(left / mean));
 }
 
 /** Per-turn switches that are not part of the conversation. */
@@ -771,7 +725,7 @@ export async function agentLoop(
       // A flag rather than an equality on the iteration count: two budgets can
       // each come into view, and the equality it replaces silently never fired
       // when the ceiling was below the warning distance.
-      const stepsLeft = stepsRemaining(state, budget);
+      const stepsLeft = state.stepsRemaining(budget);
       if (state.shouldWarnWindDown(stepsLeft)) {
         messages.push({
           role: "user",

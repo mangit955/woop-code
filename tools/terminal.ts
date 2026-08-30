@@ -2,6 +2,7 @@ import type { Tool } from "../config/types";
 import { formatCommandResult } from "./command";
 import { currentExecutor } from "../runtime/sandbox";
 import { requestCommandApproval } from "./approval";
+import { budgetedTimeout, wallBudgetTimeoutNotice } from "./timeoutBudget";
 
 function startsBackgroundProcess(command: string) {
   let quote: "'" | '"' | "`" | null = null;
@@ -69,7 +70,7 @@ export const terminalTool: Tool = {
 
   async execute(args, signal) {
     const command = args.command as string;
-    const timeoutSeconds = (args.timeout as number) || DEFAULT_TIMEOUT_SECONDS;
+    const requestedSeconds = (args.timeout as number) || DEFAULT_TIMEOUT_SECONDS;
 
     if (!command) {
       throw Error("command is required");
@@ -91,6 +92,11 @@ export const terminalTool: Tool = {
       );
     }
 
+    // Read after approval rather than at the top: the clock runs while a human
+    // decides, so a number taken earlier would grant the command time that was
+    // spent waiting for permission to run at all.
+    const { seconds: timeoutSeconds, clamped } = budgetedTimeout(requestedSeconds);
+
     try {
       return formatCommandResult(
         await currentExecutor().run(command, timeoutSeconds, signal),
@@ -100,6 +106,12 @@ export const terminalTool: Tool = {
         return "Command cancelled before completion.";
       }
       if (error instanceof Error && error.message.includes("timed out")) {
+        // A command the budget cut short must not be told to ask for longer:
+        // the number was never the constraint, and the retry spends the last of
+        // the turn reaching the same end.
+        if (clamped) {
+          return `Error: ${error.message}\n\n${wallBudgetTimeoutNotice(requestedSeconds, timeoutSeconds)}`;
+        }
         return (
           `Error: ${error.message}\n\nIf this command was never going to exit on ` +
           `its own — a server, a watcher — start it with process_start instead and ` +

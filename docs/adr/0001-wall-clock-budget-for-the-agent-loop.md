@@ -69,6 +69,18 @@ fraction as a 12000s one.
 is advisory: `run_terminal` defaults to 300s and the model may ask for more, so
 one command started just inside the budget outlives it by minutes — on
 `overfull-hbox`, a single default-timeout call is 40% of the entire budget.
+`run_terminal`, `run_tests` and `repl` clamp; `process_start` deliberately does
+not, because a background process does not hold the loop and so cannot overshoot
+the deadline. The clamp is read after approval rather than at the top of
+`execute`, since the clock runs while a human decides.
+
+**A clamped kill is explained by the clock, not by the timeout.** The standing
+advice for a timeout is to run it again with a larger one, which is exactly
+wrong when the budget rather than the number ended the call — the model would
+spend its last seconds reaching the same end. Rejected: leaving the existing
+messages and relying on the wind-down warning to have set the context, which
+puts two paragraphs an unknown number of tool calls apart and asks the model to
+connect them.
 
 **The deadline lives in module state (`runtime/deadline.ts`), not on
 `Tool.execute`.** `runtime/sandbox/registry.ts` argues this case in its own
